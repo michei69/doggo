@@ -428,10 +428,10 @@ export default function CharacterSearchScreen() {
           numColumns={isTablet ? 2 : 1}
           key={isTablet ? "tablet-2col" : "phone-1col"}
           columnWrapperStyle={isTablet ? styles.columnWrapper : undefined}
+          estimatedItemSize={140}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
-          drawDistance={2000}
-          overrideProps={{ initialDrawBatchSize: 50 }}
+          drawDistance={800}
           refreshControl={
             <RefreshControl
               refreshing={state.refreshing}
