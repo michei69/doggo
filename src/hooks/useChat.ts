@@ -245,14 +245,24 @@ export function useChat() {
             for (let i = grouped.length - 1; i >= 0; i--) {
                 if (grouped[i].isBot) {
                     const botMsgs = grouped[i].messages.filter((m) => m.id > 0);
+                    let chosenId: number | undefined;
                     if (botMsgs.length === 1) {
+                        chosenId = botMsgs[0].id;
                         chatsApi.setMessageMain(chatId, botMsgs[0].id).catch(() => {});
                     } else if (botMsgs.length > 1) {
                         const chosenIds = useChatStore.getState().chosenVariantIds;
                         const chosen = botMsgs.find((m) => chosenIds.has(m.id));
                         if (chosen) {
+                            chosenId = chosen.id;
                             chatsApi.setMessageMain(chatId, chosen.id).catch(() => {});
                         }
+                    }
+                    if (chosenId !== undefined) {
+                        useChatStore.setState((s) => ({
+                            messages: s.messages.map((m) =>
+                                m.id === chosenId ? { ...m, is_main: true } : { ...m, is_main: m.is_bot ? false : m.is_main },
+                            ),
+                        }));
                     }
                     break;
                 }
@@ -444,7 +454,7 @@ export function useChat() {
                                       })
                                     : fullMessage;
                                 try {
-                                    await withChallengeRetry(
+                                    const rawResponse: any = await withChallengeRetry(
                                         () =>
                                             chatsApi.createMessage({
                                                 is_bot: true,
@@ -458,6 +468,11 @@ export function useChat() {
                                         showChallenge,
                                         showTurnstile,
                                     );
+                                    const savedMsg = rawResponse?.data ?? rawResponse;
+                                    storeRemoveMessages([tempMessage.id]);
+                                    if (Array.isArray(savedMsg)) {
+                                        storeAddMessage(savedMsg[0]);
+                                    }
                                 } catch {}
                             }
                         },
@@ -641,7 +656,7 @@ export function useChat() {
                     flushThinking();
                     storeSetSending(false);
                     try {
-                        await withChallengeRetry(
+                        const rawResponse: any = await withChallengeRetry(
                             () =>
                                 chatsApi.createMessage({
                                     is_bot: true,
@@ -658,6 +673,11 @@ export function useChat() {
                             showChallenge,
                             showTurnstile,
                         );
+                        const savedMsg = rawResponse?.data ?? rawResponse;
+                        storeRemoveMessages([tempMessage.id]);
+                        if (Array.isArray(savedMsg)) {
+                            storeAddMessage(savedMsg[0]);
+                        }
                     } catch {}
                 },
                 onError: (err) => {
