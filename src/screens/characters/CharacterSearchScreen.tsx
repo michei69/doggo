@@ -39,6 +39,8 @@ import FilterModal, {
 } from "../../components/discover/FilterModal";
 import { colors } from "../../utils/colors";
 import { useIsTablet } from "../../hooks/useIsTablet";
+import { SlidersHorizontal, Filter } from "lucide-react-native";
+import AdvancedSearchModal from "../../components/discover/AdvancedSearchModal";
 
 type Nav = NativeStackNavigationProp<
   CharactersStackParamList,
@@ -176,6 +178,13 @@ export default function CharacterSearchScreen() {
   const filtersRef = useRef<FilterState>(INITIAL_FILTERS);
   const filtersLoadedRef = useRef(false);
   const firstRenderRef = useRef(true);
+
+  const [advancedKeywords, setAdvancedKeywords] = useState<string[]>([]);
+  const [advancedBlacklist, setAdvancedBlacklist] = useState<string[]>([]);
+  const [keywordMatchMode, setKeywordMatchMode] = useState<"any" | "all">(
+    "any",
+  );
+  const [advancedSearchVisible, setAdvancedSearchVisible] = useState(false);
 
   useEffect(() => {
     if (filtersLoadedRef.current) return;
@@ -347,6 +356,33 @@ export default function CharacterSearchScreen() {
     });
   }, []);
 
+  const hasAdvancedFilters =
+    advancedKeywords.length > 0 || advancedBlacklist.length > 0;
+
+  const displayCharacters = useMemo(() => {
+    let result = state.characters;
+    if (advancedKeywords.length > 0) {
+      result = result.filter((c) => {
+        const text =
+          `${c.name} ${c.description || ""} ${(c.tags || []).map((t) => t.name).join(" ")}`.toLowerCase();
+        if (keywordMatchMode === "all") {
+          return advancedKeywords.every((kw) =>
+            text.includes(kw.toLowerCase()),
+          );
+        }
+        return advancedKeywords.some((kw) => text.includes(kw.toLowerCase()));
+      });
+    }
+    if (advancedBlacklist.length > 0) {
+      result = result.filter((c) => {
+        const text =
+          `${c.name} ${c.description || ""} ${(c.tags || []).map((t) => t.name).join(" ")}`.toLowerCase();
+        return !advancedBlacklist.some((kw) => text.includes(kw.toLowerCase()));
+      });
+    }
+    return result;
+  }, [state.characters, advancedKeywords, advancedBlacklist, keywordMatchMode]);
+
   const renderItem = useCallback(
     ({ item }: { item: TrendingCharacter }) => (
       <CharacterCard
@@ -375,19 +411,29 @@ export default function CharacterSearchScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Discover</Text>
       <Text style={styles.subtitle}>
-        {state.total.toLocaleString()} characters
+        {hasAdvancedFilters
+          ? `${displayCharacters.length.toLocaleString()} / ${state.total.toLocaleString()} characters`
+          : `${state.total.toLocaleString()} characters`}
       </Text>
 
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search characters..."
-        placeholderTextColor={colors.textDim}
-        value={searchText}
-        onChangeText={handleSearchChange}
-        returnKeyType="search"
-        autoCorrect={false}
-        autoCapitalize="none"
-      />
+      <View style={styles.searchRow}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search characters..."
+          placeholderTextColor={colors.textDim}
+          value={searchText}
+          onChangeText={handleSearchChange}
+          returnKeyType="search"
+          autoCorrect={false}
+          autoCapitalize="none"
+        />
+        <Pressable
+          style={styles.advancedButton}
+          onPress={() => setAdvancedSearchVisible(true)}
+        >
+          <SlidersHorizontal size={18} color={colors.textSecondary} />
+        </Pressable>
+      </View>
 
       <View style={styles.controlsRow}>
         <Pressable
@@ -408,7 +454,7 @@ export default function CharacterSearchScreen() {
           style={styles.controlButtonIcon}
           onPress={() => filterModalRef.current?.open()}
         >
-          <Text style={styles.controlButtonText}>{"⚙"}</Text>
+          <Filter size={18} color={colors.textSecondary} />
         </Pressable>
       </View>
 
@@ -422,7 +468,7 @@ export default function CharacterSearchScreen() {
         </View>
       ) : (
         <FlashList
-          data={state.characters}
+          data={displayCharacters}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           numColumns={isTablet ? 2 : 1}
@@ -476,6 +522,16 @@ export default function CharacterSearchScreen() {
         filters={filters}
         onApply={handleApplyFilters}
       />
+      <AdvancedSearchModal
+        visible={advancedSearchVisible}
+        keywords={advancedKeywords}
+        blacklisted={advancedBlacklist}
+        matchMode={keywordMatchMode}
+        onKeywordsChange={setAdvancedKeywords}
+        onBlacklistedChange={setAdvancedBlacklist}
+        onMatchModeChange={setKeywordMatchMode}
+        onClose={() => setAdvancedSearchVisible(false)}
+      />
     </View>
   );
 }
@@ -499,17 +555,31 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 12,
   },
+  searchRow: {
+    flexDirection: "row",
+    marginHorizontal: 20,
+    marginBottom: 12,
+    gap: 8,
+  },
   searchInput: {
+    flex: 1,
     backgroundColor: colors.card,
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: 10,
     color: colors.text,
     fontSize: 15,
-    marginHorizontal: 20,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    marginBottom: 12,
+  },
+  advancedButton: {
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 10,
+    width: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
   controlsRow: {
     flexDirection: "row",

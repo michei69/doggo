@@ -311,10 +311,9 @@ export default function CharacterScreen() {
       setCharacter({ ...character, [key]: next });
       setSettingsSaving(key);
       try {
-        const updated = await patchCharacterSettings(character.id, {
+        await patchCharacterSettings(character.id, {
           [key]: next,
         });
-        setCharacter(updated);
       } catch {
         // Revert on failure
         setCharacter({ ...character, [key]: current });
@@ -466,8 +465,11 @@ export default function CharacterScreen() {
         animationType="fade"
         onRequestClose={() => setSettingsVisible(false)}
       >
-        <View style={styles.settingsOverlay}>
-          <View style={styles.settingsModal}>
+        <Pressable
+          style={styles.settingsOverlay}
+          onPress={() => setSettingsVisible(false)}
+        >
+          <Pressable style={styles.settingsModal} onPress={() => {}}>
             <View style={styles.settingsHeader}>
               <Text style={styles.settingsTitle}>Character Settings</Text>
               <Pressable onPress={() => setSettingsVisible(false)}>
@@ -512,8 +514,8 @@ export default function CharacterScreen() {
                 disabled={settingsSaving !== null}
               />
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       {copyLoading && (

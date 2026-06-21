@@ -38,7 +38,7 @@ export default function CharacterHeader({
   const [altIndex, setAltIndex] = useState(0);
   const nav = useNavigation<any>();
 
-  const altMessages = character.first_messages?.slice(1);
+  const altMessages = character.first_messages?.slice(1) ?? [];
 
   const descriptionMarkdown = useMemo(
     () => htmlToMarkdown(character.description || ""),
@@ -102,9 +102,9 @@ export default function CharacterHeader({
         {!character.is_public && <Badge label="Private" variant="private" />}
       </View>
 
-      {(character.tags.length > 0 || character.custom_tags?.length > 0) && (
+      {(character.tags?.length > 0 || character.custom_tags?.length > 0) && (
         <View style={styles.tagsRow}>
-          {character.tags.map((tag) => (
+          {character.tags?.map((tag) => (
             <Tag key={tag.id} label={tag.name} />
           ))}
           {character.custom_tags?.map((tag, _) => (
@@ -172,7 +172,7 @@ export default function CharacterHeader({
         title={`Start chatting with ${character.chat_name ?? character.name}`}
         onPress={onStartChat}
         loading={isLoading}
-        style={styles.startBtn}
+        style={onContinueChat ? [styles.startBtn, styles.startBtnWithContinue] : styles.startBtn}
       />
     </>
   );
@@ -477,7 +477,11 @@ const styles = StyleSheet.create({
   },
   startBtn: {
     marginTop: 24,
+    marginBottom: 24,
     width: "100%",
+  },
+  startBtnWithContinue: {
+    marginTop: 12,
   },
   continueBtn: {
     marginTop: 24,

@@ -12,6 +12,7 @@ import {
   TextInput,
   ScrollView,
   StyleSheet,
+  View,
 } from "react-native";
 import { colors } from "../../utils/colors";
 
@@ -63,6 +64,7 @@ export default forwardRef<
 >(({ mergedTags, selectedTagIds, onToggleTag, onApply }, ref) => {
   const [visible, setVisible] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
+  const [customTags, setCustomTags] = useState<TagEntry[]>([]);
 
   useImperativeHandle(ref, () => ({
     open: () => {
@@ -78,14 +80,34 @@ export default forwardRef<
     onApply();
   }, [onApply]);
 
+  const handleAddCustomTag = useCallback(() => {
+    const trimmed = tagSearch.trim();
+    if (!trimmed) return;
+    const slug = trimmed.toLowerCase().replace(/\s+/g, "_");
+    const id = `top_${slug}`;
+    if (!mergedTags.some((t) => t.id === id)) {
+      setCustomTags((prev) => {
+        if (prev.some((t) => t.id === id)) return prev;
+        return [...prev, { id, name: trimmed, slug }];
+      });
+    }
+    onToggleTag(id);
+    setTagSearch("");
+  }, [tagSearch, onToggleTag, mergedTags]);
+
+  const allTagList = useMemo(
+    () => [...customTags, ...mergedTags],
+    [customTags, mergedTags],
+  );
+
   const filteredTags = useMemo(() => {
-    if (!tagSearch.trim()) return mergedTags;
+    if (!tagSearch.trim()) return allTagList;
     const q = tagSearch.toLowerCase();
-    return mergedTags.filter(
+    return allTagList.filter(
       (t) =>
         t.name.toLowerCase().includes(q) || t.slug.toLowerCase().includes(q),
     );
-  }, [mergedTags, tagSearch]);
+  }, [allTagList, tagSearch]);
 
   return (
     <Modal
@@ -100,14 +122,25 @@ export default forwardRef<
           onPress={() => {}}
         >
           <Text style={styles.title}>Filter Tags</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search tags..."
-            placeholderTextColor={colors.textDim}
-            value={tagSearch}
-            onChangeText={setTagSearch}
-            autoCorrect={false}
-          />
+          <View style={styles.searchRow}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search tags..."
+              placeholderTextColor={colors.textDim}
+              value={tagSearch}
+              onChangeText={setTagSearch}
+              autoCorrect={false}
+            />
+            <Pressable
+              style={[
+                styles.addBtn,
+                !tagSearch.trim() && styles.addBtnDisabled,
+              ]}
+              onPress={handleAddCustomTag}
+            >
+              <Text style={styles.addBtnText}>Add</Text>
+            </Pressable>
+          </View>
           <ScrollView
             style={styles.tagsScroll}
             contentContainerStyle={styles.tagsGrid}
@@ -180,7 +213,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 16,
   },
+  searchRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
   searchInput: {
+    flex: 1,
     backgroundColor: colors.background,
     borderColor: colors.border,
     borderWidth: 1,
@@ -189,7 +228,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    marginBottom: 12,
+  },
+  addBtn: {
+    backgroundColor: colors.accent,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  addBtnDisabled: {
+    opacity: 0.4,
+  },
+  addBtnText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "600",
   },
   tagsScroll: {
     maxHeight: 300,
