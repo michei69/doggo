@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
+  TextInput,
   ActivityIndicator,
   StyleSheet,
   Pressable,
@@ -23,10 +24,14 @@ import CustomAlert, {
 import type { CharactersStackParamList } from "../../navigation/types";
 import { useAuthStore } from "../../stores/authStore";
 import { useChatStore } from "../../stores/chatStore";
+import { Heart, Ellipsis } from "lucide-react-native";
 import {
   getCharacterDetail,
   deleteCharacter,
   patchCharacterSettings,
+  checkFavorite,
+  favoriteCharacter,
+  unfavoriteCharacter,
 } from "../../api/characters";
 import {
   getCharacterChats,
@@ -41,6 +46,7 @@ import type {
   ChatListItem,
   ChatDetail,
 } from "../../types/api";
+import { apiClient } from "../../api/client";
 import { processSystemMessage } from "../../utils/processText";
 import { storage } from "../../utils/storage";
 import { colors } from "../../utils/colors";
@@ -66,6 +72,15 @@ export default function CharacterScreen() {
   const [copyLoading, setCopyLoading] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState<string | null>(null);
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [favLoading, setFavLoading] = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
+  const [reportPhase, setReportPhase] = useState<1 | 2>(1);
+  const [reportReason, setReportReason] = useState("");
+  const [reportType, setReportType] = useState("");
+  const [reportLink, setReportLink] = useState("");
+  const [reportDetails, setReportDetails] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
   const user = useAuthStore((s) => s.user);
   const createChat = useChatStore((s) => s.createChat);
 
@@ -82,7 +97,9 @@ export default function CharacterScreen() {
           chats = await getCharacterChats(route.params.characterId);
         } catch {}
         const data = await getCharacterDetail(route.params.characterId);
+        const favStatus = await checkFavorite(route.params.characterId);
         if (!cancelled) {
+          setIsFavorited(favStatus);
           setCharacter(data);
           const sorted = chats.sort(
             (a, b) =>
@@ -370,6 +387,83 @@ export default function CharacterScreen() {
     setAlertVisible(true);
   }, [character, doCopyCharacter]);
 
+  const handleToggleFavorite = useCallback(async () => {
+    if (!character || favLoading) return;
+    const wasFavorited = isFavorited;
+    setIsFavorited(!wasFavorited);
+    setFavLoading(true);
+    try {
+      if (wasFavorited) {
+        await unfavoriteCharacter(character.id);
+      } else {
+        await favoriteCharacter(character.id);
+      }
+    } catch {
+      setIsFavorited(wasFavorited);
+    } finally {
+      setFavLoading(false);
+    }
+  }, [character, isFavorited, favLoading]);
+
+  const reportReasons = [
+    { label: "Mine, posted without my permission", type: "stolen" },
+    { label: "Spam or low quality", type: "spam" },
+    { label: "Illegal or harmful content", type: "illegal" },
+    { label: "Other", type: "other" },
+  ];
+
+  const handleReportCharacter = useCallback(() => {
+    setMenuVisible(false);
+    setReportReason("");
+    setReportType("");
+    setReportLink("");
+    setReportDetails("");
+    setReportPhase(1);
+    setReportVisible(true);
+  }, []);
+
+  const handleSelectReportReason = useCallback(
+    (label: string, type: string) => {
+      setReportReason(label);
+      setReportType(type);
+    },
+    [],
+  );
+
+  const handleContinueReport = useCallback(() => {
+    if (!reportType) return;
+    setReportPhase(2);
+  }, [reportType]);
+
+  const handleSubmitReport = useCallback(async () => {
+    if (!character) return;
+    if (reportType === "stolen" && !reportLink.trim()) return;
+    if (reportType !== "stolen" && reportDetails.trim().length <= 5) return;
+
+    setReportSubmitting(true);
+    try {
+      const body: Record<string, string> = {
+        character_id: character.id,
+        reason: reportType,
+        other: reportDetails.trim(),
+        url: `https://janitorai.com/characters/${character.id}`,
+      };
+      if (reportType === "stolen") {
+        body.originalBotLink = reportLink.trim();
+      }
+      await apiClient.post("/moderation/report", body);
+      setReportVisible(false);
+    } catch {
+      // Submission failed silently
+    } finally {
+      setReportSubmitting(false);
+    }
+  }, [character, reportType, reportLink, reportDetails]);
+
+  const handleCloseReport = useCallback(() => {
+    setReportVisible(false);
+  }, []);
+
   if (fetching) {
     return (
       <View style={styles.centered}>
@@ -397,9 +491,18 @@ export default function CharacterScreen() {
         <Pressable onPress={() => goBack()} style={styles.headerBack}>
           <Text style={styles.arrow}>{"\u2190"} Back</Text>
         </Pressable>
-        <Pressable onPress={() => setMenuVisible(true)} style={styles.menuBtn}>
-          <Text style={styles.menuDots}>{"\u22ef"}</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable onPress={handleToggleFavorite} style={styles.menuBtn}>
+            <Heart
+              size={22}
+              color={isFavorited ? colors.danger : colors.textSecondary}
+              fill={isFavorited ? colors.danger : "transparent"}
+            />
+          </Pressable>
+          <Pressable onPress={() => setMenuVisible(true)} style={styles.menuBtn}>
+            <Ellipsis size={26} color={colors.textSecondary} />
+          </Pressable>
+        </View>
       </View>
       <CharacterHeader
         character={character}
@@ -444,9 +547,19 @@ export default function CharacterScreen() {
             </>
           )}
           {!isOwner && (
-            <Pressable onPress={handleCopyCharacter} style={styles.menuItem}>
-              <Text style={styles.menuItemText}>Copy Character</Text>
-            </Pressable>
+            <>
+              <Pressable onPress={handleCopyCharacter} style={styles.menuItem}>
+                <Text style={styles.menuItemText}>Copy Character</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleReportCharacter}
+                style={styles.menuItem}
+              >
+                <Text style={[styles.menuItemText, styles.menuItemDanger]}>
+                  Report Character
+                </Text>
+              </Pressable>
+            </>
           )}
         </ScrollView>
       </CustomBottomSheet>
@@ -518,6 +631,137 @@ export default function CharacterScreen() {
         </Pressable>
       </Modal>
 
+      <Modal
+        visible={reportVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCloseReport}
+      >
+        <Pressable style={styles.settingsOverlay} onPress={handleCloseReport}>
+          <Pressable style={styles.settingsModal} onPress={() => {}}>
+            {reportPhase === 1 ? (
+              <>
+                <View style={styles.settingsHeader}>
+                  <Text style={styles.settingsTitle}>Report Character</Text>
+                  <Pressable onPress={handleCloseReport}>
+                    <Text style={styles.settingsClose}>{"✕"}</Text>
+                  </Pressable>
+                </View>
+                <Text style={styles.reportSubtitle}>
+                  Why are you reporting this character?
+                </Text>
+                {reportReasons.map((r) => {
+                  const selected = reportType === r.type;
+                  return (
+                    <Pressable
+                      key={r.type}
+                      onPress={() => handleSelectReportReason(r.label, r.type)}
+                      style={[
+                        styles.reportRadioItem,
+                        selected && styles.reportRadioItemSelected,
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.reportRadio,
+                          selected && styles.reportRadioSelected,
+                        ]}
+                      >
+                        {selected && <View style={styles.reportRadioDot} />}
+                      </View>
+                      <Text style={styles.reportRadioText}>{r.label}</Text>
+                    </Pressable>
+                  );
+                })}
+                <Pressable
+                  onPress={handleContinueReport}
+                  style={[
+                    styles.reportContinueBtn,
+                    !reportType && styles.reportContinueBtnDisabled,
+                  ]}
+                  disabled={!reportType}
+                >
+                  <Text
+                    style={[
+                      styles.reportContinueText,
+                      !reportType && styles.reportContinueTextDisabled,
+                    ]}
+                  >
+                    Continue
+                  </Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <View style={styles.settingsHeader}>
+                  <Pressable onPress={() => setReportPhase(1)} style={styles.reportBackBtn}>
+                    <Text style={styles.reportBackArrow}>{"\u2190"}</Text>
+                  </Pressable>
+                  <Text style={styles.settingsTitle}>Report Character</Text>
+                  <Pressable onPress={handleCloseReport}>
+                    <Text style={styles.settingsClose}>{"✕"}</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.reportReasonChip}>
+                  <Text style={styles.reportReasonChipText}>{reportReason}</Text>
+                </View>
+
+                {reportType === "stolen" && (
+                  <>
+                    <Text style={styles.reportLabel}>
+                      Link to your original bot
+                    </Text>
+                    <TextInput
+                      style={styles.reportInput}
+                      placeholder="https://janitorai.com/characters/..."
+                      placeholderTextColor={colors.textDim}
+                      value={reportLink}
+                      onChangeText={setReportLink}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </>
+                )}
+
+                <Text style={styles.reportLabel}>
+                  {reportType === "stolen"
+                    ? "Additional details (optional)"
+                    : "Tell us more"}
+                </Text>
+                <TextInput
+                  style={[styles.reportInput, styles.reportTextArea]}
+                  placeholder={
+                    reportType === "stolen"
+                      ? "Any other details..."
+                      : "Describe the issue (at least 5 characters)"
+                  }
+                  placeholderTextColor={colors.textDim}
+                  value={reportDetails}
+                  onChangeText={setReportDetails}
+                  multiline
+                  textAlignVertical="top"
+                />
+
+                <Pressable
+                  onPress={handleSubmitReport}
+                  style={[
+                    styles.reportSubmitBtn,
+                    reportSubmitting && { opacity: 0.5 },
+                  ]}
+                  disabled={reportSubmitting}
+                >
+                  {reportSubmitting ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Text style={styles.reportSubmitText}>Submit Report</Text>
+                  )}
+                </Pressable>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {copyLoading && (
         <View style={styles.copyOverlay}>
           <View style={styles.copyOverlayBox}>
@@ -548,6 +792,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: 50,
     paddingHorizontal: 20,
+    paddingRight: 10,
     paddingBottom: 8,
   },
   headerBack: {
@@ -558,17 +803,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   menuBtn: {
     width: 40,
     height: 40,
     justifyContent: "center",
     alignItems: "center",
   },
-  menuDots: {
-    color: colors.textSecondary,
-    fontSize: 22,
-    fontWeight: "700",
-  },
+
+
   menuItem: {
     paddingVertical: 16,
     paddingHorizontal: 24,
@@ -665,5 +911,125 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 16,
     fontWeight: "500",
+  },
+  reportSubtitle: {
+    color: colors.textMuted,
+    fontSize: 14,
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  reportRadioItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  reportRadioItemSelected: {
+    borderColor: colors.accentFaded,
+    backgroundColor: colors.accentFaded
+  },
+  reportRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: colors.textFaint,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  reportRadioSelected: {
+    borderColor: colors.accent,
+  },
+  reportRadioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.accent,
+  },
+  reportRadioText: {
+    color: colors.text,
+    fontSize: 15,
+    flex: 1,
+    lineHeight: 21,
+  },
+  reportBackBtn: {
+    padding: 4,
+    marginRight: 4,
+  },
+  reportBackArrow: {
+    color: colors.accent,
+    fontSize: 20,
+    fontWeight: "600",
+  },
+  reportReasonChip: {
+    backgroundColor: colors.accentFaded,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 8,
+  },
+  reportReasonChipText: {
+    color: colors.accentLight,
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  reportContinueBtn: {
+    backgroundColor: colors.accent,
+    borderRadius: 10,
+    paddingVertical: 15,
+    alignItems: "center",
+    marginTop: 24,
+  },
+  reportContinueBtnDisabled: {
+    backgroundColor: colors.border,
+  },
+  reportContinueText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  reportContinueTextDisabled: {
+    color: colors.textFaint,
+  },
+  reportLabel: {
+    color: colors.textMuted,
+    fontSize: 13,
+    marginBottom: 8,
+    marginTop: 16,
+    fontWeight: "500",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  reportInput: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    color: colors.text,
+    fontSize: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  reportTextArea: {
+    minHeight: 110,
+    paddingTop: 12,
+  },
+  reportSubmitBtn: {
+    backgroundColor: colors.danger,
+    borderRadius: 10,
+    paddingVertical: 15,
+    alignItems: "center",
+    marginTop: 24,
+  },
+  reportSubmitText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

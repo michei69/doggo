@@ -24,6 +24,11 @@ import CustomAlert, {
 } from "../../components/common/CustomAlert";
 import { useKeyboardHeight } from "../../hooks/useKeyboardHeight";
 import type { UserProfile, ProxyConfiguration } from "../../types/api";
+import { useChatStore } from "../../stores/chatStore";
+import { storage, type ChatLocalData } from "../../utils/storage";
+import { attemptExtractSystemPrompt, fetchSystemPrompt } from "../../api/chats";
+import { processSystemMessage } from "../../utils/processText";
+import { cleanTags, generify } from "../../utils/markdown";
 
 type Config = UserProfile["config"];
 
@@ -52,6 +57,7 @@ export function buildDefaultConfig(): Config {
       enable_reasoning: true,
       enable_reasoning_chat: false,
       privacy_mode: false,
+      local_mode: false,
     },
     bad_words: [],
     bio_preview_images: false,
@@ -82,6 +88,13 @@ export default function GenerationSettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [badWordInput, setBadWordInput] = useState("");
   const fetchedRef = useRef(false);
+  const activeChatId = useChatStore((s) => s.activeChatId);
+  const [localLocalMode, setLocalLocalMode] = useState(false);
+  const [localPersonality, setLocalPersonality] = useState("");
+  const [localScenario, setLocalScenario] = useState("");
+  const [fetchingPersonality, setFetchingPersonality] = useState(false);
+  const [fetchingScenario, setFetchingScenario] = useState(false);
+  const localLoadedRef = useRef(false);
   const [editingProxy, setEditingProxy] = useState<ProxyConfiguration | null>(
     null,
   );
@@ -136,6 +149,43 @@ export default function GenerationSettingsScreen() {
     };
     loadProfile();
   }, [showAlert]);
+
+  // Load per-chat local data
+  useEffect(() => {
+    if (!activeChatId) return;
+    localLoadedRef.current = false;
+    const load = async () => {
+      const data = await storage.getChatLocalData(activeChatId);
+      if (data) {
+        setLocalLocalMode(data.local_mode);
+        setLocalPersonality(data.personality);
+        setLocalScenario(data.scenario);
+      } else {
+        setLocalLocalMode(false);
+        setLocalPersonality("");
+        setLocalScenario("");
+      }
+      localLoadedRef.current = true;
+    };
+    load();
+  }, [activeChatId]);
+
+  // Save per-chat local data on change
+  const saveLocalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!localLoadedRef.current || !activeChatId) return;
+    if (saveLocalRef.current) clearTimeout(saveLocalRef.current);
+    saveLocalRef.current = setTimeout(() => {
+      storage.setChatLocalData(activeChatId, {
+        local_mode: localLocalMode,
+        personality: localPersonality,
+        scenario: localScenario,
+      });
+    }, 300);
+    return () => {
+      if (saveLocalRef.current) clearTimeout(saveLocalRef.current);
+    };
+  }, [localLocalMode, localPersonality, localScenario, activeChatId]);
 
   const updateGen = useCallback(
     (patch: Partial<Config["generation_settings"]>) => {
@@ -262,6 +312,77 @@ export default function GenerationSettingsScreen() {
     },
     [showAlert],
   );
+
+  const handleFetchPersonality = useCallback(async () => {
+    if (!activeChatId) return;
+    setFetchingPersonality(true);
+    try {
+      const detail = useChatStore.getState().activeChatDetail;
+      if (!detail) throw new Error("Chat not loaded");
+      const characterName = detail.character.chat_name ?? detail.character.name;
+      try {
+        const prompt = await fetchSystemPrompt(detail);
+        const { personality } = processSystemMessage(prompt, characterName);
+        setLocalPersonality(
+          generify(cleanTags(personality ?? "", `${characterName}'s Persona`), characterName),
+        );
+      } catch {
+        const abortController = new AbortController();
+        const { character_id } = detail.chat;
+        const personaTag = `${characterName}'s Persona`;
+        const personaResult = await attemptExtractSystemPrompt(
+          character_id,
+          personaTag,
+          abortController.signal,
+        );
+        setLocalPersonality(generify(cleanTags(personaResult, personaTag), characterName))
+      }
+    } catch (err: any) {
+      showAlert("Error", err.message || "Failed to fetch personality", [
+        { text: "OK", onPress: () => setAlertVisible(false) },
+      ]);
+    } finally {
+      setFetchingPersonality(false);
+    }
+  }, [activeChatId, showAlert]);
+
+  const handleFetchScenario = useCallback(async () => {
+    if (!activeChatId) return;
+    setFetchingScenario(true);
+    try {
+      const detail = useChatStore.getState().activeChatDetail;
+      if (!detail) throw new Error("Chat not loaded");
+      const characterName = detail.character.chat_name ?? detail.character.name;
+      try {
+        const prompt = await fetchSystemPrompt(detail);
+        const { scenario } = processSystemMessage(prompt, characterName);
+        setLocalScenario(
+          generify(cleanTags(scenario ?? "", "Scenario"), characterName),
+        );
+      } catch {
+        const abortController = new AbortController();
+        const { character_id } = detail.chat;
+        const scenario = await attemptExtractSystemPrompt(
+          character_id,
+          "Scenario",
+          abortController.signal,
+        );
+        setLocalScenario(
+          generify(cleanTags(scenario ?? "", "Scenario"), characterName),
+        )
+      }
+    } catch (err: any) {
+      showAlert("Error", err.message || "Failed to fetch scenario", [
+        { text: "OK" },
+      ]);
+    } finally {
+      setFetchingScenario(false);
+    }
+  }, [activeChatId, showAlert]);
+
+  const handleToggleLocalMode = useCallback((v: boolean) => {
+    setLocalLocalMode(v);
+  }, []);
 
   if (loading) {
     return (
@@ -468,6 +589,71 @@ export default function GenerationSettingsScreen() {
           thumbColor={colors.text}
         />
       </View>
+
+      <View style={styles.toggleRow}>
+        <Text style={styles.toggleLabel}>Local Mode</Text>
+        <Switch
+          value={localLocalMode}
+          onValueChange={handleToggleLocalMode}
+          trackColor={{ false: colors.border, true: colors.accent }}
+          thumbColor={colors.text}
+        />
+      </View>
+
+      {localLocalMode && (
+        <CollapsibleSection title="Local Settings">
+          <View style={styles.localSection}>
+            <View>
+              <TextInput
+                style={styles.localTextInput}
+                value={localPersonality}
+                onChangeText={setLocalPersonality}
+                placeholder="Enter custom personality..."
+                placeholderTextColor={colors.textDimAlt}
+                multiline
+              />
+              <Pressable
+                style={({ pressed }) => [
+                  styles.fetchBtn,
+                  pressed && { opacity: 0.7 },
+                ]}
+                onPress={handleFetchPersonality}
+                disabled={fetchingPersonality}
+              >
+                {fetchingPersonality ? (
+                  <ActivityIndicator size="small" color={colors.text} />
+                ) : (
+                  <Text style={styles.fetchBtnText}>Fetch Original Personality</Text>
+                )}
+              </Pressable>
+            </View>
+            <View>
+              <TextInput
+                style={styles.localTextInput}
+                value={localScenario}
+                onChangeText={setLocalScenario}
+                placeholder="Enter custom scenario..."
+                placeholderTextColor={colors.textDimAlt}
+                multiline
+              />
+              <Pressable
+                style={({ pressed }) => [
+                  styles.fetchBtn,
+                  pressed && { opacity: 0.7 },
+                ]}
+                onPress={handleFetchScenario}
+                disabled={fetchingScenario}
+              >
+                {fetchingScenario ? (
+                  <ActivityIndicator size="small" color={colors.text} />
+                ) : (
+                  <Text style={styles.fetchBtnText}>Fetch Original Scenario</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </CollapsibleSection>
+      )}
 
       <CollapsibleSection title="Generation Settings">
         <Slider
@@ -1186,5 +1372,35 @@ const styles = StyleSheet.create({
     color: colors.danger,
     fontSize: 13,
     fontWeight: "500",
+  },
+  localSection: {
+    gap: 12,
+  },
+  localTextInput: {
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 8,
+    color: colors.text,
+    fontSize: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 100,
+    textAlignVertical: "top",
+  },
+  fetchBtn: {
+    backgroundColor: colors.card,
+    borderColor: colors.accent,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  fetchBtnText: {
+    color: colors.accent,
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

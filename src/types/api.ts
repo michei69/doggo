@@ -307,6 +307,7 @@ export interface GenerationSettings {
     enable_reasoning: boolean;
     enable_reasoning_chat: boolean;
     privacy_mode: boolean;
+    local_mode: boolean;
 }
 
 export interface UserProfile {

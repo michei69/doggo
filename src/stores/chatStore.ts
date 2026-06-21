@@ -170,6 +170,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     },
 
     removeChat: (chatId) => {
+        storage.removeChatLocalData(chatId);
         set((state) => ({
             chats: state.chats.filter((c) => c.id !== chatId),
         }));

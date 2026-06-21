@@ -2,6 +2,12 @@ import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { STORAGE_KEYS } from "./constants";
 
+export interface ChatLocalData {
+    local_mode: boolean;
+    personality: string;
+    scenario: string;
+}
+
 export const storage = {
     async setAccessToken(token: string): Promise<void> {
         await SecureStore.setItemAsync(STORAGE_KEYS.ACCESS_TOKEN, token);
@@ -150,6 +156,22 @@ export const storage = {
 
     async removeEditBotState(): Promise<void> {
         await AsyncStorage.removeItem(STORAGE_KEYS.EDIT_BOT_STATE);
+    },
+
+    async getChatLocalData(chatId: number): Promise<ChatLocalData | null> {
+        const key = `${STORAGE_KEYS.CHAT_LOCAL_DATA_PREFIX}${chatId}`;
+        const data = await AsyncStorage.getItem(key);
+        return data ? JSON.parse(data) : null;
+    },
+
+    async setChatLocalData(chatId: number, data: ChatLocalData): Promise<void> {
+        const key = `${STORAGE_KEYS.CHAT_LOCAL_DATA_PREFIX}${chatId}`;
+        await AsyncStorage.setItem(key, JSON.stringify(data));
+    },
+
+    async removeChatLocalData(chatId: number): Promise<void> {
+        const key = `${STORAGE_KEYS.CHAT_LOCAL_DATA_PREFIX}${chatId}`;
+        await AsyncStorage.removeItem(key);
     },
 
     async clearAll(): Promise<void> {

@@ -62,6 +62,7 @@ import {
 } from "expo-file-system/legacy";
 import { toast } from "../../utils/toast";
 import { cleanTags, generify } from "../../utils/markdown";
+import { storage } from "../../utils/storage";
 
 type Route = RouteProp<ChatsStackParamList, "ChatScreen">;
 type Nav = NativeStackNavigationProp<ChatsStackParamList, "ChatScreen">;
@@ -148,6 +149,8 @@ export default function ChatScreen() {
     null,
   );
   const [messagesActionsVisible, setMessagesActionsVisible] = useState(false);
+  const [localMode, setLocalMode] = useState(false);
+  const [localModeBannerDismissed, setLocalModeBannerDismissed] = useState(false);
   const {
     activeChatDetail,
     messages,
@@ -202,19 +205,29 @@ export default function ChatScreen() {
   const attemptAbortRef = useRef<AbortController | null>(null);
 
   const proxyBlocked = useMemo(() => {
+    if (localMode) return false;
     if (!activeChatDetail || !userConfig) return false;
     return (
       !activeChatDetail.character.allow_proxy &&
       userConfig.api === "openai" &&
       userConfig.open_ai_mode === "proxy"
     );
-  }, [activeChatDetail, userConfig]);
+  }, [activeChatDetail, userConfig, localMode]);
 
   useEffect(() => {
     if (lastLoadedChatRef.current === chatId) return;
     lastLoadedChatRef.current = chatId;
     loadMessages(chatId);
   }, [chatId, loadMessages]);
+
+  useEffect(() => {
+    const loadLocalMode = async () => {
+      const data = await storage.getChatLocalData(chatId);
+      setLocalMode(data?.local_mode ?? false);
+      setLocalModeBannerDismissed(false);
+    };
+    loadLocalMode();
+  }, [chatId]);
 
   useEffect(() => {
     loadUserConfig();
@@ -876,6 +889,19 @@ export default function ChatScreen() {
           </Text>
         </View>
       )}
+      {localMode && !localModeBannerDismissed && (
+        <View style={styles.localModeBanner}>
+          <Text style={styles.localModeBannerText}>
+            Local mode enabled.
+          </Text>
+          <Pressable
+            onPress={() => setLocalModeBannerDismissed(true)}
+            style={styles.localModeBannerClose}
+          >
+            <Text style={styles.localModeBannerCloseText}>{"\u2715"}</Text>
+          </Pressable>
+        </View>
+      )}
       {Platform.OS === "ios" ? (
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -1267,6 +1293,34 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
     textAlign: "center",
+  },
+  localModeBanner: {
+    backgroundColor: `${colors.accent}25`,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accent,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  localModeBannerText: {
+    color: colors.accent,
+    fontSize: 13,
+    fontWeight: "500",
+    flex: 1,
+    textAlign: "center",
+  },
+  localModeBannerClose: {
+    width: 16,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  localModeBannerCloseText: {
+    color: colors.accent,
+    fontSize: 16,
+    marginTop: -2,
+    fontWeight: "600",
   },
   sysPromptOverlay: {
     flex: 1,

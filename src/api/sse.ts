@@ -102,7 +102,7 @@ export class SSEClient {
         this.abortController = new AbortController();
 
         const baseUrl = apiUrl.replace(/\/+$/, "");
-        const url = `${baseUrl}/chat/completions`;
+        const url = baseUrl.endsWith("/chat/completions") ? baseUrl : `${baseUrl}/chat/completions`;
 
         try {
             const response = await fetch(url, {

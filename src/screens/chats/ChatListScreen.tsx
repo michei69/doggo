@@ -32,6 +32,7 @@ import {
 } from "../../api/chats";
 import { formatRelativeTime } from "../../utils/time";
 import { colors } from "../../utils/colors";
+import AvatarPreview from "../../components/common/AvatarPreview";
 
 type Nav = NativeStackNavigationProp<ChatsStackParamList, "ChatList">;
 
@@ -113,6 +114,9 @@ export default function ChatListScreen() {
   const [characterChatsVisible, setCharacterChatsVisible] = useState(false);
   const [characterChatsLoading, setCharacterChatsLoading] = useState(false);
   const [characterChatsName, setCharacterChatsName] = useState("");
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewUri, setPreviewUri] = useState("");
+  const [previewName, setPreviewName] = useState("");
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -227,6 +231,11 @@ export default function ChatListScreen() {
           uri={botAvatarUrl(item.character.avatar)}
           name={item.character.name}
           size={52}
+          onPress={() => {
+            setPreviewUri(botAvatarUrl(item.character.avatar));
+            setPreviewName(item.character.name);
+            setPreviewVisible(true);
+          }}
         />
         <View style={styles.chatInfo}>
           <View style={styles.chatTopRow}>
@@ -440,6 +449,12 @@ export default function ChatListScreen() {
           )}
         </View>
       </CustomBottomSheet>
+
+      <AvatarPreview
+        visible={previewVisible}
+        uri={previewUri}
+        onClose={() => setPreviewVisible(false)}
+      />
     </View>
   );
 }

@@ -120,6 +120,27 @@ export async function getTagSuggestions(
     return response.data;
 }
 
+export async function checkFavorite(
+    characterId: string,
+): Promise<boolean> {
+    const response = await apiClient.get<boolean>(
+        `/favorites/myfavorites/${characterId}`,
+    );
+    return response.data;
+}
+
+export async function favoriteCharacter(
+    characterId: string,
+): Promise<void> {
+    await apiClient.post("/favorites/favorite", { characterId });
+}
+
+export async function unfavoriteCharacter(
+    characterId: string,
+): Promise<void> {
+    await apiClient.post("/favorites/unfavorite", { characterId });
+}
+
 export async function getMyCharacters(
     params: MyCharactersParams = {},
 ): Promise<TrendingResponse> {

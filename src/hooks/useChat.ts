@@ -8,6 +8,7 @@ import type { CreateMessageRequest } from "../types/api";
 import { useTurnstile } from "../components/turnstile/TurnstileProvider";
 import { groupMessages } from "../components/chat/MessageList";
 import { processText } from "../utils/processText";
+import { storage } from "../utils/storage";
 import { TURNSTILE_LOGIN_SITE_KEY } from "../utils/turnstile";
 
 const TOKEN_BUFFER_MS = 150;
@@ -338,6 +339,141 @@ export function useChat() {
                     userConfig.open_ai_reverse_proxy = "http://doggy.privacy/";
                     userConfig.reverseProxyKey = "redacted";
                     userConfig.openAiModel = "doggy-privacy";
+                }
+
+                // Local mode: skip generateAlpha, use proxy directly
+                const localData = await storage.getChatLocalData(chatId);
+                if (localData?.local_mode) {
+                    const { personality, scenario } = localData;
+
+                    const apiUrl = selectedProxy?.apiUrl || userConfig.open_ai_reverse_proxy;
+                    const apiKey = selectedProxy?.apiKey || userConfig.reverseProxyKey;
+                    const model = selectedProxy?.model || userConfig.openAiModel;
+
+                    if (!apiUrl || !apiKey || !model) {
+                        throw new Error("No proxy configured for local mode");
+                    }
+
+                    // Build system prompt: OpenAI completions format with persona tags
+                    const charName = detail.character.chat_name ?? detail.character.name;
+                    const activePersona = detail.chat.persona_id != null
+                        ? detail.personas.find((p) => p.id === detail.chat.persona_id)
+                        : detail.personas[0];
+                    const userName = activePersona?.name ?? "user";
+                    const personaContent = activePersona?.appearance ?? "";
+
+                    const systemParts: string[] = [];
+                    if (personality) {
+                        systemParts.push(`<${charName}'s Persona>${personality}</${charName}'s Persona>`);
+                    }
+                    if (personaContent) {
+                        systemParts.push(`<${userName}'s Persona>${personaContent}</${userName}'s Persona>`);
+                    }
+                    if (scenario?.trim()) {
+                        systemParts.push(`<Scenario>${scenario}</Scenario>`);
+                    }
+                    const systemContent = systemParts.join("\n");
+
+                    const storeMsgs = useChatStore.getState().messages;
+                    const chosenIds = useChatStore.getState().chosenVariantIds;
+                    const grouped = groupMessages(storeMsgs);
+                    const end =
+                        grouped.length > 0 && grouped[grouped.length - 1].isBot
+                            ? grouped.length - 1
+                            : grouped.length;
+                    const filteredMessages: typeof storeMsgs = [];
+                    for (let i = 0; i < end; i++) {
+                        const g = grouped[i];
+                        if (g.isBot) {
+                            const chosen = g.messages.find((m) =>
+                                chosenIds.has(m.id),
+                            );
+                            filteredMessages.push(
+                                chosen ?? g.messages[g.messages.length - 1],
+                            );
+                        } else {
+                            filteredMessages.push(g.messages[0]);
+                        }
+                    }
+
+                    const msgArr: Array<{ role: string; content: string }> = [
+                        { role: "system", content: systemContent },
+                        ...filteredMessages.map((m) => ({
+                            role: m.is_bot ? "assistant" as const : "user" as const,
+                            content: m.is_bot ? m.message : `${userName}: ${m.message}`,
+                        })),
+                    ];
+
+                    const msgBuffer = createTokenBuffer((accumulated) => {
+                        const msgs = useChatStore.getState().messages;
+                        const last = msgs[msgs.length - 1];
+                        if (last && last.id === tempMessage.id) {
+                            storeUpdateOptimistically(tempMessage.id, {
+                                message: last.message + accumulated,
+                            });
+                        }
+                    });
+
+                    sseClient.streamChat(apiUrl, apiKey, model, msgArr, {
+                        onToken: (token: string) => {
+                            const msgs = useChatStore.getState().messages;
+                            const last = msgs[msgs.length - 1];
+                            if (last && last.id === tempMessage.id) {
+                                msgBuffer.add(token);
+                            }
+                        },
+                        onThinking: (thinking: string) => {
+                            if (enableThinking) {
+                                addThinking(thinking);
+                            }
+                        },
+                        onComplete: async (fullMessage: string) => {
+                            msgBuffer.flush();
+                            flushThinking();
+                            storeSetGenerating(false);
+                            genAbortRef.current = null;
+                            if (fullMessage) {
+                                const state = useChatStore.getState();
+                                const message = state.autoFormatEnabled
+                                    ? processText(fullMessage, {
+                                          wrapper: state.narrationWrapper,
+                                          removeTags: true,
+                                      })
+                                    : fullMessage;
+                                try {
+                                    const rawResponse: any = await withChallengeRetry(
+                                        () =>
+                                            chatsApi.createMessage({
+                                                is_bot: true,
+                                                is_main: false,
+                                                message,
+                                                character_id: characterId,
+                                                chat_id: chatId,
+                                                created_at: new Date(),
+                                                rating: null,
+                                            }),
+                                        showChallenge,
+                                        showTurnstile,
+                                    );
+                                    const savedMsg = rawResponse?.data ?? rawResponse;
+                                    storeRemoveMessages([tempMessage.id]);
+                                    if (Array.isArray(savedMsg)) {
+                                        storeAddMessage(savedMsg[0]);
+                                    }
+                                } catch {}
+                            }
+                        },
+                        onError: (err: Error) => {
+                            flushThinking();
+                            storeSetGenerating(false);
+                            storeSetActiveThinking("");
+                            genAbortRef.current = null;
+                            storeUpdateOptimistically(tempMessage.id, {
+                                message: `Error: ${err.message}`,
+                            });
+                        },
+                    });
+                    return; // Skip generateAlpha
                 }
 
                 const storeMessages = useChatStore.getState().messages;
