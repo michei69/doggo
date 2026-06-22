@@ -9,6 +9,7 @@ import { useTurnstile } from "../components/turnstile/TurnstileProvider";
 import { groupMessages } from "../components/chat/MessageList";
 import { processText } from "../utils/processText";
 import { storage } from "../utils/storage";
+import { toast } from "../utils/toast";
 import { TURNSTILE_LOGIN_SITE_KEY } from "../utils/turnstile";
 
 const TOKEN_BUFFER_MS = 150;
@@ -171,15 +172,20 @@ export function useChat() {
     const editMsg = useCallback(
         async (chatId: number, messageId: number, content: string) => {
             storeSetActiveThinking("");
-            await withChallengeRetry(
-                () =>
-                    chatsApi.editMessage(chatId, messageId, {
-                        message: content,
-                    }),
-                showChallenge,
-                showTurnstile,
-            );
-            storeUpdateMessage(messageId, content);
+            try {
+                await withChallengeRetry(
+                    () =>
+                        chatsApi.editMessage(chatId, messageId, {
+                            message: content,
+                        }),
+                    showChallenge,
+                    showTurnstile,
+                );
+                storeUpdateMessage(messageId, content);
+            } catch (err) {
+                toast("Failed to save message", "error");
+                throw err;
+            }
         },
         [
             storeUpdateMessage,
@@ -363,6 +369,10 @@ export function useChat() {
                     const personaContent = activePersona?.appearance ?? "";
 
                     const systemParts: string[] = [];
+                    const jailbreakPrompt = selectedProxy?.jailbreakPrompt || userConfig.open_ai_jailbreak_prompt;
+                    if (jailbreakPrompt) {
+                        systemParts.push(jailbreakPrompt);
+                    }
                     if (personality) {
                         systemParts.push(`<${charName}'s Persona>${personality}</${charName}'s Persona>`);
                     }
@@ -457,16 +467,27 @@ export function useChat() {
                                     );
                                     const savedMsg = rawResponse?.data ?? rawResponse;
                                     if (Array.isArray(savedMsg)) {
-                                        useChatStore.setState((s) => ({
-                                            messages: s.messages
-                                                .filter((m) => m.id !== tempMessage.id)
-                                                .map((m) =>
-                                                    m.is_bot && m.id > 0
-                                                        ? { ...m, is_main: false }
-                                                        : m,
-                                                )
-                                                .concat({ ...savedMsg[0], is_main: true }),
-                                        }));
+                                        useChatStore.setState((s) => {
+                                            const msgs = s.messages.filter((m) => m.id !== tempMessage.id);
+                                            // Only reset is_main on messages in the last bot group (variants being replaced)
+                                            const lastBotGroupIds = new Set<number>();
+                                            for (let i = msgs.length - 1; i >= 0; i--) {
+                                                if (msgs[i].is_bot && msgs[i].id > 0) {
+                                                    lastBotGroupIds.add(msgs[i].id);
+                                                } else {
+                                                    break;
+                                                }
+                                            }
+                                            return {
+                                                messages: msgs
+                                                    .map((m) =>
+                                                        m.is_bot && lastBotGroupIds.has(m.id)
+                                                            ? { ...m, is_main: false }
+                                                            : m,
+                                                    )
+                                                    .concat({ ...savedMsg[0], is_main: true }),
+                                            };
+                                        });
                                     }
                                 } catch {}
                             }
@@ -614,16 +635,27 @@ export function useChat() {
                                     );
                                     const savedMsg = rawResponse?.data ?? rawResponse;
                                     if (Array.isArray(savedMsg)) {
-                                        useChatStore.setState((s) => ({
-                                            messages: s.messages
-                                                .filter((m) => m.id !== tempMessage.id)
-                                                .map((m) =>
-                                                    m.is_bot && m.id > 0
-                                                        ? { ...m, is_main: false }
-                                                        : m,
-                                                )
-                                                .concat({ ...savedMsg[0], is_main: true }),
-                                        }));
+                                        useChatStore.setState((s) => {
+                                            const msgs = s.messages.filter((m) => m.id !== tempMessage.id);
+                                            // Only reset is_main on messages in the last bot group (variants being replaced)
+                                            const lastBotGroupIds = new Set<number>();
+                                            for (let i = msgs.length - 1; i >= 0; i--) {
+                                                if (msgs[i].is_bot && msgs[i].id > 0) {
+                                                    lastBotGroupIds.add(msgs[i].id);
+                                                } else {
+                                                    break;
+                                                }
+                                            }
+                                            return {
+                                                messages: msgs
+                                                    .map((m) =>
+                                                        m.is_bot && lastBotGroupIds.has(m.id)
+                                                            ? { ...m, is_main: false }
+                                                            : m,
+                                                    )
+                                                    .concat({ ...savedMsg[0], is_main: true }),
+                                            };
+                                        });
                                     }
                                 } catch {}
                             }

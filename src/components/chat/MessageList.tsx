@@ -263,14 +263,16 @@ const MessageGroupRenderer = React.memo(
     if (prev.editingMessageId !== next.editingMessageId) return false;
     if (prev.enableThinking !== next.enableThinking) return false;
 
-    if (prev.isLast || next.isLast) {
-      const prevLen = prev.group.messages.length;
-      const nextLen = next.group.messages.length;
-      if (prevLen !== nextLen) return false;
-      for (let i = 0; i < prevLen; i++) {
-        if (prev.group.messages[i]?.message !== next.group.messages[i]?.message)
-          return false;
-      }
+    // Check message content changes for ALL groups — not just isLast.
+    // Without this, editing a non-last message never shows the update.
+    const prevLen = prev.group.messages.length;
+    const nextLen = next.group.messages.length;
+    if (prevLen !== nextLen) return false;
+    for (let i = 0; i < prevLen; i++) {
+      if (prev.group.messages[i]?.message !== next.group.messages[i]?.message)
+        return false;
+      if (i < prevLen && prev.group.messages[i]?.is_main !== next.group.messages[i]?.is_main)
+        return false;
     }
 
     return true;
