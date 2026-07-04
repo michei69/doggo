@@ -32,7 +32,7 @@ export function replaceTags(
 ): string {
     let result = (text ?? "")
         .replace(/{{user}}/gi, personaName ?? "user")
-        .replace(/anon/gi, personaName ?? "user")
+        .replace(/(?<!\w)anon(?=(?:[^\w']|$)|'s)/gi, personaName ?? "user")
         .replace(/{{char}}/gi, characterChatName ?? "Character");
 
     if (pronouns) {
