@@ -141,6 +141,14 @@ export default function CharacterHeader({
             </Text>
           </>
         ) : null}
+        {character.scheduled_publish_at ? (
+          <>
+            <Text style={styles.dateSep}>·</Text>
+            <Text style={styles.scheduledText}>
+              Scheduled {formatDate(character.scheduled_publish_at, dateFormat)}
+            </Text>
+          </>
+        ) : null}
       </View>
 
       <View style={styles.stats}>
@@ -433,6 +441,11 @@ const styles = StyleSheet.create({
   dateSep: {
     color: colors.textFaint,
     fontSize: 12,
+  },
+  scheduledText: {
+    color: colors.warning,
+    fontSize: 12,
+    fontWeight: "600",
   },
   stats: {
     flexDirection: "row",
