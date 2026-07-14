@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { EnrichedMarkdownText } from "react-native-enriched-markdown";
+import { BadgeCheck, CirclePlus } from "lucide-react-native";
 import AvatarPreview from "../common/AvatarPreview";
 import Avatar from "../common/Avatar";
 import Button from "../common/Button";
@@ -88,15 +89,20 @@ export default function CharacterHeader({
         }
         hitSlop={8}
       >
+        <View style={styles.creatorRow}>
         <Text style={styles.creator}>
           by {character.creator_name}
-          {character.creator_verified && (
-            <Text style={styles.verified}> {"\u2713"}</Text>
-          )}
-          {character.creator_subscriber_badge && (
-            <Text style={styles.subscriberBadge}> Subscriber</Text>
-          )}
         </Text>
+        {character.creator_verified && (
+          <BadgeCheck size={14} color={colors.accent} />
+        )}
+        {character.creator_subscriber_badge && (
+          <View style={styles.subscriberRow}>
+            <CirclePlus size={14} color={colors.accent} />
+            <Text style={styles.subscriberBadge}> Subscriber</Text>
+          </View>
+        )}
+      </View>
       </Pressable>
 
       <View style={styles.badges}>
@@ -378,18 +384,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 2,
   },
+  creatorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+  },
   creator: {
     color: colors.accent,
     fontSize: 14,
-    marginTop: 4,
+    marginTop: 0,
   },
   subscriberBadge: {
     color: colors.accent,
     fontSize: 12,
     fontWeight: "600",
   },
-  verified: {
-    color: colors.accent,
+  subscriberRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
   },
   badges: {
     flexDirection: "row",

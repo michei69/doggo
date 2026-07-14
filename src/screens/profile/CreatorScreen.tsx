@@ -49,7 +49,8 @@ import FilterModal, {
   type FilterState,
   INITIAL_FILTERS,
 } from "../../components/discover/FilterModal";
-import { SlidersHorizontal } from "lucide-react-native";
+import AdvancedSearchModal from "../../components/discover/AdvancedSearchModal";
+import { BadgeCheck, CirclePlus, Search, SlidersHorizontal } from "lucide-react-native";
 
 type Route = RouteProp<CharactersStackParamList, "CreatorScreen">;
 
@@ -137,6 +138,14 @@ export default function CreatorScreen() {
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const filtersRef = useRef<FilterState>(INITIAL_FILTERS);
   const filterModalRef = useRef<FilterModalHandle>(null);
+
+  const [advancedKeywords, setAdvancedKeywords] = useState<string[]>([]);
+  const [advancedBlacklist, setAdvancedBlacklist] = useState<string[]>([]);
+  const [keywordMatchMode, setKeywordMatchMode] = useState<"any" | "all">(
+    "any",
+  );
+  const [advancedSearchVisible, setAdvancedSearchVisible] = useState(false);
+  const [hideDarkened, setHideDarkened] = useState(false);
 
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [longPressCharacter, setLongPressCharacter] = useState<TrendingCharacter | null>(null);
@@ -393,11 +402,15 @@ export default function CreatorScreen() {
         <Text style={styles.profileUsername}>@{profile.user_name}</Text>
       ) : null}
       {profile.is_verified && (
-        <Text style={styles.profileVerified}>{"\u2713"} Verified</Text>
+        <View style={styles.verifiedRow}>
+          <BadgeCheck size={14} color={colors.accent} />
+          <Text style={styles.profileVerified}> Verified</Text>
+        </View>
       )}
       {profile.subscriber_badge && (
         <View style={styles.subBadge}>
-          <Text style={styles.subBadgeText}>Subscriber</Text>
+          <CirclePlus size={14} color={colors.accent} />
+          <Text style={styles.subBadgeText}> Subscriber</Text>
         </View>
       )}
       {profile.about_me ? (
@@ -435,17 +448,8 @@ export default function CreatorScreen() {
           <Text style={styles.statLabel}>Followers</Text>
         </View>
         <View style={styles.statItem}>
-          <Pressable
-            onPress={() => filterModalRef.current?.open()}
-            hitSlop={8}
-            style={styles.charactersStatPressable}
-          >
-            <Text style={styles.statValue}>{list.total}</Text>
-            <View style={styles.charactersStatRow}>
-              <Text style={styles.statLabel}>Characters</Text>
-              <SlidersHorizontal size={14} color={colors.textDim} />
-            </View>
-          </Pressable>
+          <Text style={styles.statValue}>{list.total}</Text>
+          <Text style={styles.statLabel}>Characters</Text>
         </View>
       </View>
 
@@ -476,6 +480,31 @@ export default function CreatorScreen() {
     </View>
   );
 
+  const filterRow = (
+    <View style={styles.filterRow}>
+      <Pressable
+        onPress={() => filterModalRef.current?.open()}
+        style={({ pressed }) => [
+          styles.filterBtn,
+          pressed && { opacity: 0.7 },
+        ]}
+      >
+        <SlidersHorizontal size={16} color={colors.accent} />
+        <Text style={styles.filterBtnText}>Filters</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => setAdvancedSearchVisible(true)}
+        style={({ pressed }) => [
+          styles.filterBtn,
+          pressed && { opacity: 0.7 },
+        ]}
+      >
+        <Search size={16} color={colors.accent} />
+        <Text style={styles.filterBtnText}>Advanced</Text>
+      </Pressable>
+    </View>
+  );
+
   const characterList = (
     <FlashList
       data={list.characters}
@@ -493,7 +522,16 @@ export default function CreatorScreen() {
       }
       contentContainerStyle={styles.listContent}
       showsVerticalScrollIndicator={false}
-      ListHeaderComponent={isTablet ? null : profileSection}
+      ListHeaderComponent={
+        isTablet
+          ? filterRow
+          : (
+            <>
+              {profileSection}
+              {filterRow}
+            </>
+          )
+      }
       ListFooterComponent={
         list.loading && list.characters.length > 0 ? (
           <ActivityIndicator
@@ -553,6 +591,19 @@ export default function CreatorScreen() {
         onApply={handleApplyFilters}
       />
 
+      <AdvancedSearchModal
+        visible={advancedSearchVisible}
+        keywords={advancedKeywords}
+        blacklisted={advancedBlacklist}
+        matchMode={keywordMatchMode}
+        hideDarkened={hideDarkened}
+        onKeywordsChange={setAdvancedKeywords}
+        onBlacklistedChange={setAdvancedBlacklist}
+        onMatchModeChange={setKeywordMatchMode}
+        onHideDarkenedChange={setHideDarkened}
+        onClose={() => setAdvancedSearchVisible(false)}
+      />
+
       <CustomAlert
         visible={alertVisible}
         title={alertTitle}
@@ -596,9 +647,17 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontSize: 14,
     fontWeight: "600",
+  },
+  verifiedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     marginTop: 4,
   },
   subBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     backgroundColor: colors.accentFaded,
     borderRadius: 6,
     paddingHorizontal: 10,
@@ -657,6 +716,29 @@ const styles = StyleSheet.create({
   statItem: { alignItems: "center" },
   statValue: { color: colors.text, fontSize: 20, fontWeight: "700" },
   statLabel: { color: colors.textDim, fontSize: 12, marginTop: 2 },
+  filterRow: {
+    flexDirection: "row",
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+  },
+  filterBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: colors.card,
+    borderRadius: 10,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  filterBtnText: {
+    color: colors.accent,
+    fontSize: 14,
+    fontWeight: "600",
+  },
   footerLoader: { paddingVertical: 20 },
   errorText: { color: colors.danger, fontSize: 16 },
   followBtn: {
@@ -678,13 +760,5 @@ const styles = StyleSheet.create({
   },
   followingBtnText: {
     color: colors.accent,
-  },
-  charactersStatPressable: {
-    alignItems: "center",
-  },
-  charactersStatRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
   },
 });

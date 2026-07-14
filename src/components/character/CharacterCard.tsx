@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, withSpring } from "react-native-reanimated";
-import { MessageCircle, MessageSquare } from "lucide-react-native";
+import { MessageCircle, MessageSquare, BadgeCheck, CirclePlus } from "lucide-react-native";
 import Avatar from "../common/Avatar";
 import AvatarPreview from "../common/AvatarPreview";
 import Tag from "../common/Tag";
@@ -76,18 +76,23 @@ export default function CharacterCard({
                   >
                     {character.name}
                   </Text>
-                  <Text
-                    style={[styles.creator, hidden && styles.textHidden]}
-                    numberOfLines={1}
-                  >
-                    by {character.creator_name}
+                  <View style={[styles.creatorRow, hidden && styles.textHidden]}>
+                    <Text
+                      style={styles.creator}
+                      numberOfLines={1}
+                    >
+                      by {character.creator_name}
+                    </Text>
                     {character.creator_verified ? (
-                      <Text style={styles.verified}> {"\u2713"}</Text>
+                      <BadgeCheck size={14} color={colors.accent} />
                     ) : null}
                     {character.creator_subscriber_badge ? (
-                      <Text style={styles.subscriberBadge}> Subscriber</Text>
+                      <View style={styles.subscriberRow}>
+                        <CirclePlus size={14} color={colors.accent} />
+                        <Text style={styles.subscriberBadge}> Subscriber</Text>
+                      </View>
                     ) : null}
-                  </Text>
+                  </View>
                   <View style={styles.statsRow}>
                     <View style={styles.statItem}>
                       <MessageCircle
@@ -187,19 +192,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
   },
+  creatorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+  },
   creator: {
     color: colors.textFaint,
     fontSize: 13,
-    marginTop: 6,
   },
   subscriberBadge: {
     color: colors.accent,
     fontSize: 11,
     fontWeight: "600",
   },
-  verified: {
-    color: colors.accent,
-    fontWeight: "600",
+  subscriberRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
   },
   textHidden: {
     color: colors.textDimAlt,
