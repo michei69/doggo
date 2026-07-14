@@ -264,7 +264,18 @@ export interface CharacterDetail {
     raw_avatar: null;
     scenario: string;
     scheduled_publish_at: null;
-    scripts: unknown[];
+    scripts: Array<{
+        type: "advanced" | "simple";
+        id: string;
+        title: string;
+        description: string;
+        theme: string;
+        user_id: string;
+        user_name: string;
+        is_public: boolean;
+        updated_at: string;
+        message_count: number;
+    }>;
     showDefinitionOverride: boolean;
     showdefinition: boolean;
     silent_publish: null;

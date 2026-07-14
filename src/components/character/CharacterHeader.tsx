@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { EnrichedMarkdownText } from "react-native-enriched-markdown";
-import { BadgeCheck, CirclePlus } from "lucide-react-native";
+import { BadgeCheck, CirclePlus, ScrollText, Code, Clock, Lock, MessageCircle } from "lucide-react-native";
 import AvatarPreview from "../common/AvatarPreview";
 import Avatar from "../common/Avatar";
 import Button from "../common/Button";
@@ -16,6 +16,38 @@ import { markdownStyle } from "../../utils/markdownStyle";
 import { botAvatarUrl } from "../../utils/assets";
 import { colors } from "../../utils/colors";
 import { formatDate } from "../../utils/time";
+
+const SCRIPT_THEMES: Record<string, { light: string; dark: string }> = {
+  purple: { light: "#8b5cf6", dark: "#4a3570" },
+  teal: { light: "#14b8a6", dark: "#0e5a70" },
+  green: { light: "#10b981", dark: "#0f5940" },
+  orange: { light: "#f97316", dark: "#8b3a1a" },
+  pink: { light: "#ec4899", dark: "#8b2c50" },
+  red: { light: "#ef4444", dark: "#8b2929" },
+  cyan: { light: "#06b6d4", dark: "#164e63" },
+  candy: { light: "#ff6b6b", dark: "#d10056" },
+  mint: { light: "#4ade80", dark: "#00826f" },
+  sunset: { light: "#fbbf24", dark: "#dc2626" },
+  grape: { light: "#a78bfa", dark: "#6366f1" },
+  coral: { light: "#fde047", dark: "#f87171" },
+  sky: { light: "#38bdf8", dark: "#60a5fa" },
+  peach: { light: "#fdba74", dark: "#fed7aa" },
+  lavender: { light: "#f9a8d4", dark: "#c7d2fe" },
+  aqua: { light: "#67e8f9", dark: "#1e5f88" },
+  cherry: { light: "#fb7185", dark: "#dc2626" },
+  lime: { light: "#bef264", dark: "#65a30d" },
+  plum: { light: "#a5b4fc", dark: "#6366f1" },
+  midnight: { light: "#6366f1", dark: "#1e1b4b" },
+  shadow: { light: "#6b7280", dark: "#2d2f32" },
+  storm: { light: "#60a5fa", dark: "#3f4451" },
+  obsidian: { light: "#525252", dark: "#1a1a1a" },
+  forest: { light: "#22c55e", dark: "#14532d" },
+  wine: { light: "#a855f7", dark: "#4a1040" },
+  steel: { light: "#a1a1aa", dark: "#3f3f46" },
+  cosmos: { light: "#3b82f6", dark: "#1e1b4b" },
+  raven: { light: "#525252", dark: "#1f1f1f" },
+  thunder: { light: "#6366f1", dark: "#312e81" },
+};
 
 export default function CharacterHeader({
   character,
@@ -308,6 +340,48 @@ export default function CharacterHeader({
           </View>
         </CollapsibleSection>
       )}
+
+      {character.scripts?.length > 0 && (
+        <View style={styles.scriptsSection}>
+          <Text style={styles.sectionTitle}>Scripts</Text>
+          {character.scripts.map((script) => {
+            const theme = SCRIPT_THEMES[script.theme] ?? { light: colors.accent, dark: colors.card };
+            const ScriptIcon = script.type === "simple" ? ScrollText : Code;
+            return (
+              <View
+                key={script.id}
+                style={[
+                  styles.scriptCard,
+                  { borderColor: theme.light, backgroundColor: theme.dark },
+                ]}
+              >
+                <View style={styles.scriptHeaderRow}>
+                  <ScriptIcon size={16} color={theme.light} />
+                  <Text style={styles.scriptTitle}>{script.title}</Text>
+                  {!script.is_public && (
+                    <Lock size={14} color={theme.light} style={{ marginLeft: "auto" }} />
+                  )}
+                </View>
+                <Text style={styles.scriptDesc}>{script.description}</Text>
+                <View style={styles.scriptFooterRow}>
+                  <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
+                    <Clock size={12} color={colors.textDim} />
+                    <Text style={{ color: colors.textDim, fontSize: 11 }}>
+                      {formatDate(script.updated_at, dateFormat)}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
+                    <MessageCircle size={12} color={colors.textDim} />
+                    <Text style={{ color: colors.textDim, fontSize: 11 }}>
+                      {script.message_count}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
     </>
   );
 
@@ -558,5 +632,38 @@ const styles = StyleSheet.create({
   continueBtn: {
     marginTop: 24,
     width: "100%",
+  },
+  scriptsSection: {
+    width: "100%",
+    marginTop: 20,
+  },
+  scriptCard: {
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  scriptHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  scriptTitle: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "600",
+    flexShrink: 1,
+  },
+  scriptDesc: {
+    color: colors.textDim,
+    fontSize: 12,
+    marginTop: 6,
+    lineHeight: 16,
+  },
+  scriptFooterRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+    alignItems: "center",
   },
 });
