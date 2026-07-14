@@ -184,8 +184,8 @@ const linking: LinkingOptions<RootStackParamList> = {
           DiscoverTab: {
             screens: {
               CharacterSearch: "search",
-              CreatorScreen: "profiles/:uuid_:name",
-              CharacterScreen: "characters/:uuid_:name",
+              CreatorScreen: "profiles",
+              CharacterScreen: "characters",
             },
           },
         },
