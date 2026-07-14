@@ -12,8 +12,11 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { ChatsStackParamList } from "../../navigation/types";
 import { getMyProfile, updateMyProfile } from "../../api/profile";
 import { colors } from "../../utils/colors";
 import Slider from "../../components/common/Slider";
@@ -82,10 +85,12 @@ export function fmtInt(v: number): string {
 }
 
 export default function GenerationSettingsScreen() {
-  const { goBack } = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<ChatsStackParamList, "GenerationSettings">>();
+  const { goBack } = navigation;
   const [config, setConfig] = useState<Config>(buildDefaultConfig);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
   const [badWordInput, setBadWordInput] = useState("");
   const fetchedRef = useRef(false);
   const activeChatId = useChatStore((s) => s.activeChatId);
@@ -193,14 +198,40 @@ export default function GenerationSettingsScreen() {
         ...c,
         generation_settings: { ...c.generation_settings, ...patch },
       }));
+      setIsDirty(true);
     },
     [],
   );
+
+  // Intercept back navigation when there are unsaved changes
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("beforeRemove", (e: any) => {
+      if (!isDirty) return;
+
+      e.preventDefault();
+
+      Alert.alert(
+        "Unsaved Changes",
+        "You have unsaved changes. Discard them?",
+        [
+          { text: "Stay", style: "cancel", onPress: () => {} },
+          {
+            text: "Leave",
+            style: "destructive",
+            onPress: () => navigation.dispatch(e.data.action),
+          },
+        ],
+      );
+    });
+
+    return unsubscribe;
+  }, [navigation, isDirty]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
       await updateMyProfile(config);
+      setIsDirty(false);
       showAlert("Saved", "Generation settings updated.", [
         { text: "OK", onPress: goBack },
       ]);
@@ -218,6 +249,7 @@ export default function GenerationSettingsScreen() {
     if (!w) return;
     setConfig((c) => ({ ...c, bad_words: [...c.bad_words, w] }));
     setBadWordInput("");
+    setIsDirty(true);
   }, [badWordInput]);
 
   const removeBadWord = useCallback((index: number) => {
@@ -225,10 +257,14 @@ export default function GenerationSettingsScreen() {
       ...c,
       bad_words: c.bad_words.filter((_, i) => i !== index),
     }));
+    setIsDirty(true);
   }, []);
 
   const selectProxy = useCallback(
-    (id: string) => setConfig((c) => ({ ...c, selectedProxyConfigId: id })),
+    (id: string) => {
+      setConfig((c) => ({ ...c, selectedProxyConfigId: id }));
+      setIsDirty(true);
+    },
     [],
   );
 
@@ -264,6 +300,7 @@ export default function GenerationSettingsScreen() {
       ),
     }));
     setEditingProxy(null);
+    setIsDirty(true);
   }, [editingProxy, editForm]);
 
   const duplicateProxy = useCallback((proxy: ProxyConfiguration) => {
@@ -274,6 +311,7 @@ export default function GenerationSettingsScreen() {
         { ...proxy, id: newId(), name: `${proxy.name} (Copy)` },
       ],
     }));
+    setIsDirty(true);
   }, []);
 
   const deleteProxy = useCallback(
@@ -382,6 +420,7 @@ export default function GenerationSettingsScreen() {
 
   const handleToggleLocalMode = useCallback((v: boolean) => {
     setLocalLocalMode(v);
+    setIsDirty(true);
   }, []);
 
   if (loading) {
@@ -411,7 +450,10 @@ export default function GenerationSettingsScreen() {
               styles.apiToggleBtn,
               isJanitor && styles.apiToggleBtnActive,
             ]}
-            onPress={() => setConfig((c) => ({ ...c, api: "janitor" }))}
+            onPress={() => {
+              setConfig((c) => ({ ...c, api: "janitor" }));
+              setIsDirty(true);
+            }}
           >
             <Text
               style={[
@@ -427,7 +469,10 @@ export default function GenerationSettingsScreen() {
               styles.apiToggleBtn,
               !isJanitor && styles.apiToggleBtnActive,
             ]}
-            onPress={() => setConfig((c) => ({ ...c, api: "openai", open_ai_mode: "proxy" }))}
+            onPress={() => {
+              setConfig((c) => ({ ...c, api: "openai", open_ai_mode: "proxy" }));
+              setIsDirty(true);
+            }}
           >
             <Text
               style={[
@@ -456,9 +501,10 @@ export default function GenerationSettingsScreen() {
         <TextInput
           style={styles.globalPromptInput}
           value={config.proxy_global_prompt}
-          onChangeText={(v) =>
-            setConfig((c) => ({ ...c, proxy_global_prompt: v }))
-          }
+          onChangeText={(v) => {
+            setConfig((c) => ({ ...c, proxy_global_prompt: v }));
+            setIsDirty(true);
+          }}
           placeholder="e.g. -"
           placeholderTextColor={colors.textDimAlt}
           multiline
@@ -607,7 +653,10 @@ export default function GenerationSettingsScreen() {
               <TextInput
                 style={styles.localTextInput}
                 value={localPersonality}
-                onChangeText={setLocalPersonality}
+                onChangeText={(v) => {
+                  setLocalPersonality(v);
+                  setIsDirty(true);
+                }}
                 placeholder="Enter custom personality..."
                 placeholderTextColor={colors.textDimAlt}
                 multiline
@@ -631,7 +680,10 @@ export default function GenerationSettingsScreen() {
               <TextInput
                 style={styles.localTextInput}
                 value={localScenario}
-                onChangeText={setLocalScenario}
+                onChangeText={(v) => {
+                  setLocalScenario(v);
+                  setIsDirty(true);
+                }}
                 placeholder="Enter custom scenario..."
                 placeholderTextColor={colors.textDimAlt}
                 multiline

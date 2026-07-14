@@ -105,6 +105,31 @@ export async function deleteComment(commentId: string): Promise<void> {
     await apiClient.delete(`/reviews/comment/${commentId}`);
 }
 
+export async function translateComment(
+    commentId: string,
+    content: string,
+): Promise<string> {
+    const response = await apiClient.post<{ translated: string }>(
+        "/reviews/translate",
+        { comment_id: commentId, content },
+    );
+    return response.data.translated;
+}
+
+export async function reportComment(data: {
+    comment_id: string;
+    review_id: string;
+    reason: string;
+    details: string;
+}): Promise<void> {
+    await apiClient.post("/moderation/report", {
+        comment_id: data.comment_id,
+        review_id: data.review_id,
+        reason: data.reason,
+        other: data.details,
+    });
+}
+
 export async function deleteReview(reviewId: string): Promise<void> {
     await apiClient.delete(`/reviews/${reviewId}`);
 }

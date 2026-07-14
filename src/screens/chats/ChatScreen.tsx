@@ -1202,21 +1202,36 @@ export default function ChatScreen() {
                 <Text style={styles.sysPromptClose}>{"\u2715"}</Text>
               </Pressable>
             </View>
-            {systemPromptLoading ? (
+            {systemPromptError ? (
+              <Text style={styles.sysPromptError}>{systemPromptError}</Text>
+            ) : systemPromptLoading &&
+              !systemPromptContent &&
+              !botPersonalityContent &&
+              !scenarioContent ? (
               <ActivityIndicator
                 color={colors.accent}
                 style={{ paddingVertical: 24 }}
               />
-            ) : systemPromptError ? (
-              <Text style={styles.sysPromptError}>{systemPromptError}</Text>
             ) : (
               <ScrollView style={styles.sysPromptScroll}>
+                {systemPromptLoading && (
+                  <View style={styles.sysPromptLoadingBar}>
+                    <ActivityIndicator
+                      size="small"
+                      color={colors.accent}
+                    />
+                    <Text style={styles.sysPromptLoadingText}>
+                      Loading system prompt...
+                    </Text>
+                  </View>
+                )}
                 {systemPromptContent.length > 0 && (
                   <CollapsibleSection title="System Prompt">
                     <TextInput
                       multiline
                       label="Raw System Prompt"
                       style={styles.sysPromptTextInput}
+                      editable={!systemPromptLoading}
                     >
                       {systemPromptContent}
                     </TextInput>
@@ -1239,6 +1254,7 @@ export default function ChatScreen() {
                       multiline
                       label="Bot Personality"
                       style={styles.sysPromptTextInput}
+                      editable={!systemPromptLoading}
                     >
                       {botPersonalityContent}
                     </TextInput>
@@ -1262,6 +1278,7 @@ export default function ChatScreen() {
                       multiline
                       label="Scenario"
                       style={styles.sysPromptTextInput}
+                      editable={!systemPromptLoading}
                     >
                       {scenarioContent}
                     </TextInput>
@@ -1496,6 +1513,21 @@ const styles = StyleSheet.create({
   },
   sysPromptTextInput: {
     maxHeight: 300,
+  },
+  sysPromptLoadingBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    marginBottom: 8,
+    backgroundColor: `${colors.accent}15`,
+    borderRadius: 8,
+  },
+  sysPromptLoadingText: {
+    color: colors.accent,
+    fontSize: 13,
+    fontWeight: "500",
   },
   sysPromptError: {
     color: colors.danger,

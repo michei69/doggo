@@ -413,7 +413,7 @@ export default function CharacterSearchScreen() {
     if (advancedKeywords.length > 0) {
       result = result.filter((c) => {
         const text =
-          `${c.name} ${c.description || ""} ${(c.tags || []).map((t) => t.name).join(" ")}`.toLowerCase();
+          `${c.name} ${c.description || ""} ${(c.tags || []).map((t) => t.name).join(" ")} ${(c.custom_tags || []).join(" ")}`.toLowerCase();
         if (keywordMatchMode === "all") {
           return advancedKeywords.every((kw) =>
             text.includes(kw.toLowerCase()),
@@ -425,7 +425,7 @@ export default function CharacterSearchScreen() {
     if (advancedBlacklist.length > 0) {
       result = result.filter((c) => {
         const text =
-          `${c.name} ${c.description || ""} ${(c.tags || []).map((t) => t.name).join(" ")}`.toLowerCase();
+          `${c.name} ${c.description || ""} ${(c.tags || []).map((t) => t.name).join(" ")} ${(c.custom_tags || []).join(" ")}`.toLowerCase();
         return !advancedBlacklist.some((kw) => text.includes(kw.toLowerCase()));
       });
     }

@@ -1,17 +1,20 @@
 import { useState, useCallback } from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet, Pressable, ActivityIndicator } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { ThumbsUp, Trash2, BadgeCheck, Shield } from "lucide-react-native";
+import { ThumbsUp, Trash2, BadgeCheck, Shield, MoreHorizontal } from "lucide-react-native";
 import Avatar from "../common/Avatar";
+import CustomBottomSheet from "../common/CustomBottomSheet";
 import type { ReviewComment } from "../../types/api";
 import {
   likeComment,
   deleteComment as deleteCommentApi,
+  translateComment,
 } from "../../api/reviews";
 import { useAuthStore } from "../../stores/authStore";
 import { colors } from "../../utils/colors";
 import { avatarUrl } from "../../utils/assets";
 import { formatRelativeTime } from "../../utils/time";
+import CommentReportModal from "./CommentReportModal";
 
 export default function CommentItem({
   comment: initialComment,
@@ -65,6 +68,40 @@ export default function CommentItem({
     }
   }, [comment.id, onDelete]);
 
+  const [actionsVisible, setActionsVisible] = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
+  const [translating, setTranslating] = useState(false);
+  const [translatedContent, setTranslatedContent] = useState<string | null>(
+    null,
+  );
+
+  const handleMore = useCallback(() => {
+    setActionsVisible(true);
+  }, []);
+
+  const handleTranslate = useCallback(async () => {
+    setActionsVisible(false);
+    if (translatedContent) return;
+    setTranslating(true);
+    try {
+      const translated = await translateComment(comment.id, comment.content);
+      setTranslatedContent(translated);
+    } catch {
+      // silently fail
+    } finally {
+      setTranslating(false);
+    }
+  }, [comment.id, comment.content, translatedContent]);
+
+  const handleReport = useCallback(() => {
+    setActionsVisible(false);
+    setReportVisible(true);
+  }, []);
+
+  const handleReportClose = useCallback(() => {
+    setReportVisible(false);
+  }, []);
+
   return (
     <View style={styles.container}>
       <Pressable
@@ -107,6 +144,18 @@ export default function CommentItem({
           </Text>
         </Pressable>
         <Text style={styles.content}>{comment.content}</Text>
+        {translatedContent && (
+          <View style={styles.translatedBox}>
+            <Text style={styles.translatedLabel}>Translated</Text>
+            <Text style={styles.translatedText}>{translatedContent}</Text>
+          </View>
+        )}
+        {translating && (
+          <View style={styles.translatingRow}>
+            <ActivityIndicator size="small" color={colors.accent} />
+            <Text style={styles.translatingText}>Translating...</Text>
+          </View>
+        )}
         <View style={styles.actions}>
           <Pressable
             onPress={handleLike}
@@ -128,6 +177,9 @@ export default function CommentItem({
               </Text>
             )}
           </Pressable>
+          <Pressable onPress={handleMore} style={styles.moreBtn}>
+            <MoreHorizontal size={iconSize} color={colors.textDim} />
+          </Pressable>
           {isOwnComment && (
             <Pressable onPress={handleDelete}>
               <Trash2 size={iconSize} color={colors.danger} />
@@ -135,6 +187,29 @@ export default function CommentItem({
           )}
         </View>
       </View>
+
+      <CustomBottomSheet
+        visible={actionsVisible}
+        onClose={() => setActionsVisible(false)}
+      >
+        <View style={styles.sheetContent}>
+          <Pressable style={styles.sheetItem} onPress={handleTranslate}>
+            <Text style={styles.sheetItemText}>Translate Comment</Text>
+          </Pressable>
+          <Pressable style={styles.sheetItem} onPress={handleReport}>
+            <Text style={[styles.sheetItemText, styles.sheetItemDanger]}>
+              Report Comment
+            </Text>
+          </Pressable>
+        </View>
+      </CustomBottomSheet>
+
+      <CommentReportModal
+        visible={reportVisible}
+        commentId={comment.id}
+        reviewId={comment.review_id}
+        onClose={handleReportClose}
+      />
     </View>
   );
 }
@@ -191,5 +266,54 @@ const styles = StyleSheet.create({
   },
   likeTextActive: {
     color: colors.accent,
+  },
+  moreBtn: {
+    padding: 2,
+  },
+  sheetContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  sheetItem: {
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  sheetItemText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  sheetItemDanger: {
+    color: colors.danger,
+  },
+  translatedBox: {
+    backgroundColor: `${colors.accent}15`,
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 4,
+  },
+  translatedLabel: {
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  translatedText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  translatingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 4,
+  },
+  translatingText: {
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: "500",
   },
 });
