@@ -47,6 +47,7 @@ import { colors } from "../../utils/colors";
 import { useIsTablet } from "../../hooks/useIsTablet";
 import { cleanTags, generify } from "../../utils/markdown";
 import { formatCount } from "../../utils/format";
+import { getEmojiDefinitions } from "../../stores/reviewStore";
 
 type Route = RouteProp<CharactersStackParamList, "CharacterScreen">;
 
@@ -80,6 +81,14 @@ export default function CharacterScreen() {
 
   useEffect(() => {
     storage.getDateFormat().then(setDateFormat);
+  }, []);
+
+  useEffect(() => {
+    storage.getReviewReactionsEnabled().then((enabled) => {
+      if (enabled) {
+        getEmojiDefinitions().catch(() => {});
+      }
+    });
   }, []);
 
   useEffect(() => {

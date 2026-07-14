@@ -195,6 +195,18 @@ export const storage = {
         );
     },
 
+    async setReviewReactionsEnabled(enabled: boolean): Promise<void> {
+        await AsyncStorage.setItem(
+            STORAGE_KEYS.REVIEW_REACTIONS_ENABLED,
+            String(enabled),
+        );
+    },
+
+    async getReviewReactionsEnabled(): Promise<boolean> {
+        const v = await AsyncStorage.getItem(STORAGE_KEYS.REVIEW_REACTIONS_ENABLED);
+        return v === "true";
+    },
+
     async clearAll(): Promise<void> {
         await Promise.all([
             SecureStore.deleteItemAsync(STORAGE_KEYS.ACCESS_TOKEN),

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,29 +9,34 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import {
-  ThumbsUp,
-  ThumbsDown,
-  MessageCircle,
-  Pin,
-  Trash2,
-  BadgeCheck,
-  Shield,
-  Send,
+    ThumbsUp,
+    ThumbsDown,
+    CirclePlus,
+    MessageCircle,
+    Pin,
+    Trash2,
+    BadgeCheck,
+    Shield,
+    Send,
 } from "lucide-react-native";
 import Avatar from "../common/Avatar";
 import type { Review, ReviewComment } from "../../types/api";
 import {
-  getReviewComments,
-  createComment,
-  deleteComment,
-  likeReview,
-  deleteReview as deleteReviewApi,
+    getReviewComments,
+    createComment,
+    deleteComment,
+    likeReview,
+    deleteReview as deleteReviewApi,
+    reactToReview,
+    removeReviewReaction,
 } from "../../api/reviews";
 import { useAuthStore } from "../../stores/authStore";
+import { storage } from "../../utils/storage";
 import { colors } from "../../utils/colors";
 import { avatarUrl } from "../../utils/assets";
 import { formatRelativeTime } from "../../utils/time";
 import CommentItem from "./CommentItem";
+import EmojiPickerModal from "./EmojiPickerModal";
 
 export default function ReviewCard({
   review: initialReview,
@@ -55,6 +60,12 @@ export default function ReviewCard({
   const [commentText, setCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
   const [liking, setLiking] = useState(false);
+  const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
+  const [reactionsEnabled, setReactionsEnabled] = useState(false);
+
+  useEffect(() => {
+    storage.getReviewReactionsEnabled().then(setReactionsEnabled);
+  }, []);
 
   const isOwnReview = review.user_id === user?.id;
   const isOwnCharacter = isOwner;
@@ -138,6 +149,25 @@ export default function ReviewCard({
       setLiking(false);
     }
   }, [review.id, review.is_liked_by_user, liking]);
+
+  const handleEmojiReact = useCallback(
+    async (emojiId: string) => {
+      try {
+        await reactToReview(review.id, emojiId);
+      } catch {
+        // silently fail
+      }
+    },
+    [review.id],
+  );
+
+  const handleRemoveReaction = useCallback(async () => {
+    try {
+      await removeReviewReaction(review.id);
+    } catch {
+      // silently fail
+    }
+  }, [review.id]);
 
   const handleDeleteReview = useCallback(async () => {
     try {
@@ -260,10 +290,14 @@ export default function ReviewCard({
           </Text>
         </Pressable>
 
-        <View style={styles.actionBtn}>
-          <ThumbsDown size={iconSize} color={iconColor} />
-          <Text style={styles.actionText}> {review.dislike_count}</Text>
-        </View>
+        {reactionsEnabled && (
+          <Pressable
+            onPress={() => setEmojiPickerVisible(true)}
+            style={styles.actionBtn}
+          >
+            <CirclePlus size={iconSize} color={iconColor} />
+          </Pressable>
+        )}
 
         <Pressable onPress={handleToggleComments} style={styles.actionBtn}>
           <MessageCircle size={iconSize} color={iconColor} />
@@ -341,6 +375,13 @@ export default function ReviewCard({
           </View>
         </View>
       )}
+
+      <EmojiPickerModal
+        visible={emojiPickerVisible}
+        onClose={() => setEmojiPickerVisible(false)}
+        onReact={handleEmojiReact}
+        onRemoveReact={handleRemoveReaction}
+      />
     </View>
   );
 }

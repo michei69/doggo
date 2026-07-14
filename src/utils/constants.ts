@@ -21,6 +21,7 @@ export const STORAGE_KEYS = {
     EDIT_BOT_STATE: "edit_bot_state",
     CHAT_LOCAL_DATA_PREFIX: "chat_local_",
     HIDDEN_CHARACTERS: "hidden_characters",
+    REVIEW_REACTIONS_ENABLED: "review_reactions_enabled",
 } as const;
 
 export const SUPABASE_ANON_KEY =

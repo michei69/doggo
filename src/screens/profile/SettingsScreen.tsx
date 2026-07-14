@@ -74,11 +74,16 @@ export default function SettingsScreen() {
   const setChatCentered = useChatStore((s) => s.setChatCentered);
   const isTablet = useIsTablet();
   const [dateFormat, setDateFormat] = useState<"relative" | "absolute">("relative");
+  const [reviewReactionsEnabled, setReviewReactionsEnabled] = useState(false);
   const [layoutPickerVisible, setLayoutPickerVisible] = useState(false);
   const [wrapperPickerVisible, setWrapperPickerVisible] = useState(false);
 
   useEffect(() => {
     storage.getDateFormat().then(setDateFormat);
+  }, []);
+
+  useEffect(() => {
+    storage.getReviewReactionsEnabled().then(setReviewReactionsEnabled);
   }, []);
 
   const handleLogout = useCallback(() => {
@@ -210,6 +215,24 @@ export default function SettingsScreen() {
                 const next = val ? "relative" : "absolute";
                 setDateFormat(next);
                 storage.setDateFormat(next);
+              }}
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={colors.text}
+            />
+          </View>
+
+          <View style={styles.toggleRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Review Reactions</Text>
+              <Text style={styles.settingValue}>
+                Enable emoji reactions on reviews
+              </Text>
+            </View>
+            <Switch
+              value={reviewReactionsEnabled}
+              onValueChange={(val) => {
+                setReviewReactionsEnabled(val);
+                storage.setReviewReactionsEnabled(val);
               }}
               trackColor={{ false: colors.border, true: colors.accent }}
               thumbColor={colors.text}

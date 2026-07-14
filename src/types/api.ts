@@ -531,6 +531,18 @@ export interface CreateReviewResponse {
     pinned_at: string | null;
 }
 
+export interface EmojiDef {
+    id: string;
+    img: string;
+    label: string;
+    sortOrder: number;
+}
+
+export interface EmojiDefinitionsResponse {
+    all: EmojiDef[];
+    definitions: Record<string, EmojiDef>;
+}
+
 export interface CreateCommentRequest {
     content: string;
     review_id: string;

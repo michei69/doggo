@@ -8,6 +8,7 @@ import type {
     CreateReviewResponse,
     CreateCommentRequest,
     CreateCommentResponse,
+    EmojiDefinitionsResponse,
 } from "../types/api";
 
 export type ReviewSort = "likes" | "latest" | "oldest";
@@ -132,4 +133,27 @@ export async function reportComment(data: {
 
 export async function deleteReview(reviewId: string): Promise<void> {
     await apiClient.delete(`/reviews/${reviewId}`);
+}
+
+export async function fetchEmojiDefinitions(): Promise<EmojiDefinitionsResponse> {
+    const response = await apiClient.get<EmojiDefinitionsResponse>(
+        "/reviews/emoji-definitions",
+    );
+    return response.data;
+}
+
+export async function reactToReview(reviewId: string, emojiId: string): Promise<void> {
+    await apiClient.post(`/reviews/react/review/${reviewId}`, { emoji: emojiId });
+}
+
+export async function removeReviewReaction(reviewId: string): Promise<void> {
+    await apiClient.delete(`/reviews/react/review/${reviewId}`);
+}
+
+export async function reactToComment(commentId: string, emojiId: string): Promise<void> {
+    await apiClient.post(`/reviews/react/comment/${commentId}`, { emoji: emojiId });
+}
+
+export async function removeCommentReaction(commentId: string): Promise<void> {
+    await apiClient.delete(`/reviews/react/comment/${commentId}`);
 }

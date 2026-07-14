@@ -1,20 +1,24 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { ThumbsUp, Trash2, BadgeCheck, Shield, MoreHorizontal } from "lucide-react-native";
+import { ThumbsUp, Trash2, BadgeCheck, Shield, MoreHorizontal, CirclePlus } from "lucide-react-native";
 import Avatar from "../common/Avatar";
 import CustomBottomSheet from "../common/CustomBottomSheet";
 import type { ReviewComment } from "../../types/api";
 import {
-  likeComment,
-  deleteComment as deleteCommentApi,
-  translateComment,
+    likeComment,
+    deleteComment as deleteCommentApi,
+    translateComment,
+    reactToComment,
+    removeCommentReaction,
 } from "../../api/reviews";
 import { useAuthStore } from "../../stores/authStore";
+import { storage } from "../../utils/storage";
 import { colors } from "../../utils/colors";
 import { avatarUrl } from "../../utils/assets";
 import { formatRelativeTime } from "../../utils/time";
 import CommentReportModal from "./CommentReportModal";
+import EmojiPickerModal from "./EmojiPickerModal";
 
 export default function CommentItem({
   comment: initialComment,
@@ -29,6 +33,12 @@ export default function CommentItem({
   const navigation = useNavigation<any>();
   const [comment, setComment] = useState(initialComment);
   const [liking, setLiking] = useState(false);
+  const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
+  const [reactionsEnabled, setReactionsEnabled] = useState(false);
+
+  useEffect(() => {
+    storage.getReviewReactionsEnabled().then(setReactionsEnabled);
+  }, []);
 
   const isOwnComment = comment.user_id === user?.id;
   const profile = comment.user_profiles;
@@ -67,6 +77,25 @@ export default function CommentItem({
       // silently fail
     }
   }, [comment.id, onDelete]);
+
+  const handleEmojiReact = useCallback(
+    async (emojiId: string) => {
+      try {
+        await reactToComment(comment.id, emojiId);
+      } catch {
+        // silently fail
+      }
+    },
+    [comment.id],
+  );
+
+  const handleRemoveReaction = useCallback(async () => {
+    try {
+      await removeCommentReaction(comment.id);
+    } catch {
+      // silently fail
+    }
+  }, [comment.id]);
 
   const [actionsVisible, setActionsVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
@@ -177,6 +206,14 @@ export default function CommentItem({
               </Text>
             )}
           </Pressable>
+          {reactionsEnabled && (
+            <Pressable
+              onPress={() => setEmojiPickerVisible(true)}
+              style={styles.moreBtn}
+            >
+              <CirclePlus size={iconSize} color={colors.textDim} />
+            </Pressable>
+          )}
           <Pressable onPress={handleMore} style={styles.moreBtn}>
             <MoreHorizontal size={iconSize} color={colors.textDim} />
           </Pressable>
@@ -209,6 +246,13 @@ export default function CommentItem({
         commentId={comment.id}
         reviewId={comment.review_id}
         onClose={handleReportClose}
+      />
+
+      <EmojiPickerModal
+        visible={emojiPickerVisible}
+        onClose={() => setEmojiPickerVisible(false)}
+        onReact={handleEmojiReact}
+        onRemoveReact={handleRemoveReaction}
       />
     </View>
   );
