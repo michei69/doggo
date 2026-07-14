@@ -14,7 +14,7 @@ export type ChatsStackParamList = {
 };
 
 export type CharactersStackParamList = {
-    CharacterSearch: undefined;
+    CharacterSearch: { search?: string; tag_id?: string; custom_tags?: string; mode?: string; sort?: string; messages?: string; messages_mode?: string; tokens?: string; tokens_mode?: string; proxyenabled?: string; tag?: string } | undefined;
     CharacterScreen: { characterId: string; characterName: string };
     CreatorScreen: { userId: string; userName: string };
 };

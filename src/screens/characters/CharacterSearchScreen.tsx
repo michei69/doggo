@@ -16,7 +16,8 @@ import {
   Pressable,
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import type { RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import CharacterCard from "../../components/character/CharacterCard";
 import CharacterDiscoverActionsSheet from "../../components/character/CharacterDiscoverActionsSheet";
@@ -52,6 +53,8 @@ type Nav = NativeStackNavigationProp<
   CharactersStackParamList,
   "CharacterSearch"
 >;
+
+type SearchRoute = RouteProp<CharactersStackParamList, "CharacterSearch">;
 
 interface ListState {
   characters: TrendingCharacter[];
@@ -162,6 +165,7 @@ export function buildParams(
 
 export default function CharacterSearchScreen() {
   const { navigate } = useNavigation<Nav>();
+  const route = useRoute<SearchRoute>();
   const isTablet = useIsTablet();
   const [state, dispatch] = useReducer(listReducer, {
     characters: [],
@@ -305,6 +309,81 @@ export default function CharacterSearchScreen() {
     } catch (err: any) {
       loadingMoreRef.current = false;
       dispatch({ type: "ERROR", payload: err.message });
+    }
+  }, []);
+
+  // Handle deep link params on mount
+  useEffect(() => {
+    const p = route.params;
+    if (!p) return;
+
+    // Prevent storage-loaded filters from overriding deep link filters
+    filtersLoadedRef.current = true;
+
+    if (p.search) {
+      searchRef.current = p.search;
+      setSearchText(p.search);
+    }
+
+    if (p.sort) {
+      sortModeRef.current = p.sort;
+      setSortMode(p.sort);
+    }
+
+    if (p.tag) {
+      const newTags = new Set(selectedTagsRef.current);
+      newTags.add(`top_${p.tag}`);
+      selectedTagsRef.current = newTags;
+      setSelectedTagIds(newTags);
+    }
+
+    if (p.tag_id) {
+      const ids = p.tag_id
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean);
+      if (ids.length > 0) {
+        const newTags = new Set(selectedTagsRef.current);
+        ids.forEach((id) => newTags.add(id));
+        selectedTagsRef.current = newTags;
+        setSelectedTagIds(newTags);
+      }
+    }
+
+    const newFilters = { ...filtersRef.current };
+    let filtersChanged = false;
+
+    if (p.messages !== undefined) {
+      newFilters.messages = p.messages;
+      filtersChanged = true;
+    }
+    if (p.messages_mode === "lte" || p.messages_mode === "gte") {
+      newFilters.messagesMode = p.messages_mode;
+      filtersChanged = true;
+    }
+    if (p.tokens !== undefined) {
+      newFilters.tokens = p.tokens;
+      filtersChanged = true;
+    }
+    if (p.tokens_mode === "lte" || p.tokens_mode === "gte") {
+      newFilters.tokensMode = p.tokens_mode;
+      filtersChanged = true;
+    }
+    if (p.mode === "sfw") {
+      newFilters.limitlessMode = false;
+      filtersChanged = true;
+    } else if (p.mode === "all") {
+      newFilters.limitlessMode = true;
+      filtersChanged = true;
+    }
+    if (p.proxyenabled === "true") {
+      newFilters.proxyOnly = true;
+      filtersChanged = true;
+    }
+
+    if (filtersChanged) {
+      filtersRef.current = newFilters;
+      setFilters(newFilters);
     }
   }, []);
 
