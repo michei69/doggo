@@ -33,6 +33,7 @@ import CustomAlert, {
 } from "../../components/common/CustomAlert";
 import { getProfile, followUser, unfollowUser, getMyFollowing, getBlockedContent, updateBlockedContent } from "../../api/profile";
 import { getCharacters } from "../../api/characters";
+import type { CharacterSearchParams } from "../../api/characters";
 import { stripHtml } from "../../utils/markdown";
 import { assetUrl, avatarUrl } from "../../utils/assets";
 import { colors } from "../../utils/colors";
@@ -43,6 +44,12 @@ import type {
   TrendingResponse,
 } from "../../types/api";
 import type { CharactersStackParamList } from "../../navigation/types";
+import FilterModal, {
+  type FilterModalHandle,
+  type FilterState,
+  INITIAL_FILTERS,
+} from "../../components/discover/FilterModal";
+import { SlidersHorizontal } from "lucide-react-native";
 
 type Route = RouteProp<CharactersStackParamList, "CreatorScreen">;
 
@@ -127,6 +134,10 @@ export default function CreatorScreen() {
     null,
   );
 
+  const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
+  const filtersRef = useRef<FilterState>(INITIAL_FILTERS);
+  const filterModalRef = useRef<FilterModalHandle>(null);
+
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [longPressCharacter, setLongPressCharacter] = useState<TrendingCharacter | null>(null);
   const [actionsVisible, setActionsVisible] = useState(false);
@@ -191,11 +202,27 @@ export default function CreatorScreen() {
       else dispatch({ type: "LOADING" });
 
       try {
-        const response: TrendingResponse = await getCharacters({
+        const params: CharacterSearchParams = {
           page: pageNum,
           sort: "latest",
           user_id: [userId],
-        });
+        };
+
+        const currentFilters = filtersRef.current;
+        if (currentFilters.messages && Number(currentFilters.messages) > 0) {
+          params.messages = Number(currentFilters.messages);
+          params.messages_mode = currentFilters.messagesMode;
+        }
+        if (currentFilters.tokens && Number(currentFilters.tokens) > 0) {
+          params.tokens = Number(currentFilters.tokens);
+          params.tokens_mode = currentFilters.tokensMode;
+        }
+        if (currentFilters.proxyOnly) {
+          params.is_proxy_enabled = true;
+        }
+        params.mode = currentFilters.limitlessMode ? "all" : "sfw";
+
+        const response: TrendingResponse = await getCharacters(params);
         dispatch({
           type: "LOADED",
           payload: {
@@ -237,6 +264,15 @@ export default function CreatorScreen() {
       return next;
     });
   }, []);
+
+  const handleApplyFilters = useCallback(
+    (newFilters: FilterState) => {
+      setFilters(newFilters);
+      filtersRef.current = newFilters;
+      doFetch(1);
+    },
+    [doFetch],
+  );
 
   const handleLongPress = useCallback((item: TrendingCharacter) => {
     setLongPressCharacter(item);
@@ -352,7 +388,7 @@ export default function CreatorScreen() {
           size={80}
         />
       </Pressable>
-      <Text style={styles.profileName}>{profile.name}</Text>
+      <Text style={styles.profileName}>{profile.name || `@${profile.user_name}`}</Text>
       {profile.user_name ? (
         <Text style={styles.profileUsername}>@{profile.user_name}</Text>
       ) : null}
@@ -399,8 +435,17 @@ export default function CreatorScreen() {
           <Text style={styles.statLabel}>Followers</Text>
         </View>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{list.total}</Text>
-          <Text style={styles.statLabel}>Characters</Text>
+          <Pressable
+            onPress={() => filterModalRef.current?.open()}
+            hitSlop={8}
+            style={styles.charactersStatPressable}
+          >
+            <Text style={styles.statValue}>{list.total}</Text>
+            <View style={styles.charactersStatRow}>
+              <Text style={styles.statLabel}>Characters</Text>
+              <SlidersHorizontal size={14} color={colors.textDim} />
+            </View>
+          </Pressable>
         </View>
       </View>
 
@@ -500,6 +545,12 @@ export default function CreatorScreen() {
         visible={reportVisible}
         characterId={longPressCharacter?.id ?? ""}
         onClose={handleCloseReport}
+      />
+
+      <FilterModal
+        ref={filterModalRef}
+        filters={filters}
+        onApply={handleApplyFilters}
       />
 
       <CustomAlert
@@ -627,5 +678,13 @@ const styles = StyleSheet.create({
   },
   followingBtnText: {
     color: colors.accent,
+  },
+  charactersStatPressable: {
+    alignItems: "center",
+  },
+  charactersStatRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
 });

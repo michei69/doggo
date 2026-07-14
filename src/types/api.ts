@@ -206,6 +206,7 @@ export interface TrendingCharacter {
     created_at: string;
     creator_id: string;
     creator_name: string;
+    creator_subscriber_badge: boolean;
     creator_verified: boolean;
     custom_tags: string[];
     description: string;

@@ -1,10 +1,11 @@
-import React, { memo } from "react";
+import { memo, useState, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   Pressable,
   ScrollView,
+  Share,
 } from "react-native";
 import CustomBottomSheet from "../common/CustomBottomSheet";
 import { colors } from "../../utils/colors";
@@ -19,6 +20,8 @@ function CharacterMenuSheet({
   onDeleteCharacter,
   onCopyCharacter,
   onReportCharacter,
+  characterId,
+  characterName,
 }: {
   visible: boolean;
   isOwner: boolean;
@@ -29,10 +32,23 @@ function CharacterMenuSheet({
   onDeleteCharacter: () => void;
   onCopyCharacter: () => void;
   onReportCharacter: () => void;
+  characterId: string;
+  characterName: string;
 }) {
+  const handleShare = useCallback(async () => {
+    const url = `https://janitorai.com/characters/${characterId}_${encodeURIComponent(characterName)}`;
+    try {
+      await Share.share({ url, message: url });
+    } catch {
+      // silently fail
+    }
+  }, [characterId, characterName]);
   return (
     <CustomBottomSheet visible={visible} onClose={onClose}>
       <ScrollView>
+        <Pressable onPress={handleShare} style={styles.item}>
+          <Text style={styles.text}>Share</Text>
+        </Pressable>
         <Pressable onPress={onViewCreator} style={styles.item}>
           <Text style={styles.text}>View Creator</Text>
         </Pressable>

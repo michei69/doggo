@@ -1,17 +1,49 @@
 export function htmlToMarkdown(text?: string): string {
-    return text
-        ? text
-              .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-              .replace(/<strong>(.*?)<\/strong>/gi, "**$1**")
-              .replace(/<b>(.*?)<\/b>/gi, "**$1**")
-              .replace(/<em>(.*?)<\/em>/gi, "*$1*")
-              .replace(/<i>(.*?)<\/i>/gi, "*$1*")
-              .replace(/<u>(.*?)<\/u>/gi, "__$1__")
-              .replace(/<br\s*\/?>/gi, "\n\n")
-              .replace(/<p[^>]*>/gi, "")
-              .replace(/<\/p>/gi, "\n\n")
-              .replace(/<[^>]*>/g, "")
-        : "";
+    if (!text) return "";
+    let result = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
+
+    // Fix \n breaking bold: replace newlines inside <strong>/<b> with a space
+    result = result.replace(
+        /<(strong|b)>([\s\S]*?)<\/\1>/gi,
+        (_match, _tag, content: string) => {
+            return `<${_tag}>${content.replace(/\n/g, " ")}</${_tag}>`;
+        },
+    );
+
+    // Fix adjacent tag spacing: </em><b> → </em> <b>
+    result = result.replace(/(<\/(?:em|i|u)>)<(strong|b)>/gi, "$1 <$2>");
+
+    // Convert images: <img src="url" alt="alt"> → ![alt](url)
+    // Handle src before alt
+    result = result.replace(
+        /<img[^>]*src="([^"]*)"[^>]*alt="([^"]*)"[^>]*\/?>/gi,
+        "![$2]($1)",
+    );
+    // Handle alt before src
+    result = result.replace(
+        /<img[^>]*alt="([^"]*)"[^>]*src="([^"]*)"[^>]*\/?>/gi,
+        "![$1]($2)",
+    );
+
+    // Convert links: <a href="url">text</a> → [text](url)
+    result = result.replace(
+        /<a\s+(?:[^>]*?\s+)?href="([^"]*)"[^>]*>(.*?)<\/a>/gi,
+        "[$2]($1)",
+    );
+
+    // Convert remaining HTML formatting
+    result = result
+        .replace(/<strong>(.*?)<\/strong>/gi, "**$1**")
+        .replace(/<b>(.*?)<\/b>/gi, "**$1**")
+        .replace(/<em>(.*?)<\/em>/gi, "*$1*")
+        .replace(/<i>(.*?)<\/i>/gi, "*$1*")
+        .replace(/<u>(.*?)<\/u>/gi, "__$1__")
+        .replace(/<br\s*\/?>/gi, "\n\n")
+        .replace(/<p[^>]*>/gi, "")
+        .replace(/<\/p>/gi, "\n\n")
+        .replace(/<[^>]*>/g, "");
+
+    return result;
 }
 
 export function stripHtml(text?: string): string {

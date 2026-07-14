@@ -91,7 +91,10 @@ export default function CharacterHeader({
         <Text style={styles.creator}>
           by {character.creator_name}
           {character.creator_verified && (
-            <Text style={styles.verified}> ✓</Text>
+            <Text style={styles.verified}> {"\u2713"}</Text>
+          )}
+          {character.creator_subscriber_badge && (
+            <Text style={styles.subscriberBadge}> Subscriber</Text>
           )}
         </Text>
       </Pressable>
@@ -379,6 +382,11 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontSize: 14,
     marginTop: 4,
+  },
+  subscriberBadge: {
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: "600",
   },
   verified: {
     color: colors.accent,

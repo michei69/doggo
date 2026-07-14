@@ -80,9 +80,13 @@ function listReducer(state: ListState, action: ListAction): ListState {
       return { ...state, refreshing: true, error: null };
     case "LOADED": {
       const { data, total, page } = action.payload;
+      const existingIds = new Set(state.characters.map((c) => c.id));
       return {
         ...state,
-        characters: page === 1 ? data : [...state.characters, ...data],
+        characters:
+          page === 1
+            ? data
+            : [...state.characters, ...data.filter((d) => !existingIds.has(d.id))],
         total,
         page,
         loading: false,
@@ -584,7 +588,7 @@ export default function CharacterSearchScreen() {
           numColumns={isTablet ? 2 : 1}
           key={isTablet ? "tablet-2col" : "phone-1col"}
           columnWrapperStyle={isTablet ? styles.columnWrapper : undefined}
-          estimatedItemSize={140}
+          estimatedItemSize={260}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
           drawDistance={800}

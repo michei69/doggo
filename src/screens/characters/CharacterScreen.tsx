@@ -489,6 +489,8 @@ export default function CharacterScreen() {
         onDeleteCharacter={handleDeleteCharacter}
         onCopyCharacter={handleCopyCharacter}
         onReportCharacter={handleReportCharacter}
+        characterId={character.id}
+        characterName={character.name}
       />
 
       <CustomAlert
