@@ -141,7 +141,7 @@ function getStateFromPath(path: string) {
     };
   }
 
-  // /create_character -> navigate to discover tab
+  // /create_character -> navigate to CreateTab
   if (
     cleanPath === "/create_character" ||
     cleanPath === "/create_character/"
@@ -151,20 +151,20 @@ function getStateFromPath(path: string) {
         {
           name: "MainTabs",
           state: {
-            routes: [{ name: "DiscoverTab" }],
+            routes: [{ name: "CreateTab" }],
           },
         },
       ],
     };
   }
 
-  // Default: discover page
+  // Default: chats list
   return {
     routes: [
       {
         name: "MainTabs",
         state: {
-          routes: [{ name: "DiscoverTab" }],
+          routes: [{ name: "ChatsTab" }],
         },
       },
     ],
