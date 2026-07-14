@@ -281,7 +281,9 @@ export default function CharacterSearchScreen() {
       let filteredData = response.data;
       if (filtersRef.current.customAvatar) {
         filteredData = filteredData.filter(
-          (c) => c.avatar !== "placeholder-nsfw.webp",
+          (c) =>
+            c.avatar !== "placeholder-nsfw.webp" &&
+            c.avatar !== "countdown.webp",
         );
       }
       dispatch({
