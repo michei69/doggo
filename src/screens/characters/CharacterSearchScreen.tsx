@@ -196,6 +196,7 @@ export default function CharacterSearchScreen() {
     "any",
   );
   const [advancedSearchVisible, setAdvancedSearchVisible] = useState(false);
+  const [hideDarkened, setHideDarkened] = useState(false);
 
   const [longPressCharacter, setLongPressCharacter] = useState<TrendingCharacter | null>(null);
   const [actionsVisible, setActionsVisible] = useState(false);
@@ -429,8 +430,11 @@ export default function CharacterSearchScreen() {
         return !advancedBlacklist.some((kw) => text.includes(kw.toLowerCase()));
       });
     }
+    if (hideDarkened) {
+      result = result.filter((c) => !hiddenIds.has(c.id));
+    }
     return result;
-  }, [state.characters, advancedKeywords, advancedBlacklist, keywordMatchMode]);
+  }, [state.characters, advancedKeywords, advancedBlacklist, keywordMatchMode, hideDarkened, hiddenIds]);
 
   const handleLongPress = useCallback((item: TrendingCharacter) => {
     setLongPressCharacter(item);
@@ -641,9 +645,11 @@ export default function CharacterSearchScreen() {
         keywords={advancedKeywords}
         blacklisted={advancedBlacklist}
         matchMode={keywordMatchMode}
+        hideDarkened={hideDarkened}
         onKeywordsChange={setAdvancedKeywords}
         onBlacklistedChange={setAdvancedBlacklist}
         onMatchModeChange={setKeywordMatchMode}
+        onHideDarkenedChange={setHideDarkened}
         onClose={() => setAdvancedSearchVisible(false)}
       />
 

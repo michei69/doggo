@@ -5,6 +5,7 @@ import {
   Text,
   TextInput,
   ScrollView,
+  Switch,
   View,
   StyleSheet,
 } from "react-native";
@@ -16,18 +17,22 @@ export default function AdvancedSearchModal({
   keywords,
   blacklisted,
   matchMode,
+  hideDarkened,
   onKeywordsChange,
   onBlacklistedChange,
   onMatchModeChange,
+  onHideDarkenedChange,
   onClose,
 }: {
   visible: boolean;
   keywords: string[];
   blacklisted: string[];
   matchMode: "any" | "all";
+  hideDarkened: boolean;
   onKeywordsChange: (keywords: string[]) => void;
   onBlacklistedChange: (keywords: string[]) => void;
   onMatchModeChange: (mode: "any" | "all") => void;
+  onHideDarkenedChange: (hide: boolean) => void;
   onClose: () => void;
 }) {
   const [keywordInput, setKeywordInput] = useState("");
@@ -207,6 +212,18 @@ export default function AdvancedSearchModal({
               </View>
             </View>
 
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>
+                Hide darkened: {hideDarkened ? "On" : "Off"}
+              </Text>
+              <Switch
+                value={hideDarkened}
+                onValueChange={onHideDarkenedChange}
+                trackColor={{ false: colors.border, true: colors.accent }}
+                thumbColor={colors.text}
+              />
+            </View>
+
             {hasAnyFilter && (
               <Pressable style={styles.clearRow} onPress={handleClearAll}>
                 <Text style={styles.clearText}>Clear all</Text>
@@ -359,6 +376,18 @@ const styles = StyleSheet.create({
   },
   matchBtnTextActive: {
     color: colors.accent,
+  },
+  toggleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  toggleLabel: {
+    color: colors.textSecondary,
+    fontSize: 14,
   },
   clearRow: {
     backgroundColor: colors.border,
