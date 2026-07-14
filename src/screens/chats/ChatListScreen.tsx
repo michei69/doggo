@@ -1,14 +1,16 @@
-import React, { useCallback, useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import {
   View,
   Text,
   ActivityIndicator,
   StyleSheet,
   RefreshControl,
+  TextInput,
   Pressable,
   ScrollView,
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
+import { Search } from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useShallow } from "zustand/react/shallow";
@@ -117,6 +119,19 @@ export default function ChatListScreen() {
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewUri, setPreviewUri] = useState("");
   const [previewName, setPreviewName] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredChats = useMemo(
+    () =>
+      searchQuery.trim()
+        ? chats.filter((c) =>
+            c.character.name
+              ?.toLowerCase()
+              .includes(searchQuery.toLowerCase()),
+          )
+        : chats,
+    [chats, searchQuery],
+  );
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -314,6 +329,25 @@ export default function ChatListScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Chats</Text>
+      {chats.length > 0 && (
+        <View style={styles.searchRow}>
+          <Search size={16} color={colors.textDim} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search conversations..."
+            placeholderTextColor={colors.textDim}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          {searchQuery.length > 0 && (
+            <Pressable onPress={() => setSearchQuery("")}>
+              <Text style={styles.clearBtn}>Clear</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
       {chats.length === 0 ? (
         <ScrollView
           contentContainerStyle={[styles.centered, { flexGrow: 1 }]}
@@ -332,7 +366,7 @@ export default function ChatListScreen() {
         </ScrollView>
       ) : (
         <FlashList
-          data={chats}
+          data={filteredChats}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           onEndReached={handleLoadMore}
@@ -477,6 +511,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 12,
+  },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.overlayLight,
+    borderRadius: 10,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 10,
+    height: 40,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 14,
+    paddingVertical: 0,
+  },
+  clearBtn: {
+    color: colors.accent,
+    fontSize: 13,
+    fontWeight: "600",
   },
   list: {
     paddingVertical: 8,
