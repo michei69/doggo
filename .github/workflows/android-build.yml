@@ -1,0 +1,98 @@
+name: Android Build
+
+on:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+      NODE_OPTIONS: --max-old-space-size=4096
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Fix worklets resolver (path + placeholder)
+        run: node fix-worklets-ci.js
+
+      - name: Prebuild Android
+        run: npx expo prebuild --platform android --clean
+
+      - name: Generate CI keystore
+        run: |
+          keytool -genkeypair -v \
+            -keystore android/app/ci-release.keystore \
+            -alias ci-release \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=CI Build"
+
+      - name: Configure release signing
+        run: |
+          node -e "
+          const fs = require('fs');
+          const buildGradle = 'android/app/build.gradle';
+          let gradle = fs.readFileSync(buildGradle, 'utf8');
+
+          const signingBlock = \`
+              signingConfigs {
+                  release {
+                      storeFile file('ci-release.keystore')
+                      storePassword 'android'
+                      keyAlias 'ci-release'
+                      keyPassword 'android'
+                  }
+              }
+          \`;
+          gradle = gradle.replace(
+            /^(android\s*\{)/m,
+            '\$1' + signingBlock
+          );
+
+          gradle = gradle.replace(
+            /(buildTypes\s*\{[\s\S]*?release\s*\{)/m,
+            '\$1\n            signingConfig signingConfigs.release'
+          );
+
+          fs.writeFileSync(buildGradle, gradle);
+          console.log('Signing config injected');
+          "
+
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew assembleRelease
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: doggo-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 30
