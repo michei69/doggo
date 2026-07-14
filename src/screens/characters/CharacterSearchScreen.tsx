@@ -14,6 +14,8 @@ import {
   RefreshControl,
   TextInput,
   Pressable,
+  ScrollView,
+  Image,
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -22,12 +24,14 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import CharacterCard from "../../components/character/CharacterCard";
 import CharacterDiscoverActionsSheet from "../../components/character/CharacterDiscoverActionsSheet";
 import CharacterReportModal from "../../components/character/CharacterReportModal";
-import { getCharacters, getTags } from "../../api/characters";
+import { getCharacters, getTags, searchProfiles } from "../../api/characters";
 import { getBlockedContent, updateBlockedContent } from "../../api/profile";
 import type { CharacterSearchParams } from "../../api/characters";
+import type { ProfileSearchResult } from "../../api/characters";
 import type { TrendingCharacter, TrendingResponse } from "../../types/api";
 import type { CharactersStackParamList } from "../../navigation/types";
 import { storage } from "../../utils/storage";
+import Avatar from "../../components/common/Avatar";
 import SortModal, {
   type SortModalHandle,
   SORT_OPTIONS,
@@ -214,6 +218,16 @@ export default function CharacterSearchScreen() {
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const hiddenLoadedRef = useRef(false);
 
+  const [discoveryMode, setDiscoveryMode] = useState<"characters" | "creators">("characters");
+
+  const [creators, setCreators] = useState<ProfileSearchResult[]>([]);
+  const [creatorsPage, setCreatorsPage] = useState(1);
+  const [creatorsTotal, setCreatorsTotal] = useState(0);
+  const [creatorsLoading, setCreatorsLoading] = useState(false);
+  const [creatorsRefreshing, setCreatorsRefreshing] = useState(false);
+  const creatorsPageRef = useRef(1);
+  const loadingMoreCreatorsRef = useRef(false);
+
   useEffect(() => {
     if (hiddenLoadedRef.current) return;
     hiddenLoadedRef.current = true;
@@ -311,6 +325,46 @@ export default function CharacterSearchScreen() {
       dispatch({ type: "ERROR", payload: err.message });
     }
   }, []);
+
+  const doFetchCreators = useCallback(async (pageNum: number, isRefresh = false) => {
+    if (isRefresh) {
+      setCreatorsRefreshing(true);
+    } else if (pageNum === 1) {
+      setCreators([]);
+      setCreatorsLoading(true);
+    } else {
+      setCreatorsLoading(true);
+    }
+
+    try {
+      const response = await searchProfiles({ page: pageNum, mode: "creator" });
+      if (pageNum === 1) {
+        setCreators(response.data);
+      } else {
+        setCreators((prev) => [...prev, ...response.data]);
+      }
+      setCreatorsPage(pageNum);
+      setCreatorsTotal(response.total);
+      creatorsPageRef.current = pageNum;
+      setCreatorsLoading(false);
+      setCreatorsRefreshing(false);
+      loadingMoreCreatorsRef.current = false;
+    } catch {
+      setCreatorsLoading(false);
+      setCreatorsRefreshing(false);
+      loadingMoreCreatorsRef.current = false;
+    }
+  }, []);
+
+  const handleToggleMode = useCallback(() => {
+    setDiscoveryMode((prev) => {
+      const next = prev === "characters" ? "creators" : "characters";
+      if (next === "creators" && creators.length === 0) {
+        doFetchCreators(1);
+      }
+      return next;
+    });
+  }, [creators.length, doFetchCreators]);
 
   // Handle deep link params on mount
   useEffect(() => {
@@ -431,8 +485,21 @@ export default function CharacterSearchScreen() {
   }, [state.loading, state.characters.length, state.total, doFetch]);
 
   const handleRefresh = useCallback(() => {
-    doFetch(1, true);
-  }, [doFetch]);
+    if (discoveryMode === "characters") {
+      doFetch(1, true);
+    } else {
+      doFetchCreators(1, true);
+    }
+  }, [doFetch, doFetchCreators, discoveryMode]);
+
+  const handleLoadMoreCreators = useCallback(() => {
+    if (loadingMoreCreatorsRef.current) return;
+    if (!creatorsLoading && creators.length < creatorsTotal) {
+      loadingMoreCreatorsRef.current = true;
+      const nextPage = creatorsPageRef.current + 1;
+      doFetchCreators(nextPage);
+    }
+  }, [creatorsLoading, creators.length, creatorsTotal, doFetchCreators]);
 
   const handleSortSelect = useCallback(
     (value: string) => {
@@ -598,6 +665,66 @@ export default function CharacterSearchScreen() {
     [navigate, isTablet, handleLongPress, hiddenIds, handleToggleHidden],
   );
 
+  const renderCreatorItem = useCallback(
+    ({ item }: { item: ProfileSearchResult }) => (
+      <Pressable
+        style={styles.creatorCard}
+        onPress={() =>
+          navigate("CreatorScreen", {
+            userId: item.id,
+            userName: item.user_name,
+          })
+        }
+      >
+        <View style={styles.creatorRow}>
+          <Avatar uri={item.avatar} name={item.user_name} size={48} />
+          <View style={styles.creatorInfo}>
+            <Text style={styles.creatorName} numberOfLines={1}>
+              {item.user_name}
+            </Text>
+            <Text style={styles.creatorMeta}>
+              {item.followers_count} followers · {item.character_count} characters
+            </Text>
+          </View>
+        </View>
+        {item.character_avatar_previews.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.charPreviewScroll}
+            contentContainerStyle={styles.charPreviewContent}
+          >
+            {item.character_avatar_previews.slice(0, 3).map((char) => (
+              <Pressable
+                key={char.id}
+                style={styles.charPreviewItem}
+                onPress={() =>
+                  navigate("CharacterScreen", {
+                    characterId: char.id,
+                    characterName: char.name,
+                  })
+                }
+              >
+                <Image
+                  source={{ uri: char.avatar }}
+                  style={styles.charPreviewAvatar}
+                />
+                <Text
+                  style={styles.charPreviewName}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {char.name}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
+      </Pressable>
+    ),
+    [navigate],
+  );
+
   const sortLabel =
     SORT_OPTIONS.find((o) => o.value === sortMode)?.label ?? "Trending 24h";
   const tagsLabel =
@@ -608,78 +735,138 @@ export default function CharacterSearchScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Discover</Text>
-      <Text style={styles.subtitle}>
-        {hasAdvancedFilters
-          ? `${displayCharacters.length.toLocaleString()} / ${state.total.toLocaleString()} characters`
-          : `${state.total.toLocaleString()} characters`}
-      </Text>
-
-      <View style={styles.searchRow}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search characters..."
-          placeholderTextColor={colors.textDim}
-          value={searchText}
-          onChangeText={handleSearchChange}
-          returnKeyType="search"
-          autoCorrect={false}
-          autoCapitalize="none"
-        />
+      <View style={styles.titleRow}>
+        <Text style={styles.title}>Discover</Text>
         <Pressable
-          style={styles.advancedButton}
-          onPress={() => setAdvancedSearchVisible(true)}
+          style={styles.modeToggle}
+          onPress={handleToggleMode}
         >
-          <SlidersHorizontal size={18} color={colors.textSecondary} />
+          <Text style={styles.modeToggleText}>
+            {discoveryMode === "characters" ? "Creators" : "Characters"}
+          </Text>
         </Pressable>
       </View>
+      {discoveryMode === "characters" && (
+        <Text style={styles.subtitle}>
+          {hasAdvancedFilters
+            ? `${displayCharacters.length.toLocaleString()} / ${state.total.toLocaleString()} characters`
+            : `${state.total.toLocaleString()} characters`}
+        </Text>
+      )}
+      {discoveryMode === "creators" && (
+        <Text style={styles.subtitle}>
+          {creatorsTotal.toLocaleString()} creators
+        </Text>
+      )}
 
-      <View style={styles.controlsRow}>
-        <Pressable
-          style={styles.controlButton}
-          onPress={() => sortModalRef.current?.open()}
-        >
-          <Text style={styles.controlButtonText}>{sortLabel}</Text>
-        </Pressable>
+      {discoveryMode === "characters" && (
+        <View style={styles.searchRow}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search characters..."
+            placeholderTextColor={colors.textDim}
+            value={searchText}
+            onChangeText={handleSearchChange}
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          <Pressable
+            style={styles.advancedButton}
+            onPress={() => setAdvancedSearchVisible(true)}
+          >
+            <SlidersHorizontal size={18} color={colors.textSecondary} />
+          </Pressable>
+        </View>
+      )}
 
-        <Pressable
-          style={styles.controlButton}
-          onPress={() => tagsModalRef.current?.open()}
-        >
-          <Text style={styles.controlButtonText}>{tagsLabel}</Text>
-        </Pressable>
+      {discoveryMode === "characters" && (
+        <View style={styles.controlsRow}>
+          <Pressable
+            style={styles.controlButton}
+            onPress={() => sortModalRef.current?.open()}
+          >
+            <Text style={styles.controlButtonText}>{sortLabel}</Text>
+          </Pressable>
 
-        <Pressable
-          style={styles.controlButtonIcon}
-          onPress={() => filterModalRef.current?.open()}
-        >
-          <Filter size={18} color={colors.textSecondary} />
-        </Pressable>
-      </View>
+          <Pressable
+            style={styles.controlButton}
+            onPress={() => tagsModalRef.current?.open()}
+          >
+            <Text style={styles.controlButtonText}>{tagsLabel}</Text>
+          </Pressable>
 
-      {isLoading ? (
+          <Pressable
+            style={styles.controlButtonIcon}
+            onPress={() => filterModalRef.current?.open()}
+          >
+            <Filter size={18} color={colors.textSecondary} />
+          </Pressable>
+        </View>
+      )}
+
+      {discoveryMode === "characters" ? (
+        isLoading ? (
+          <View style={styles.listLoader}>
+            <ActivityIndicator size="large" color={colors.accent} />
+          </View>
+        ) : isEmptyError ? (
+          <View style={styles.listLoader}>
+            <Text style={styles.errorText}>{state.error}</Text>
+          </View>
+        ) : (
+          <FlashList
+            data={displayCharacters}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id}
+            numColumns={isTablet ? 2 : 1}
+            key={isTablet ? "tablet-2col" : "phone-1col"}
+            columnWrapperStyle={isTablet ? styles.columnWrapper : undefined}
+            estimatedItemSize={260}
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.5}
+            drawDistance={800}
+            refreshControl={
+              <RefreshControl
+                refreshing={state.refreshing}
+                onRefresh={handleRefresh}
+                tintColor={colors.accent}
+              />
+            }
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              !state.loading && !state.error ? (
+                <View style={styles.listLoader}>
+                  <Text style={styles.emptyText}>No characters found</Text>
+                </View>
+              ) : null
+            }
+            ListFooterComponent={
+              state.loading && state.characters.length > 0 ? (
+                <ActivityIndicator
+                  style={styles.footerLoader}
+                  color={colors.accent}
+                />
+              ) : null
+            }
+          />
+        )
+      ) : creatorsLoading && creators.length === 0 ? (
         <View style={styles.listLoader}>
           <ActivityIndicator size="large" color={colors.accent} />
         </View>
-      ) : isEmptyError ? (
-        <View style={styles.listLoader}>
-          <Text style={styles.errorText}>{state.error}</Text>
-        </View>
       ) : (
         <FlashList
-          data={displayCharacters}
-          renderItem={renderItem}
+          data={creators}
+          renderItem={renderCreatorItem}
           keyExtractor={(item) => item.id}
-          numColumns={isTablet ? 2 : 1}
-          key={isTablet ? "tablet-2col" : "phone-1col"}
-          columnWrapperStyle={isTablet ? styles.columnWrapper : undefined}
-          estimatedItemSize={260}
-          onEndReached={handleLoadMore}
+          onEndReached={handleLoadMoreCreators}
           onEndReachedThreshold={0.5}
           drawDistance={800}
           refreshControl={
             <RefreshControl
-              refreshing={state.refreshing}
+              refreshing={creatorsRefreshing}
               onRefresh={handleRefresh}
               tintColor={colors.accent}
             />
@@ -687,14 +874,14 @@ export default function CharacterSearchScreen() {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            !state.loading && !state.error ? (
+            !creatorsLoading ? (
               <View style={styles.listLoader}>
-                <Text style={styles.emptyText}>No characters found</Text>
+                <Text style={styles.emptyText}>No creators found</Text>
               </View>
             ) : null
           }
           ListFooterComponent={
-            state.loading && state.characters.length > 0 ? (
+            creatorsLoading && creators.length > 0 ? (
               <ActivityIndicator
                 style={styles.footerLoader}
                 color={colors.accent}
@@ -864,5 +1051,73 @@ const styles = StyleSheet.create({
   columnWrapper: {
     gap: 12,
     paddingHorizontal: 20,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingRight: 20,
+  },
+  modeToggle: {
+    marginLeft: "auto",
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginTop: 60,
+  },
+  modeToggleText: {
+    color: colors.accent,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  creatorCard: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    marginHorizontal: 20,
+    marginBottom: 12,
+    padding: 16,
+  },
+  creatorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  creatorInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  creatorName: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  creatorMeta: {
+    color: colors.textDim,
+    fontSize: 13,
+    marginTop: 2,
+  },
+  charPreviewScroll: {
+    marginTop: 12,
+  },
+  charPreviewContent: {
+    gap: 12,
+  },
+  charPreviewItem: {
+    alignItems: "center",
+    width: 64,
+  },
+  charPreviewAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.border,
+  },
+  charPreviewName: {
+    color: colors.textDim,
+    fontSize: 11,
+    marginTop: 4,
+    textAlign: "center",
+    width: 64,
   },
 });

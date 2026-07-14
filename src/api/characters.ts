@@ -151,6 +151,49 @@ export async function getFavoriteCount(
     return response.data;
 }
 
+export interface CharacterAvatarPreview {
+    avatar: string;
+    id: string;
+    message_count: number;
+    name: string;
+    public_chat_count: number;
+}
+
+export interface ProfileSearchResult {
+    avatar: string;
+    character_avatar_previews: CharacterAvatarPreview[];
+    character_count: number;
+    display_prefs: null;
+    followers_count: number;
+    id: string;
+    is_verified: boolean;
+    plusbadge: boolean;
+    user_name: string;
+}
+
+export interface ProfileSearchResponse {
+    data: ProfileSearchResult[];
+    page: number;
+    size: number;
+    total: number;
+}
+
+export async function searchProfiles(
+    params: { page?: number; mode?: string } = {},
+): Promise<ProfileSearchResponse> {
+    const filteredParams: Record<string, string | number> = {};
+    if (params.page !== undefined) {
+        filteredParams.page = params.page;
+    }
+    if (params.mode !== undefined) {
+        filteredParams.mode = params.mode;
+    }
+    const response = await apiClient.get<ProfileSearchResponse>("/profiles/search", {
+        params: filteredParams,
+    });
+    return response.data;
+}
+
 export async function getMyCharacters(
     params: MyCharactersParams = {},
 ): Promise<TrendingResponse> {
