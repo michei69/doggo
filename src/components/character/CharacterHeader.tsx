@@ -351,7 +351,7 @@ export default function CharacterHeader({
 
       {character.scripts?.length > 0 && (
         <View style={styles.scriptsSection}>
-          <Text style={styles.sectionTitle}>Scripts</Text>
+          <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>Scripts</Text>
           {character.scripts.map((script) => {
             const theme = SCRIPT_THEMES[script.theme] ?? { light: colors.accent, dark: colors.card };
             const ScriptIcon = script.type === "simple" ? ScrollText : Code;
@@ -365,22 +365,22 @@ export default function CharacterHeader({
               >
                 <View style={styles.scriptHeaderRow}>
                   <ScriptIcon size={16} color={theme.light} />
-                  <Text style={styles.scriptTitle}>{script.title}</Text>
+                  <Text style={[styles.scriptTitle, { color: theme.light }]}>{script.title}</Text>
                   {!script.is_public && (
                     <Lock size={14} color={theme.light} style={{ marginLeft: "auto" }} />
                   )}
                 </View>
-                <Text style={styles.scriptDesc}>{script.description}</Text>
+                <Text style={[styles.scriptDesc, { color: theme.light }]}>{script.description}</Text>
                 <View style={styles.scriptFooterRow}>
                   <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
-                    <Clock size={12} color={colors.textDim} />
-                    <Text style={{ color: colors.textDim, fontSize: 11 }}>
+                    <Clock size={12} color={theme.light} />
+                    <Text style={{ color: theme.light, fontSize: 11 }}>
                       {formatDate(script.updated_at, dateFormat)}
                     </Text>
                   </View>
                   <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
-                    <MessageCircle size={12} color={colors.textDim} />
-                    <Text style={{ color: colors.textDim, fontSize: 11 }}>
+                    <MessageCircle size={12} color={theme.light} />
+                    <Text style={{ color: theme.light, fontSize: 11 }}>
                       {script.message_count}
                     </Text>
                   </View>
