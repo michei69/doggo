@@ -13,6 +13,7 @@ import ReviewsSection from "../reviews/ReviewsSection";
 import type { CharacterDetail } from "../../types/api";
 import { htmlToMarkdown } from "../../utils/markdown";
 import { markdownStyle } from "../../utils/markdownStyle";
+import { useNavigateToJanitorLink } from "../../utils/janitorLinks";
 import { botAvatarUrl } from "../../utils/assets";
 import { colors } from "../../utils/colors";
 import { formatDate } from "../../utils/time";
@@ -73,6 +74,7 @@ export default function CharacterHeader({
   );
   const [altIndex, setAltIndex] = useState(0);
   const nav = useNavigation<any>();
+  const onLinkPress = useNavigateToJanitorLink();
 
   const altMessages = character.first_messages?.slice(1) ?? [];
 
@@ -214,6 +216,7 @@ export default function CharacterHeader({
               markdown={descriptionMarkdown}
               markdownStyle={markdownStyle}
               selectable={false}
+              onLinkPress={onLinkPress}
             />
           </View>
           {descTruncated && (
@@ -255,6 +258,7 @@ export default function CharacterHeader({
             markdown={htmlToMarkdown(character.personality)}
             markdownStyle={markdownStyle}
             selectable={false}
+            onLinkPress={onLinkPress}
           />
         </CollapsibleSection>
       ) : null}
@@ -264,6 +268,7 @@ export default function CharacterHeader({
             markdown={htmlToMarkdown(character.scenario)}
             markdownStyle={markdownStyle}
             selectable={false}
+            onLinkPress={onLinkPress}
           />
         </CollapsibleSection>
       ) : null}
@@ -273,6 +278,7 @@ export default function CharacterHeader({
             markdown={htmlToMarkdown(character.example_dialogs)}
             markdownStyle={markdownStyle}
             selectable={false}
+            onLinkPress={onLinkPress}
           />
         </CollapsibleSection>
       ) : null}
@@ -283,6 +289,7 @@ export default function CharacterHeader({
             markdown={htmlToMarkdown(character.first_message)}
             markdownStyle={markdownStyle}
             selectable={false}
+            onLinkPress={onLinkPress}
           />
         </CollapsibleSection>
       ) : null}
@@ -295,6 +302,7 @@ export default function CharacterHeader({
             markdown={htmlToMarkdown(altMessages[altIndex])}
             markdownStyle={markdownStyle}
             selectable={false}
+            onLinkPress={onLinkPress}
           />
           <View style={styles.altNav}>
             <Pressable

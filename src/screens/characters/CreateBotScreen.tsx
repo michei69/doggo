@@ -43,6 +43,7 @@ import CustomAlert, {
 } from "../../components/common/CustomAlert";
 import { EnrichedMarkdownText } from "react-native-enriched-markdown";
 import { markdownStyle } from "../../utils/markdownStyle";
+import { useNavigateToJanitorLink } from "../../utils/janitorLinks";
 import { useKeyboardHeight } from "../../hooks/useKeyboardHeight";
 
 type Route = RouteProp<CreateStackParamList, "CreateBot">;
@@ -102,6 +103,7 @@ function clearPersistedForm(isEditMode: boolean): void {
 export default function CreateBotScreen() {
   const route = useRoute<Route>();
   const { navigate, goBack } = useNavigation<Nav>();
+  const onLinkPress = useNavigateToJanitorLink();
   const characterId = route.params?.characterId;
   const isEditMode = !!characterId;
 
@@ -851,6 +853,7 @@ export default function CreateBotScreen() {
                 <EnrichedMarkdownText
                   markdown={form.first_messages[firstMsgIndex] ?? ""}
                   markdownStyle={markdownStyle}
+                  onLinkPress={onLinkPress}
                 />
               </View>
             </ScrollView>

@@ -14,6 +14,7 @@ import type { ChatMessage } from "../../types/api";
 import type { Pronouns } from "../../types/api";
 import { replaceTags } from "../../utils/markdown";
 import { markdownStyle, userMarkdownStyle } from "../../utils/markdownStyle";
+import { useNavigateToJanitorLink } from "../../utils/janitorLinks";
 import { useChatStore } from "../../stores/chatStore";
 import { colors } from "../../utils/colors";
 
@@ -73,6 +74,7 @@ export default React.memo(function ChatBubble({
     null,
   );
   const inputRef = useRef<TextInput>(null);
+  const onLinkPress = useNavigateToJanitorLink();
 
   useEffect(() => {
     if (editingMessageId === message.id) {
@@ -176,6 +178,7 @@ export default React.memo(function ChatBubble({
             markdown={displayContent}
             markdownStyle={isUser && chatLayout === "messaging" ? userMarkdownStyle : markdownStyle}
             selectable={false}
+            onLinkPress={onLinkPress}
           />
           {showTimestamps ? (
             <Text style={styles.time}>
