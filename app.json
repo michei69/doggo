@@ -7,10 +7,22 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "associatedDomains": ["applinks:janitorai.com"]
     },
     "android": {
       "package": "dev.michei.doggo",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "host": "janitorai.com", "pathPrefix": "/" },
+            { "scheme": "janitorai", "host": "*", "pathPrefix": "/" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
