@@ -337,7 +337,7 @@ export default function CharacterSearchScreen() {
     }
 
     try {
-      const response = await searchProfiles({ page: pageNum, mode: "creator" });
+      const response = await searchProfiles({ page: pageNum, mode: "foryou" });
       if (pageNum === 1) {
         setCreators(response.data);
       } else {
