@@ -46,6 +46,7 @@ import FilterModal, {
   INITIAL_FILTERS,
 } from "../../components/discover/FilterModal";
 import { colors } from "../../utils/colors";
+import { avatarUrl, botAvatarUrl } from "../../utils/assets";
 import { useIsTablet } from "../../hooks/useIsTablet";
 import { SlidersHorizontal, Filter } from "lucide-react-native";
 import AdvancedSearchModal from "../../components/discover/AdvancedSearchModal";
@@ -677,7 +678,7 @@ export default function CharacterSearchScreen() {
         }
       >
         <View style={styles.creatorRow}>
-          <Avatar uri={item.avatar} name={item.user_name} size={48} />
+          <Avatar uri={avatarUrl(item.avatar)} name={item.user_name} size={48} />
           <View style={styles.creatorInfo}>
             <Text style={styles.creatorName} numberOfLines={1}>
               {item.user_name}
@@ -706,7 +707,7 @@ export default function CharacterSearchScreen() {
                 }
               >
                 <Image
-                  source={{ uri: char.avatar }}
+                  source={{ uri: botAvatarUrl(char.avatar) }}
                   style={styles.charPreviewAvatar}
                 />
                 <Text
