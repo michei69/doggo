@@ -115,6 +115,7 @@ export default function AvatarPreview({
   }, [visible, scale, translateX, translateY]);
 
   if (!uri) return null;
+  const previewUri = uri.replace(/\?width=\d+$/, "");
 
   return (
     <Modal
@@ -127,7 +128,7 @@ export default function AvatarPreview({
         <GestureDetector gesture={composed}>
           <View style={styles.overlay}>
             <Animated.Image
-              source={{ uri }}
+              source={{ uri: previewUri }}
               style={[styles.image, animatedStyle]}
               resizeMode="contain"
             />

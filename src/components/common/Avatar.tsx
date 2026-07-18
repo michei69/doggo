@@ -31,7 +31,7 @@ export default function Avatar({
     >
       {uri ? (
         <Image
-          source={{ uri }}
+          source={{ uri: uri.includes("?width=") ? uri : `${uri}?width=${size}` }}
           style={[styles.image, { borderRadius: size / 2 }]}
         />
       ) : (
