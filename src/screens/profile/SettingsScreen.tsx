@@ -75,6 +75,7 @@ export default function SettingsScreen() {
   const isTablet = useIsTablet();
   const [dateFormat, setDateFormat] = useState<"relative" | "absolute">("relative");
   const [reviewReactionsEnabled, setReviewReactionsEnabled] = useState(false);
+  const [fullResImages, setFullResImages] = useState(false);
   const [layoutPickerVisible, setLayoutPickerVisible] = useState(false);
   const [wrapperPickerVisible, setWrapperPickerVisible] = useState(false);
 
@@ -84,6 +85,10 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     storage.getReviewReactionsEnabled().then(setReviewReactionsEnabled);
+  }, []);
+
+  useEffect(() => {
+    storage.getFullResImages().then(setFullResImages);
   }, []);
 
   const handleLogout = useCallback(() => {
@@ -233,6 +238,24 @@ export default function SettingsScreen() {
               onValueChange={(val) => {
                 setReviewReactionsEnabled(val);
                 storage.setReviewReactionsEnabled(val);
+              }}
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={colors.text}
+            />
+          </View>
+
+          <View style={styles.toggleRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Full Resolution Images</Text>
+              <Text style={styles.settingValue}>
+                Always load images in full resolution
+              </Text>
+            </View>
+            <Switch
+              value={fullResImages}
+              onValueChange={(val) => {
+                setFullResImages(val);
+                storage.setFullResImages(val);
               }}
               trackColor={{ false: colors.border, true: colors.accent }}
               thumbColor={colors.text}

@@ -7,11 +7,13 @@ export default function Avatar({
   name,
   size = 48,
   onPress,
+  highRes = false,
 }: {
   uri?: string;
   name?: string;
   size?: number;
   onPress?: () => void;
+  highRes?: boolean;
 }) {
   const initials = name
     ? name
@@ -31,7 +33,7 @@ export default function Avatar({
     >
       {uri ? (
         <Image
-          source={{ uri: uri.includes("?width=") ? uri : `${uri}?width=${size}` }}
+          source={{ uri: highRes ? uri : uri.includes("?width=") ? uri : `${uri}?width=${size}` }}
           style={[styles.image, { borderRadius: size / 2 }]}
         />
       ) : (

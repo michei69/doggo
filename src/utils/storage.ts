@@ -207,6 +207,14 @@ export const storage = {
         return v === "true";
     },
 
+    async setFullResImages(enabled: boolean): Promise<void> {
+        await AsyncStorage.setItem(STORAGE_KEYS.FULL_RES_IMAGES, String(enabled));
+    },
+    async getFullResImages(): Promise<boolean> {
+        const v = await AsyncStorage.getItem(STORAGE_KEYS.FULL_RES_IMAGES);
+        return v === "true";
+    },
+
     async clearAll(): Promise<void> {
         await Promise.all([
             SecureStore.deleteItemAsync(STORAGE_KEYS.ACCESS_TOKEN),
