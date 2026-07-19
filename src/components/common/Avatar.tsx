@@ -1,20 +1,24 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { View, Image, Text, Pressable, StyleSheet } from "react-native";
 import { colors } from "../../utils/colors";
+import storage from "../../utils/storage";
 
 export default function Avatar({
   uri,
   name,
   size = 48,
   onPress,
-  highRes = false,
 }: {
   uri?: string;
   name?: string;
   size?: number;
   onPress?: () => void;
-  highRes?: boolean;
 }) {
+  const [useThumbnail, setUseThumbnail] = useState(true);
+
+  useEffect(() => {
+    storage.getFullResImages().then((enabled) => setUseThumbnail(!enabled));
+  }, []);
   const initials = name
     ? name
         .split(" ")
@@ -33,7 +37,7 @@ export default function Avatar({
     >
       {uri ? (
         <Image
-          source={{ uri: highRes ? uri : uri.includes("?width=") ? uri : `${uri}?width=${size}` }}
+          source={{ uri: useThumbnail && !uri.includes("?width=") ? `${uri}?width=${size}` : uri }}
           style={[styles.image, { borderRadius: size / 2 }]}
         />
       ) : (
