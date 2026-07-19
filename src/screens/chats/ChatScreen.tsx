@@ -652,6 +652,7 @@ export default function ChatScreen() {
           setDeleteAlertVisible(false);
           try {
             const ids = activeChatDetail.chatMessages.map((m) => m.id);
+            useChatStore.getState().clearMessages();
             await clearAndResetMessages(
               chatId,
               ids,
