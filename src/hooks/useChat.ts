@@ -505,7 +505,7 @@ export function useChat() {
                                 message: `Error: ${err.message}`,
                             });
                         },
-                    });
+                    }, userConfig.generation_settings?.enable_reasoning !== false && userConfig.generation_settings?.enable_reasoning_chat === true);
                     return; // Skip generateAlpha
                 }
 

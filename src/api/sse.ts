@@ -97,12 +97,15 @@ export class SSEClient {
         model: string,
         messages: Array<{ role: string; content: string }>,
         callbacks: SSECallbacks,
+        enableReasoning?: boolean,
     ): Promise<void> {
         this.abort();
         this.abortController = new AbortController();
 
         const baseUrl = apiUrl.replace(/\/+$/, "");
         const url = baseUrl.endsWith("/chat/completions") ? baseUrl : `${baseUrl}/chat/completions`;
+
+        const thinkingParam = { type: enableReasoning ? "enabled" as const : "disabled" as const };
 
         try {
             const response = await fetch(url, {
@@ -111,7 +114,7 @@ export class SSEClient {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${apiKey}`,
                 },
-                body: JSON.stringify({ model, messages, stream: true }),
+                body: JSON.stringify({ model, messages, stream: true, thinking: thinkingParam }),
                 signal: this.abortController.signal,
             });
 
