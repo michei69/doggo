@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, Image, Text, Pressable, StyleSheet } from "react-native";
 import { colors } from "../../utils/colors";
-import storage from "../../utils/storage";
+import { storage } from "../../utils/storage";
 
 export default function Avatar({
   uri,
