@@ -12,7 +12,6 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -210,14 +209,14 @@ export default function GenerationSettingsScreen() {
 
       e.preventDefault();
 
-      Alert.alert(
+      showAlert(
         "Unsaved Changes",
         "You have unsaved changes. Discard them?",
         [
-          { text: "Stay", style: "cancel", onPress: () => {} },
+          { text: "Stay", style: "cancel" as const, onPress: () => {} },
           {
             text: "Leave",
-            style: "destructive",
+            style: "destructive" as const,
             onPress: () => navigation.dispatch(e.data.action),
           },
         ],

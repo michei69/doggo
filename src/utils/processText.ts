@@ -35,7 +35,9 @@ export function processText(
 
     if (wrapper === "") return processed;
 
-    const normalized = processed.replace(/[«"„‟⹂❞❝\u201c\u201d\u2018\u2019\u201a\u201b\u2039\u203a\u00bb]/g, '"');
+    const normalized = processed
+        .replace(/[«"„‟⹂❞❝\u201c\u201d\u00bb]/g, '"')
+        .replace(/[\u2018\u2019\u201a\u201b\u2039\u203a]/g, "'");
     const lines = normalized.split("\n");
 
     return lines
