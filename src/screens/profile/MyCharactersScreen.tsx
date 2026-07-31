@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -40,8 +40,8 @@ export default function MyCharactersScreen() {
   const [initialLoad, setInitialLoad] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const pageRef = useRef(1);
+  const hasMoreRef = useRef(true);
   const [filter, setFilter] = useState<PrivacyFilter>("all");
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
@@ -78,8 +78,8 @@ export default function MyCharactersScreen() {
         } else {
           setCharacters(result.data);
         }
-        setPage(pageNum);
-        setHasMore(result.data.length > 0);
+        pageRef.current = pageNum;
+        hasMoreRef.current = result.data.length > 0;
       } catch {
       } finally {
         setInitialLoad(false);
@@ -94,9 +94,9 @@ export default function MyCharactersScreen() {
   }, [filter, fetchCharacters]);
 
   const handleLoadMore = useCallback(() => {
-    if (loadingMore || !hasMore) return;
-    fetchCharacters(page + 1, filter, true);
-  }, [loadingMore, hasMore, page, filter, fetchCharacters]);
+    if (loadingMore || !hasMoreRef.current) return;
+    fetchCharacters(pageRef.current + 1, filter, true);
+  }, [loadingMore, filter, fetchCharacters]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);

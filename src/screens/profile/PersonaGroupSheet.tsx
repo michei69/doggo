@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useEffectEvent } from "react";
 import {
   View,
   Text,
@@ -44,94 +44,52 @@ const GROUP_COLORS = [
   "#ff9800",
 ];
 
-export default function PersonaGroupSheet({
-  visible,
+interface GroupForm {
+  name: string;
+  description: string;
+  color: string;
+}
+
+function initialGroupForm(group?: PersonaGroup): GroupForm {
+  if (group) {
+    return {
+      name: group.name,
+      description: group.description,
+      color: group.color,
+    };
+  }
+  return { name: "", description: "", color: GROUP_COLORS[0] };
+}
+
+function PersonaGroupContent({
   group,
   onClose,
   onSaved,
   onDeleteRequested,
+  keyboardHeight,
+  windowHeight,
+  isTablet,
+  sheetInset,
+  translateY,
+  backdropOpacity,
+  animateOut,
 }: {
-  visible: boolean;
   group?: PersonaGroup;
   onClose: () => void;
   onSaved: () => void;
   onDeleteRequested: (groupId: string) => void;
+  keyboardHeight: number;
+  windowHeight: number;
+  isTablet: boolean;
+  sheetInset: number;
+  translateY: ReturnType<typeof useSharedValue<number>>;
+  backdropOpacity: ReturnType<typeof useSharedValue<number>>;
+  animateOut: (onFinish: () => void) => void;
 }) {
-  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
-  const isTablet = Math.min(windowWidth, windowHeight) >= 600;
-  const sheetInset = isTablet ? windowWidth * 0.1 : 0;
-  const translateY = useSharedValue(windowHeight);
-  const backdropOpacity = useSharedValue(0);
-  const isClosing = useSharedValue(false);
-
   const editingId = group?.id ?? null;
 
-  const [form, setForm] = useState({
-    name: "",
-    description: "",
-    color: GROUP_COLORS[0],
-  });
+  const [form, setForm] = useState<GroupForm>(() => initialGroupForm(group));
   const [saving, setSaving] = useState(false);
-  const keyboardHeight = useKeyboardHeight();
-
-  // Reset form state when sheet opens
-  useEffect(() => {
-    if (!visible) return;
-    if (group) {
-      setForm({
-        name: group.name,
-        description: group.description,
-        color: group.color,
-      });
-    } else {
-      setForm({ name: "", description: "", color: GROUP_COLORS[0] });
-    }
-  }, [visible, group]);
-
-  const windowHeightRef = useRef(windowHeight);
-  windowHeightRef.current = windowHeight;
-
-  const animateIn = useCallback(() => {
-    "worklet";
-    const h = windowHeightRef.current;
-    cancelAnimation(translateY);
-    cancelAnimation(backdropOpacity);
-    translateY.value = h;
-    translateY.value = withSpring(0, {
-      damping: 24,
-      stiffness: 200,
-      mass: 0.8,
-    });
-    backdropOpacity.value = withTiming(1, { duration: 200 });
-  }, [backdropOpacity, translateY]);
-
-  const animateOut = useCallback((onFinish: () => void) => {
-    "worklet";
-    if (isClosing.value) return;
-    isClosing.value = true;
-    const h = windowHeightRef.current;
-    cancelAnimation(translateY);
-    cancelAnimation(backdropOpacity);
-    translateY.value = withTiming(h, { duration: 250 });
-    backdropOpacity.value = withTiming(0, { duration: 250 }, () => {
-      scheduleOnRN(onFinish);
-    });
-  }, [backdropOpacity, isClosing, translateY]);
-
-  const prevVisible = useRef(false);
-  useEffect(() => {
-    if (visible && !prevVisible.current) {
-      isClosing.value = false;
-      translateY.value = windowHeightRef.current;
-      backdropOpacity.value = 0;
-      requestAnimationFrame(() => animateIn());
-    } else if (!visible && prevVisible.current) {
-      animateOut(() => {
-        onClose();
-      });
-    }
-    prevVisible.current = visible;
-  }, [visible, animateIn, animateOut, backdropOpacity, isClosing, onClose, translateY]);
 
   const handleCancel = useCallback(() => {
     animateOut(() => {
@@ -187,7 +145,7 @@ export default function PersonaGroupSheet({
     }),
   }));
 
-  const overlay = (
+  return (
     <Animated.View style={[styles.container, rContainerStyle]}>
       <Animated.View style={[styles.backdrop, rBackdropStyle]} />
 
@@ -306,6 +264,95 @@ export default function PersonaGroupSheet({
       </KeyboardAvoidingView>
     </Animated.View>
   );
+}
+
+export default function PersonaGroupSheet({
+  visible,
+  group,
+  onClose,
+  onSaved,
+  onDeleteRequested,
+}: {
+  visible: boolean;
+  group?: PersonaGroup;
+  onClose: () => void;
+  onSaved: () => void;
+  onDeleteRequested: (groupId: string) => void;
+}) {
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+  const isTablet = Math.min(windowWidth, windowHeight) >= 600;
+  const sheetInset = isTablet ? windowWidth * 0.1 : 0;
+  const translateY = useSharedValue(windowHeight);
+  const backdropOpacity = useSharedValue(0);
+  const isClosing = useSharedValue(false);
+  const keyboardHeight = useKeyboardHeight();
+
+  const windowHeightRef = useRef(windowHeight);
+
+  useEffect(() => {
+    windowHeightRef.current = windowHeight;
+  });
+
+  const animateIn = useCallback(() => {
+    "worklet";
+    const h = windowHeightRef.current;
+    cancelAnimation(translateY);
+    cancelAnimation(backdropOpacity);
+    translateY.value = h;
+    translateY.value = withSpring(0, {
+      damping: 24,
+      stiffness: 200,
+      mass: 0.8,
+    });
+    backdropOpacity.value = withTiming(1, { duration: 200 });
+  }, [backdropOpacity, translateY]);
+
+  const animateOut = useCallback((onFinish: () => void) => {
+    "worklet";
+    if (isClosing.value) return;
+    isClosing.value = true;
+    const h = windowHeightRef.current;
+    cancelAnimation(translateY);
+    cancelAnimation(backdropOpacity);
+    translateY.value = withTiming(h, { duration: 250 });
+    backdropOpacity.value = withTiming(0, { duration: 250 }, () => {
+      scheduleOnRN(onFinish);
+    });
+  }, [backdropOpacity, isClosing, translateY]);
+
+  const animateInEvent = useEffectEvent(animateIn);
+
+  const prevVisible = useRef(false);
+  useEffect(() => {
+    if (visible && !prevVisible.current) {
+      isClosing.value = false;
+      translateY.value = windowHeightRef.current;
+      backdropOpacity.value = 0;
+      requestAnimationFrame(() => animateInEvent());
+    } else if (!visible && prevVisible.current) {
+      animateOut(() => {
+        onClose();
+      });
+    }
+    prevVisible.current = visible;
+  }, [visible, animateOut, backdropOpacity, isClosing, onClose, translateY]);
+
+  const overlay = (
+    <PersonaGroupContent
+      key={group?.id ?? ""}
+      group={group}
+      onClose={onClose}
+      onSaved={onSaved}
+      onDeleteRequested={onDeleteRequested}
+      keyboardHeight={keyboardHeight}
+      windowHeight={windowHeight}
+      isTablet={isTablet}
+      sheetInset={sheetInset}
+      translateY={translateY}
+      backdropOpacity={backdropOpacity}
+      animateOut={animateOut}
+    />
+  );
 
   // Register with portal so the sheet renders above the tab bar
   const portalKeyRef = useRef(-1);
@@ -334,7 +381,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 1000,
-    elevation: 1000,
     justifyContent: "flex-end",
   },
   backdrop: {
@@ -361,7 +407,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 16,
   },
-
   formGroup: { marginBottom: 16 },
   formLabel: {
     color: colors.textMuted,
@@ -379,8 +424,11 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 15,
   },
-
-  colorRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  colorRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
   colorSwatch: {
     width: 32,
     height: 32,
@@ -390,7 +438,6 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: colors.text,
   },
-
   modalActions: {
     flexDirection: "row",
     gap: 12,
@@ -418,7 +465,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalSaveText: { color: colors.text, fontSize: 15, fontWeight: "600" },
-
   modalDeleteBtn: {
     marginTop: 8,
     paddingVertical: 10,

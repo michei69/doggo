@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { View, Image, Text, Pressable, StyleSheet } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
+import { Image } from "expo-image";
 import { colors } from "../../utils/colors";
 import { storage } from "../../utils/storage";
 

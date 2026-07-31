@@ -15,28 +15,11 @@ import {
   StyleSheet,
 } from "react-native";
 import { colors } from "../../utils/colors";
-
-export type FilterOperator = "lte" | "gte";
-
-export interface FilterState {
-  messages: string;
-  messagesMode: FilterOperator;
-  tokens: string;
-  tokensMode: FilterOperator;
-  proxyOnly: boolean;
-  limitlessMode: boolean;
-  customAvatar: boolean;
-}
-
-export const INITIAL_FILTERS: FilterState = {
-  messages: "",
-  messagesMode: "gte",
-  tokens: "",
-  tokensMode: "gte",
-  proxyOnly: false,
-  limitlessMode: true,
-  customAvatar: false,
-};
+import {
+  INITIAL_FILTERS,
+  type FilterOperator,
+  type FilterState,
+} from "../../utils/discover";
 
 export interface FilterModalHandle {
   open: () => void;

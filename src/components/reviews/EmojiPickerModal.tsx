@@ -5,9 +5,9 @@ import {
     StyleSheet,
     Modal,
     Pressable,
-    Image,
     ActivityIndicator,
 } from "react-native";
+import { Image } from "expo-image";
 import type { EmojiDef } from "../../types/api";
 import { getEmojiDefinitions } from "../../stores/reviewStore";
 import { colors } from "../../utils/colors";

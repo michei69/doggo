@@ -6,14 +6,7 @@ import React, {
 } from "react";
 import { Modal, Pressable, Text, StyleSheet } from "react-native";
 import { colors } from "../../utils/colors";
-
-export const SORT_OPTIONS: { label: string; value: string }[] = [
-  { label: "Trending 24h", value: "trending24" },
-  { label: "Trending", value: "trending" },
-  { label: "Popular", value: "popular" },
-  { label: "Latest", value: "latest" },
-  { label: "Relevance", value: "relevance" },
-];
+import { SORT_OPTIONS } from "../../utils/discover";
 
 export interface SortModalHandle {
   open: () => void;

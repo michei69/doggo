@@ -1,5 +1,5 @@
 import type React from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { StyleSheet, Pressable, View, useWindowDimensions } from "react-native";
 import { colors } from "../../utils/colors";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -64,7 +64,7 @@ function SheetRenderer({
   const isClosing = useSharedValue(false);
   const wasVisible = useRef(false);
 
-  const animateIn = () => {
+  const animateIn = useCallback(() => {
     "worklet";
     cancelAnimation(translateY);
     cancelAnimation(backdropOpacity);
@@ -74,9 +74,9 @@ function SheetRenderer({
       mass: 0.8,
     });
     backdropOpacity.value = withTiming(1, { duration: 200 });
-  };
+  }, [translateY, backdropOpacity]);
 
-  const animateOut = () => {
+  const animateOut = useCallback(() => {
     "worklet";
     if (isClosing.value) return;
     isClosing.value = true;
@@ -86,7 +86,7 @@ function SheetRenderer({
     backdropOpacity.value = withTiming(0, { duration: 250 }, () => {
       scheduleOnRN(onClose);
     });
-  };
+  }, [isClosing, translateY, backdropOpacity, windowHeight, onClose]);
 
   useEffect(() => {
     if (visible) {
@@ -98,7 +98,7 @@ function SheetRenderer({
     } else if (wasVisible.current) {
       animateOut();
     }
-  }, [visible, isClosing, translateY, backdropOpacity, windowHeight]);
+  }, [visible, isClosing, translateY, backdropOpacity, windowHeight, animateIn, animateOut]);
 
   const panGesture = Gesture.Pan()
     .onStart(() => {
@@ -194,7 +194,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 1000,
-    elevation: 1000,
   },
   backdropTouchable: {
     position: "absolute",

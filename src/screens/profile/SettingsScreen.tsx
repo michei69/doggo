@@ -59,25 +59,197 @@ function wrapperLabel(key: string): string {
   return WRAPPERS.find((w) => w.key === key)?.label ?? "Italic (*)";
 }
 
-export default function SettingsScreen() {
-  const { goBack, navigate } = useNavigation<Nav>();
-  const logout = useAuthStore((s) => s.logout);
+type PickerOption = { key: string; label: string; desc?: string };
+
+const ToggleRow = React.memo(function ToggleRow({
+  label,
+  detail,
+  value,
+  onValueChange,
+}: {
+  label: string;
+  detail?: string;
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+}) {
+  return (
+    <View style={styles.toggleRow}>
+      <View style={styles.settingInfo}>
+        <Text style={styles.settingLabel}>{label}</Text>
+        {detail ? <Text style={styles.settingValue}>{detail}</Text> : null}
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: colors.border, true: colors.accent }}
+        thumbColor={colors.text}
+      />
+    </View>
+  );
+});
+
+const PressableRow = React.memo(function PressableRow({
+  label,
+  detail,
+  chevron,
+  spaced,
+  onPress,
+}: {
+  label: string;
+  detail?: string;
+  chevron?: string;
+  spaced?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.settingRow,
+        spaced && styles.rowSpaced,
+        pressed && { opacity: 0.7 },
+      ]}
+      onPress={onPress}
+    >
+      <View style={styles.settingInfo}>
+        <Text style={styles.settingLabel}>{label}</Text>
+        {detail ? <Text style={styles.settingValue}>{detail}</Text> : null}
+      </View>
+      {chevron ? <Text style={styles.settingChevron}>{chevron}</Text> : null}
+    </Pressable>
+  );
+});
+
+const PickerModal = React.memo(function PickerModal({
+  visible,
+  title,
+  options,
+  activeKey,
+  onSelect,
+  onClose,
+}: {
+  visible: boolean;
+  title: string;
+  options: PickerOption[];
+  activeKey: string;
+  onSelect: (key: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <Pressable style={styles.overlay} onPress={onClose}>
+        <Pressable style={styles.pickerContent} onPress={() => {}}>
+          <Text style={styles.pickerTitle}>{title}</Text>
+          {options.map((opt) => {
+            const active = activeKey === opt.key;
+            return (
+              <Pressable
+                key={opt.key}
+                style={[
+                  styles.pickerOption,
+                  active && styles.pickerOptionActive,
+                ]}
+                onPress={() => onSelect(opt.key)}
+              >
+                <Text
+                  style={[
+                    styles.pickerOptionLabel,
+                    active && styles.pickerOptionLabelActive,
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+                {opt.desc ? (
+                  <Text style={styles.pickerOptionDesc}>{opt.desc}</Text>
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+});
+
+const ChatLayoutSection = React.memo(function ChatLayoutSection({
+  isTablet,
+  onOpenLayoutPicker,
+}: {
+  isTablet: boolean;
+  onOpenLayoutPicker: () => void;
+}) {
   const chatLayout = useChatStore((s) => s.chatLayout);
-  const setChatLayout = useChatStore((s) => s.setChatLayout);
   const showTimestamps = useChatStore((s) => s.showTimestamps);
   const setShowTimestamps = useChatStore((s) => s.setShowTimestamps);
+  const chatCentered = useChatStore((s) => s.chatCentered);
+  const setChatCentered = useChatStore((s) => s.setChatCentered);
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Chat Layout</Text>
+      <PressableRow
+        label="Layout"
+        detail={layoutLabel(chatLayout)}
+        chevron="▼"
+        onPress={onOpenLayoutPicker}
+      />
+      <ToggleRow
+        label="Show timestamps"
+        value={showTimestamps}
+        onValueChange={setShowTimestamps}
+      />
+      {isTablet && (
+        <ToggleRow
+          label="Center chat"
+          detail="Constrain chat width instead of edge-to-edge"
+          value={chatCentered}
+          onValueChange={setChatCentered}
+        />
+      )}
+    </View>
+  );
+});
+
+const AutoFormatSection = React.memo(function AutoFormatSection({
+  onOpenWrapperPicker,
+}: {
+  onOpenWrapperPicker: () => void;
+}) {
   const autoFormatEnabled = useChatStore((s) => s.autoFormatEnabled);
   const setAutoFormatEnabled = useChatStore((s) => s.setAutoFormatEnabled);
   const narrationWrapper = useChatStore((s) => s.narrationWrapper);
-  const setNarrationWrapper = useChatStore((s) => s.setNarrationWrapper);
-  const chatCentered = useChatStore((s) => s.chatCentered);
-  const setChatCentered = useChatStore((s) => s.setChatCentered);
-  const isTablet = useIsTablet();
-  const [dateFormat, setDateFormat] = useState<"relative" | "absolute">("relative");
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Auto Formatting</Text>
+      <ToggleRow
+        label="Auto-format on generation"
+        detail="Wrap narration lines when bot finishes generating"
+        value={autoFormatEnabled}
+        onValueChange={setAutoFormatEnabled}
+      />
+      <PressableRow
+        label="Narration style"
+        detail={wrapperLabel(narrationWrapper)}
+        chevron="▼"
+        spaced
+        onPress={onOpenWrapperPicker}
+      />
+    </View>
+  );
+});
+
+const ContentSection = React.memo(function ContentSection() {
+  const { navigate } = useNavigation<Nav>();
+  const [dateFormat, setDateFormat] = useState<"relative" | "absolute">(
+    "relative",
+  );
   const [reviewReactionsEnabled, setReviewReactionsEnabled] = useState(false);
   const [fullResImages, setFullResImages] = useState(false);
-  const [layoutPickerVisible, setLayoutPickerVisible] = useState(false);
-  const [wrapperPickerVisible, setWrapperPickerVisible] = useState(false);
 
   useEffect(() => {
     storage.getDateFormat().then(setDateFormat);
@@ -91,6 +263,85 @@ export default function SettingsScreen() {
     storage.getFullResImages().then(setFullResImages);
   }, []);
 
+  const changeDateFormat = useCallback((value: boolean) => {
+    const next = value ? "relative" : "absolute";
+    setDateFormat(next);
+    storage.setDateFormat(next);
+  }, []);
+
+  const changeReviewReactions = useCallback((value: boolean) => {
+    setReviewReactionsEnabled(value);
+    storage.setReviewReactionsEnabled(value);
+  }, []);
+
+  const changeFullResImages = useCallback((value: boolean) => {
+    setFullResImages(value);
+    storage.setFullResImages(value);
+  }, []);
+
+  const openBlockedContent = useCallback(
+    () => navigate("BlockedContent"),
+    [navigate],
+  );
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Content</Text>
+      <PressableRow
+        label="Blocked Content"
+        detail="Manage blocked creators, characters, and tags"
+        chevron="›"
+        onPress={openBlockedContent}
+      />
+      <ToggleRow
+        label="Date Format"
+        detail={
+          dateFormat === "relative"
+            ? "Relative (2d, 3mo, 1y)"
+            : "Absolute (January 15, 2024)"
+        }
+        value={dateFormat === "relative"}
+        onValueChange={changeDateFormat}
+      />
+      <ToggleRow
+        label="Review Reactions"
+        detail="Enable emoji reactions on reviews"
+        value={reviewReactionsEnabled}
+        onValueChange={changeReviewReactions}
+      />
+      <ToggleRow
+        label="Full Resolution Images"
+        detail="Always load images in full resolution"
+        value={fullResImages}
+        onValueChange={changeFullResImages}
+      />
+    </View>
+  );
+});
+
+const AboutSection = React.memo(function AboutSection() {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>About</Text>
+      <View style={styles.placeholder}>
+        <Text style={styles.placeholderText}>Janitor AI</Text>
+        <Text style={styles.versionText}>Version 1.0.0</Text>
+      </View>
+    </View>
+  );
+});
+
+export default function SettingsScreen() {
+  const { goBack } = useNavigation<Nav>();
+  const logout = useAuthStore((s) => s.logout);
+  const chatLayout = useChatStore((s) => s.chatLayout);
+  const setChatLayout = useChatStore((s) => s.setChatLayout);
+  const narrationWrapper = useChatStore((s) => s.narrationWrapper);
+  const setNarrationWrapper = useChatStore((s) => s.setNarrationWrapper);
+  const isTablet = useIsTablet();
+  const [layoutPickerVisible, setLayoutPickerVisible] = useState(false);
+  const [wrapperPickerVisible, setWrapperPickerVisible] = useState(false);
+
   const handleLogout = useCallback(() => {
     Alert.alert("Logout", "Are you sure you want to log out?", [
       {
@@ -102,175 +353,43 @@ export default function SettingsScreen() {
     ]);
   }, [logout]);
 
+  const openLayoutPicker = useCallback(() => setLayoutPickerVisible(true), []);
+  const closeLayoutPicker = useCallback(() => setLayoutPickerVisible(false), []);
+  const selectLayout = useCallback(
+    (key: string) => {
+      setChatLayout(key as LayoutOption);
+      setLayoutPickerVisible(false);
+    },
+    [setChatLayout],
+  );
+
+  const openWrapperPicker = useCallback(
+    () => setWrapperPickerVisible(true),
+    [],
+  );
+  const closeWrapperPicker = useCallback(
+    () => setWrapperPickerVisible(false),
+    [],
+  );
+  const selectWrapper = useCallback(
+    (key: string) => {
+      setNarrationWrapper(key);
+      setWrapperPickerVisible(false);
+    },
+    [setNarrationWrapper],
+  );
+
   return (
     <View style={styles.container}>
       <ScreenHeader title="Settings" onBack={() => goBack()} />
       <ScrollView style={styles.content}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Chat Layout</Text>
-          <Pressable
-            style={({ pressed }) => [
-              styles.settingRow,
-              pressed && { opacity: 0.7 },
-            ]}
-            onPress={() => setLayoutPickerVisible(true)}
-          >
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Layout</Text>
-              <Text style={styles.settingValue}>{layoutLabel(chatLayout)}</Text>
-            </View>
-            <Text style={styles.settingChevron}>▼</Text>
-          </Pressable>
-
-          <View style={styles.toggleRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Show timestamps</Text>
-            </View>
-            <Switch
-              value={showTimestamps}
-              onValueChange={setShowTimestamps}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.text}
-            />
-          </View>
-
-          {isTablet && (
-            <View style={styles.toggleRow}>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingLabel}>Center chat</Text>
-                <Text style={styles.settingValue}>
-                  Constrain chat width instead of edge-to-edge
-                </Text>
-              </View>
-              <Switch
-                value={chatCentered}
-                onValueChange={setChatCentered}
-                trackColor={{ false: colors.border, true: colors.accent }}
-                thumbColor={colors.text}
-              />
-            </View>
-          )}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Auto Formatting</Text>
-          <View style={styles.toggleRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Auto-format on generation</Text>
-              <Text style={styles.settingValue}>
-                Wrap narration lines when bot finishes generating
-              </Text>
-            </View>
-            <Switch
-              value={autoFormatEnabled}
-              onValueChange={setAutoFormatEnabled}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.text}
-            />
-          </View>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.settingRow,
-              { marginTop: 10 },
-              pressed && { opacity: 0.7 },
-            ]}
-            onPress={() => setWrapperPickerVisible(true)}
-          >
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Narration style</Text>
-              <Text style={styles.settingValue}>
-                {wrapperLabel(narrationWrapper)}
-              </Text>
-            </View>
-            <Text style={styles.settingChevron}>▼</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Content</Text>
-          <Pressable
-            style={({ pressed }) => [
-              styles.settingRow,
-              pressed && { opacity: 0.7 },
-            ]}
-            onPress={() => navigate("BlockedContent")}
-          >
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Blocked Content</Text>
-              <Text style={styles.settingValue}>
-                Manage blocked creators, characters, and tags
-              </Text>
-            </View>
-            <Text style={styles.settingChevron}>›</Text>
-          </Pressable>
-
-          <View style={styles.toggleRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Date Format</Text>
-              <Text style={styles.settingValue}>
-                {dateFormat === "relative"
-                  ? "Relative (2d, 3mo, 1y)"
-                  : "Absolute (January 15, 2024)"}
-              </Text>
-            </View>
-            <Switch
-              value={dateFormat === "relative"}
-              onValueChange={(val) => {
-                const next = val ? "relative" : "absolute";
-                setDateFormat(next);
-                storage.setDateFormat(next);
-              }}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.text}
-            />
-          </View>
-
-          <View style={styles.toggleRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Review Reactions</Text>
-              <Text style={styles.settingValue}>
-                Enable emoji reactions on reviews
-              </Text>
-            </View>
-            <Switch
-              value={reviewReactionsEnabled}
-              onValueChange={(val) => {
-                setReviewReactionsEnabled(val);
-                storage.setReviewReactionsEnabled(val);
-              }}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.text}
-            />
-          </View>
-
-          <View style={styles.toggleRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Full Resolution Images</Text>
-              <Text style={styles.settingValue}>
-                Always load images in full resolution
-              </Text>
-            </View>
-            <Switch
-              value={fullResImages}
-              onValueChange={(val) => {
-                setFullResImages(val);
-                storage.setFullResImages(val);
-              }}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.text}
-            />
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
-          <View style={styles.placeholder}>
-            <Text style={styles.placeholderText}>Janitor AI</Text>
-            <Text style={styles.versionText}>Version 1.0.0</Text>
-          </View>
-        </View>
-
+        <ChatLayoutSection
+          isTablet={isTablet}
+          onOpenLayoutPicker={openLayoutPicker}
+        />
+        <AutoFormatSection onOpenWrapperPicker={openWrapperPicker} />
+        <ContentSection />
+        <AboutSection />
         <Button
           title="Logout"
           onPress={handleLogout}
@@ -279,88 +398,23 @@ export default function SettingsScreen() {
         />
       </ScrollView>
 
-      <Modal
+      <PickerModal
         visible={layoutPickerVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setLayoutPickerVisible(false)}
-      >
-        <Pressable
-          style={styles.overlay}
-          onPress={() => setLayoutPickerVisible(false)}
-        >
-          <Pressable style={styles.pickerContent} onPress={() => {}}>
-            <Text style={styles.pickerTitle}>Chat Layout</Text>
-            {LAYOUTS.map((opt) => {
-              const active = chatLayout === opt.key;
-              return (
-                <Pressable
-                  key={opt.key}
-                  style={[
-                    styles.pickerOption,
-                    active && styles.pickerOptionActive,
-                  ]}
-                  onPress={() => {
-                    setChatLayout(opt.key);
-                    setLayoutPickerVisible(false);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.pickerOptionLabel,
-                      active && styles.pickerOptionLabelActive,
-                    ]}
-                  >
-                    {opt.label}
-                  </Text>
-                  <Text style={styles.pickerOptionDesc}>{opt.desc}</Text>
-                </Pressable>
-              );
-            })}
-          </Pressable>
-        </Pressable>
-      </Modal>
+        title="Chat Layout"
+        options={LAYOUTS}
+        activeKey={chatLayout}
+        onSelect={selectLayout}
+        onClose={closeLayoutPicker}
+      />
 
-      <Modal
+      <PickerModal
         visible={wrapperPickerVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setWrapperPickerVisible(false)}
-      >
-        <Pressable
-          style={styles.overlay}
-          onPress={() => setWrapperPickerVisible(false)}
-        >
-          <Pressable style={styles.pickerContent} onPress={() => {}}>
-            <Text style={styles.pickerTitle}>Narration Style</Text>
-            {WRAPPERS.map((opt) => {
-              const active = narrationWrapper === opt.key;
-              return (
-                <Pressable
-                  key={opt.key}
-                  style={[
-                    styles.pickerOption,
-                    active && styles.pickerOptionActive,
-                  ]}
-                  onPress={() => {
-                    setNarrationWrapper(opt.key);
-                    setWrapperPickerVisible(false);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.pickerOptionLabel,
-                      active && styles.pickerOptionLabelActive,
-                    ]}
-                  >
-                    {opt.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </Pressable>
-        </Pressable>
-      </Modal>
+        title="Narration Style"
+        options={WRAPPERS}
+        activeKey={narrationWrapper}
+        onSelect={selectWrapper}
+        onClose={closeWrapperPicker}
+      />
     </View>
   );
 }
@@ -386,6 +440,9 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  rowSpaced: {
+    marginTop: 10,
   },
   settingInfo: {
     flex: 1,

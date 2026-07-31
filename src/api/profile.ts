@@ -85,14 +85,6 @@ export async function uploadFile(
     return response.data;
 }
 
-export async function putFile(url: string, blob: Blob): Promise<void> {
-    await fetch(url, {
-        method: "PUT",
-        body: blob,
-        headers: { "Content-Type": "image/webp" },
-    });
-}
-
 export async function getPersonaGroups(): Promise<PersonaGroup[]> {
     const response = await apiClient.get<PersonaGroup[]>(
         "/persona-groups/mine",

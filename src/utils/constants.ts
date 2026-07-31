@@ -1,6 +1,5 @@
 export const API_BASE_URL = "https://janitorai.com/hampter";
 export const AUTH_BASE_URL = "https://auth.janitorai.com";
-export const JANITOR_DOMAIN = "https://janitorai.com";
 
 export const STORAGE_KEYS = {
     ACCESS_TOKEN: "access_token",
@@ -27,7 +26,3 @@ export const STORAGE_KEYS = {
 
 export const SUPABASE_ANON_KEY =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jbXp4dHpvbW1wbnhreW5kZGJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjgzNzA3NDAsImV4cCI6MjA0Mzk0Njc0MH0.UfRPni4ga9Lmin8j0JjV5ouuK9bXp8tsqPJ8pMTDDAI";
-
-export const THINKING_REGEX = /<thinking>([\s\S]*?)<\/thinking>/g;
-export const THINKING_TAG_OPEN = "<thinking>";
-export const THINKING_TAG_CLOSE = "</thinking>";

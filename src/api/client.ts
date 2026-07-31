@@ -10,12 +10,14 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use(async (config) => {
-    const token = await storage.getAccessToken();
+    const [token, cfClearance, cfBm] = await Promise.all([
+        storage.getAccessToken(),
+        storage.getCfClearance(),
+        storage.getCfBm(),
+    ]);
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
-    const cfClearance = await storage.getCfClearance();
-    const cfBm = await storage.getCfBm();
     const cookies: string[] = [];
     if (cfClearance) cookies.push(`cf_clearance=${cfClearance}`);
     if (cfBm) cookies.push(`__cf_bm=${cfBm}`);

@@ -71,6 +71,10 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     fs.mkdirSync(path.dirname(fullModuleName), { recursive: true });
     fs.writeFileSync(fullModuleName, 'export default function __w() {}');
   }
+  if (!fs.existsSync(fullModuleName)) {
+    fs.mkdirSync(path.dirname(fullModuleName), { recursive: true });
+    fs.writeFileSync(fullModuleName, 'export default function __w() {}');
+  }
   return { type: "sourceFile", filePath: fullModuleName };
   }
 

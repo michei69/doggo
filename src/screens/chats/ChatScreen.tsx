@@ -1,4 +1,4 @@
-import {
+import React, {
   useEffect,
   useCallback,
   useMemo,
@@ -22,6 +22,7 @@ import {
   useNavigation,
 } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { FlashList } from "@shopify/flash-list";
 import MessageList from "../../components/chat/MessageList";
 import ChatInput from "../../components/chat/ChatInput";
 import ChatSettingsOverlay from "../../components/chat/ChatSettingsOverlay";
@@ -32,12 +33,10 @@ import { useAuthStore } from "../../stores/authStore";
 import { useChatStore } from "../../stores/chatStore";
 import type { ChatsStackParamList } from "../../navigation/types";
 import { Settings } from "lucide-react-native";
-import type { ChatMessage } from "../../types/api";
-import type { ChatListItem } from "../../types/api";
+import type { ChatMessage, ChatListItem, Pronouns } from "../../types/api";
 import { avatarUrl, botAvatarUrl } from "../../utils/assets";
-import CustomAlert, {
-  type AlertButton,
-} from "../../components/common/CustomAlert";
+import CustomAlert from "../../components/common/CustomAlert";
+import { useAlert } from "../../hooks/useAlert";
 import CustomBottomSheet from "../../components/common/CustomBottomSheet";
 import Avatar from "../../components/common/Avatar";
 import PersonaPicker from "../../components/chat/PersonaPicker";
@@ -68,6 +67,31 @@ import { getMyProfile } from "../../api/profile";
 
 type Route = RouteProp<ChatsStackParamList, "ChatScreen">;
 type Nav = NativeStackNavigationProp<ChatsStackParamList, "ChatScreen">;
+
+interface MessageBatchBody {
+  is_bot: boolean;
+  is_main: boolean;
+  message: string;
+  metadata: unknown;
+  character_id: string;
+  chat_id: number;
+  created_at: string;
+}
+
+async function postMessageBatches(
+  chatId: number,
+  bodies: MessageBatchBody[],
+): Promise<void> {
+  const batches: MessageBatchBody[][] = [];
+  for (let i = 0; i < bodies.length; i += 10) {
+    batches.push(bodies.slice(i, i + 10).reverse());
+  }
+  await batches.reduce(
+    (prev, batch) =>
+      prev.then(() => apiClient.post(`/chats/${chatId}/messages`, batch)),
+    Promise.resolve(),
+  );
+}
 
 function validateMessagesImport(
   raw: string,
@@ -122,7 +146,7 @@ function validateMessagesImport(
   return { valid: true, messages };
 }
 
-export default function ChatScreen() {
+function useChatScreen() {
   const route = useRoute<Route>();
   const { goBack, setOptions, navigate, replace } = useNavigation<Nav>();
   const { chatId, characterName, characterId } = route.params;
@@ -132,26 +156,21 @@ export default function ChatScreen() {
     isUser: boolean;
   } | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
-  const [deleteAlertVisible, setDeleteAlertVisible] = useState(false);
-  const [deleteAlertButtons, setDeleteAlertButtons] = useState<AlertButton[]>(
-    [],
-  );
-  const [deleteAlertTitle, setDeleteAlertTitle] = useState("");
-  const [deleteAlertMessage, setDeleteAlertMessage] = useState("");
+  const { alert: deleteAlert, showAlert, dismissAlert } = useAlert();
   const [newChatPickerVisible, setNewChatPickerVisible] = useState(false);
   const [switchPersonaPickerVisible, setSwitchPersonaPickerVisible] =
     useState(false);
   const [allChatsVisible, setAllChatsVisible] = useState(false);
   const [allChats, setAllChats] = useState<ChatListItem[]>([]);
   const [allChatsLoading, setAllChatsLoading] = useState(false);
-  const [systemPromptVisible, setSystemPromptVisible] = useState(false);
-  const [systemPromptContent, setSystemPromptContent] = useState("");
-  const [botPersonalityContent, setBotPersonalityContent] = useState("");
-  const [scenarioContent, setScenarioContent] = useState("");
-  const [systemPromptLoading, setSystemPromptLoading] = useState(false);
-  const [systemPromptError, setSystemPromptError] = useState<string | null>(
-    null,
-  );
+  const [systemPrompt, setSystemPrompt] = useState({
+    visible: false,
+    content: "",
+    botPersonality: "",
+    scenario: "",
+    loading: false,
+    error: null as string | null,
+  });
   const [messagesActionsVisible, setMessagesActionsVisible] = useState(false);
   const [localMode, setLocalMode] = useState(false);
   const [localModeBannerDismissed, setLocalModeBannerDismissed] = useState(false);
@@ -177,7 +196,6 @@ export default function ChatScreen() {
   } = useChat();
   const user = useAuthStore((s) => s.user);
   const storeRemoveMessages = useChatStore((s) => s.removeMessages);
-  const storeReplaceMessages = useChatStore((s) => s.replaceMessages);
   const isTablet = useIsTablet();
   const chatCentered = useChatStore((s) => s.chatCentered);
 
@@ -225,12 +243,17 @@ export default function ChatScreen() {
   }, [chatId, loadMessages]);
 
   useEffect(() => {
+    let cancelled = false;
     const loadLocalMode = async () => {
       const data = await storage.getChatLocalData(chatId);
+      if (cancelled) return;
       setLocalMode(data?.local_mode ?? false);
       setLocalModeBannerDismissed(false);
     };
     loadLocalMode();
+    return () => {
+      cancelled = true;
+    };
   }, [chatId]);
 
   useEffect(() => {
@@ -283,22 +306,22 @@ export default function ChatScreen() {
   }, [characterId]);
 
   const handleViewSystemPrompt = useCallback(() => {
-    setSystemPromptVisible(true);
-    setSystemPromptLoading(true);
-    setSystemPromptError(null);
-    setSystemPromptContent("");
-    setBotPersonalityContent("");
-    setScenarioContent("");
+    setSystemPrompt((p) => ({ ...p, visible: true }));
+    setSystemPrompt((p) => ({ ...p, loading: true }));
+    setSystemPrompt((p) => ({ ...p, error: null }));
+    setSystemPrompt((p) => ({ ...p, content: "" }));
+    setSystemPrompt((p) => ({ ...p, botPersonality: "" }));
+    setSystemPrompt((p) => ({ ...p, scenario: "" }));
     const detail = useChatStore.getState().activeChatDetail;
     if (!detail) {
-      setSystemPromptError("Chat not loaded");
-      setSystemPromptLoading(false);
+      setSystemPrompt((p) => ({ ...p, error: "Chat not loaded" }));
+      setSystemPrompt((p) => ({ ...p, loading: false }));
       return;
     }
     const fetchPrompt = async () => {
       try {
         const prompt = await fetchSystemPrompt(detail);
-        setSystemPromptContent(prompt);
+        setSystemPrompt((p) => ({ ...p, content: prompt }));
         const characterName =
           detail.character.chat_name || detail.character.name;
 
@@ -306,42 +329,40 @@ export default function ChatScreen() {
           prompt,
           characterName,
         );
-        setBotPersonalityContent(generify(cleanTags(personality ?? "", `${characterName}'s Persona`), characterName));
-        setScenarioContent(generify(cleanTags(scenario ?? "", "Scenario"), characterName));
+        setSystemPrompt((p) => ({ ...p, botPersonality: generify(cleanTags(personality ?? "", `${characterName}'s Persona`), characterName) }));
+        setSystemPrompt((p) => ({ ...p, scenario: generify(cleanTags(scenario ?? "", "Scenario"), characterName) }));
       } catch (err: any) {
-        setSystemPromptError(err.message || "Failed to load system prompt");
+        setSystemPrompt((p) => ({ ...p, error: err.message || "Failed to load system prompt" }));
       } finally {
-        setSystemPromptLoading(false);
+        setSystemPrompt((p) => ({ ...p, loading: false }));
       }
     };
     fetchPrompt();
   }, []);
 
   const handleAttemptViewSystemPrompt = useCallback(() => {
-    setDeleteAlertTitle("Extract System Prompt");
-    setDeleteAlertMessage(
+    showAlert("Extract System Prompt", 
       "This will attempt to extract the system prompt by having the AI reproduce it. " +
         "It may take a while and the extracted content may be incomplete or incorrect. Continue?",
-    );
-    setDeleteAlertButtons([
+    [
       {
         text: "Continue",
         onPress: () => {
-          setDeleteAlertVisible(false);
+          dismissAlert();
 
           const detail = useChatStore.getState().activeChatDetail;
           if (!detail) {
-            setSystemPromptError("Chat not loaded");
-            setSystemPromptVisible(true);
+            setSystemPrompt((p) => ({ ...p, error: "Chat not loaded" }));
+            setSystemPrompt((p) => ({ ...p, visible: true }));
             return;
           }
 
-          setSystemPromptVisible(true);
-          setSystemPromptLoading(true);
-          setSystemPromptError(null);
-          setSystemPromptContent("");
-          setBotPersonalityContent("");
-          setScenarioContent("");
+          setSystemPrompt((p) => ({ ...p, visible: true }));
+          setSystemPrompt((p) => ({ ...p, loading: true }));
+          setSystemPrompt((p) => ({ ...p, error: null }));
+          setSystemPrompt((p) => ({ ...p, content: "" }));
+          setSystemPrompt((p) => ({ ...p, botPersonality: "" }));
+          setSystemPrompt((p) => ({ ...p, scenario: "" }));
 
           const abortController = new AbortController();
           attemptAbortRef.current = abortController;
@@ -361,9 +382,13 @@ export default function ChatScreen() {
                 personaTag,
                 abortController.signal,
               );
-              setBotPersonalityContent(
-                generify(cleanTags(personaResult, personaTag), characterName),
-              );
+              setSystemPrompt((p) => ({
+                ...p,
+                botPersonality: generify(
+                  cleanTags(personaResult, personaTag),
+                  characterName,
+                ),
+              }));
             } catch (err: any) {
               if (!abortController.signal.aborted) {
                 extractionError = `Persona: ${err.message}`;
@@ -377,12 +402,13 @@ export default function ChatScreen() {
                   "Scenario",
                   abortController.signal,
                 );
-                setScenarioContent(
-                  generify(
+                setSystemPrompt((p) => ({
+                  ...p,
+                  scenario: generify(
                     cleanTags(scenarioResult, "Scenario"),
                     characterName,
                   ),
-                );
+                }));
               } catch (err: any) {
                 if (!abortController.signal.aborted) {
                   extractionError = `Scenario: ${err.message}`;
@@ -391,9 +417,9 @@ export default function ChatScreen() {
             }
 
             if (extractionError) {
-              setSystemPromptError(extractionError);
+              setSystemPrompt((p) => ({ ...p, error: extractionError }));
             }
-            setSystemPromptLoading(false);
+            setSystemPrompt((p) => ({ ...p, loading: false }));
             attemptAbortRef.current = null;
           };
           doExtraction();
@@ -402,15 +428,14 @@ export default function ChatScreen() {
       {
         text: "Cancel",
         style: "cancel",
-        onPress: () => setDeleteAlertVisible(false),
+        onPress: () => dismissAlert(),
       },
     ]);
-    setDeleteAlertVisible(true);
-  }, []);
+  }, [showAlert, dismissAlert]);
 
   const handleSystemPromptClose = useCallback(() => {
     attemptAbortRef.current?.abort();
-    setSystemPromptVisible(false);
+    setSystemPrompt((p) => ({ ...p, visible: false }));
   }, []);
 
   const handleNewChatPersonaSelect = useCallback(
@@ -438,22 +463,17 @@ export default function ChatScreen() {
   const handleExport = useCallback(() => {
     const currentMessages = useChatStore.getState().messages;
     if (currentMessages.length === 0) {
-      setDeleteAlertTitle("Export Messages");
-      setDeleteAlertMessage("No messages to export.");
-      setDeleteAlertButtons([
-        { text: "OK", onPress: () => setDeleteAlertVisible(false) },
+      showAlert("Export Messages", "No messages to export.", [
+        { text: "OK", onPress: dismissAlert },
       ]);
-      setDeleteAlertVisible(true);
       return;
     }
-    setDeleteAlertVisible(false);
-    setDeleteAlertTitle("Export as");
-    setDeleteAlertMessage("Copy the JSON to clipboard or save as a file?");
-    setDeleteAlertButtons([
+    dismissAlert();
+    showAlert("Export as", "Copy the JSON to clipboard or save as a file?", [
       {
         text: "Copy",
         onPress: async () => {
-          setDeleteAlertVisible(false);
+          dismissAlert();
           try {
             const json = JSON.stringify(
               currentMessages.map((m) => ({
@@ -474,7 +494,7 @@ export default function ChatScreen() {
       {
         text: "Save as File",
         onPress: async () => {
-          setDeleteAlertVisible(false);
+          dismissAlert();
           try {
             const json = JSON.stringify(
               currentMessages.map((m) => ({
@@ -506,25 +526,39 @@ export default function ChatScreen() {
         },
       },
     ]);
-    setDeleteAlertVisible(true);
-  }, [chatId]);
+  }, [chatId, showAlert, dismissAlert]);
 
   const handleImport = useCallback(() => {
     const importMessagesToServer = async (messages: ChatMessage[]) => {
       try {
         // Delete existing server messages first
-        const currentIds = useChatStore
-          .getState()
-          .messages.filter(
-            (m) => m.id > 0 && m.id <= 99000000000 && Number.isInteger(m.id),
-          )
-          .map((m) => m.id);
-        for (let i = 0; i < currentIds.length; i += 256) {
-          const batch = currentIds.slice(i, i + 256);
-          await apiClient.delete(`/chats/${chatId}/messages`, {
-            data: { message_ids: batch },
-          });
-        }
+        const currentIds = useChatStore.getState().messages.reduce<number[]>(
+          (acc, m) => {
+            if (
+              m.id > 0 &&
+              m.id <= 99000000000 &&
+              Number.isInteger(m.id)
+            ) {
+              acc.push(m.id);
+            }
+            return acc;
+          },
+          [],
+        );
+        await Promise.all(
+          (() => {
+            const requests: Promise<unknown>[] = [];
+            for (let i = 0; i < currentIds.length; i += 256) {
+              const batch = currentIds.slice(i, i + 256);
+              requests.push(
+                apiClient.delete(`/chats/${chatId}/messages`, {
+                  data: { message_ids: batch },
+                }),
+              );
+            }
+            return requests;
+          })(),
+        );
         // Post imported messages in batches of 25
         const body = messages.map((m) => ({
           is_bot: m.is_bot,
@@ -535,10 +569,7 @@ export default function ChatScreen() {
           chat_id: chatId,
           created_at: m.created_at,
         }));
-        for (let i = 0; i < body.length; i += 10) {
-          const batch = body.slice(i, i + 10).reverse();
-          await apiClient.post(`/chats/${chatId}/messages`, batch);
-        }
+        await postMessageBatches(chatId, body);
         await loadMessages(chatId);
         toast("Messages imported successfully");
       } catch {
@@ -546,110 +577,95 @@ export default function ChatScreen() {
       }
     };
 
-    setDeleteAlertTitle("Import Messages");
-    setDeleteAlertMessage(
+    showAlert(
+      "Import Messages",
       "This will replace all current messages with the imported ones. Continue?",
-    );
-    setDeleteAlertButtons([
-      {
-        text: "Import",
-        style: "destructive",
-        onPress: () => {
-          setDeleteAlertVisible(false);
-          setDeleteAlertTitle("Import from");
-          setDeleteAlertMessage("Read JSON from clipboard or pick a file?");
-          setDeleteAlertButtons([
-            {
-              text: "Clipboard",
-              onPress: async () => {
-                setDeleteAlertVisible(false);
-                try {
-                  const Clipboard = require("expo-clipboard");
-                  const text = await Clipboard.getStringAsync();
-                  if (!text || text.trim().length === 0) {
-                    setDeleteAlertTitle("Import Failed");
-                    setDeleteAlertMessage("Clipboard is empty.");
-                    setDeleteAlertButtons([
-                      {
-                        text: "OK",
-                        onPress: () => setDeleteAlertVisible(false),
-                      },
-                    ]);
-                    setDeleteAlertVisible(true);
-                    return;
-                  }
-                  const result = validateMessagesImport(text);
-                  if (!result.valid) {
-                    setDeleteAlertTitle("Import Failed");
-                    setDeleteAlertMessage(result.error);
-                    setDeleteAlertButtons([
-                      {
-                        text: "OK",
-                        onPress: () => setDeleteAlertVisible(false),
-                      },
-                    ]);
-                    setDeleteAlertVisible(true);
-                    return;
-                  }
-                  await importMessagesToServer(result.messages);
-                } catch {}
+      [
+        {
+          text: "Import",
+          style: "destructive",
+          onPress: () => {
+            dismissAlert();
+            showAlert("Import from", "Read JSON from clipboard or pick a file?", [
+              {
+                text: "Clipboard",
+                onPress: async () => {
+                  dismissAlert();
+                  try {
+                    const Clipboard = require("expo-clipboard");
+                    const text = await Clipboard.getStringAsync();
+                    if (!text || text.trim().length === 0) {
+                      showAlert("Import Failed", "Clipboard is empty.", [
+                        {
+                          text: "OK",
+                          onPress: dismissAlert,
+                        },
+                      ]);
+                      return;
+                    }
+                    const result = validateMessagesImport(text);
+                    if (!result.valid) {
+                      showAlert("Import Failed", result.error, [
+                        {
+                          text: "OK",
+                          onPress: dismissAlert,
+                        },
+                      ]);
+                      return;
+                    }
+                    await importMessagesToServer(result.messages);
+                  } catch {}
+                },
               },
-            },
-            {
-              text: "File",
-              onPress: async () => {
-                setDeleteAlertVisible(false);
-                try {
-                  const pickResult = await ExpoFile.pickFileAsync({
-                    mimeTypes: "application/json",
-                  });
-                  if (pickResult.canceled || !pickResult.result) return;
-                  const pickedFile = Array.isArray(pickResult.result)
-                    ? pickResult.result[0]
-                    : pickResult.result;
-                  const text = await pickedFile.text();
-                  const result = validateMessagesImport(text);
-                  if (!result.valid) {
-                    setDeleteAlertTitle("Import Failed");
-                    setDeleteAlertMessage(result.error);
-                    setDeleteAlertButtons([
-                      {
-                        text: "OK",
-                        onPress: () => setDeleteAlertVisible(false),
-                      },
-                    ]);
-                    setDeleteAlertVisible(true);
-                    return;
-                  }
-                  await importMessagesToServer(result.messages);
-                } catch {}
+              {
+                text: "File",
+                onPress: async () => {
+                  dismissAlert();
+                  try {
+                    const pickResult = await ExpoFile.pickFileAsync({
+                      mimeTypes: "application/json",
+                    });
+                    if (pickResult.canceled || !pickResult.result) return;
+                    const pickedFile = Array.isArray(pickResult.result)
+                      ? pickResult.result[0]
+                      : pickResult.result;
+                    const text = await pickedFile.text();
+                    const result = validateMessagesImport(text);
+                    if (!result.valid) {
+                      showAlert("Import Failed", result.error, [
+                        {
+                          text: "OK",
+                          onPress: dismissAlert,
+                        },
+                      ]);
+                      return;
+                    }
+                    await importMessagesToServer(result.messages);
+                  } catch {}
+                },
               },
-            },
-          ]);
-          setDeleteAlertVisible(true);
+            ]);
+          },
         },
-      },
-      {
-        text: "Cancel",
-        style: "cancel",
-        onPress: () => setDeleteAlertVisible(false),
-      },
-    ]);
-    setDeleteAlertVisible(true);
-  }, [storeReplaceMessages]);
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: dismissAlert,
+        },
+      ],
+    );
+  }, [chatId, characterId, loadMessages, showAlert, dismissAlert]);
 
   const handleReset = useCallback(() => {
     if (!activeChatDetail) return;
-    setDeleteAlertTitle("Reset Messages");
-    setDeleteAlertMessage(
+    showAlert("Reset Messages", 
       "Reset this conversation to the first messages? All current messages will be permanently deleted.",
-    );
-    setDeleteAlertButtons([
+    [
       {
         text: "Reset",
         style: "destructive",
         onPress: async () => {
-          setDeleteAlertVisible(false);
+          dismissAlert();
           try {
             const ids = activeChatDetail.chatMessages.map((m) => m.id);
             useChatStore.getState().clearMessages();
@@ -665,23 +681,20 @@ export default function ChatScreen() {
       {
         text: "Cancel",
         style: "cancel",
-        onPress: () => setDeleteAlertVisible(false),
+        onPress: () => dismissAlert(),
       },
     ]);
-    setDeleteAlertVisible(true);
-  }, [chatId, activeChatDetail, loadMessages]);
+  }, [chatId, activeChatDetail, loadMessages, showAlert, dismissAlert]);
 
   const handleDeleteChatFromCog = useCallback(() => {
-    setDeleteAlertTitle("Delete Chat");
-    setDeleteAlertMessage(
+    showAlert("Delete Chat", 
       `Delete conversation with ${characterName}? This cannot be undone.`,
-    );
-    setDeleteAlertButtons([
+    [
       {
         text: "Delete",
         style: "destructive",
         onPress: async () => {
-          setDeleteAlertVisible(false);
+          dismissAlert();
           try {
             await deleteChat(chatId);
             goBack();
@@ -691,11 +704,10 @@ export default function ChatScreen() {
       {
         text: "Cancel",
         style: "cancel",
-        onPress: () => setDeleteAlertVisible(false),
+        onPress: () => dismissAlert(),
       },
     ]);
-    setDeleteAlertVisible(true);
-  }, [chatId, characterName, deleteChat, goBack]);
+  }, [chatId, characterName, deleteChat, goBack, showAlert, dismissAlert]);
 
   const handleSettingsClose = useCallback(() => setSettingsVisible(false), []);
 
@@ -704,10 +716,6 @@ export default function ChatScreen() {
     [],
   );
   const handleAllChatsClose = useCallback(() => setAllChatsVisible(false), []);
-  const handleAlertDismiss = useCallback(
-    () => setDeleteAlertVisible(false),
-    [],
-  );
   const handleAllChatsBack = useCallback(() => {
     setAllChatsVisible(false);
     setSettingsVisible(true);
@@ -787,16 +795,14 @@ export default function ChatScreen() {
       if (serverIds.length > 0) handleDelete(serverIds);
       if (tempIds.length > 0) storeRemoveMessages(tempIds);
       setActionsTarget(null);
-      setDeleteAlertVisible(false);
+      dismissAlert();
     };
 
     if (hasAfter) {
       const afterCount = messages.length - 1 - idx;
-      setDeleteAlertTitle("Delete Message");
-      setDeleteAlertMessage(
+      showAlert("Delete Message", 
         `Delete just this message, or this message and the ${afterCount} message${afterCount > 1 ? "s" : ""} after it?`,
-      );
-      setDeleteAlertButtons([
+      [
         {
           text: "Just this",
           onPress: () => doDelete([actionsTarget.message.id]),
@@ -811,15 +817,14 @@ export default function ChatScreen() {
           style: "cancel",
           onPress: () => {
             setActionsTarget(null);
-            setDeleteAlertVisible(false);
+            dismissAlert();
           },
         },
       ]);
-      setDeleteAlertVisible(true);
     } else {
       doDelete([actionsTarget.message.id]);
     }
-  }, [actionsTarget, messages, handleDelete, storeRemoveMessages]);
+  }, [actionsTarget, messages, handleDelete, storeRemoveMessages, showAlert, dismissAlert]);
 
   const handleEditingDone = useCallback(() => {
     setEditingMessageId(null);
@@ -868,26 +873,23 @@ export default function ChatScreen() {
   }, [actionsTarget, chatId, editMsg]);
 
   const handleSwitchPersona = useCallback(() => {
-    setDeleteAlertTitle("Switch Persona");
-    setDeleteAlertMessage(
+    showAlert("Switch Persona", 
       "This action is irreversible. All messages will be transferred to the new persona. Continue?",
-    );
-    setDeleteAlertButtons([
+    [
       {
         text: "Continue",
         onPress: () => {
-          setDeleteAlertVisible(false);
+          dismissAlert();
           setSwitchPersonaPickerVisible(true);
         },
       },
       {
         text: "Cancel",
         style: "cancel",
-        onPress: () => setDeleteAlertVisible(false),
+        onPress: () => dismissAlert(),
       },
     ]);
-    setDeleteAlertVisible(true);
-  }, []);
+  }, [showAlert, dismissAlert]);
 
   const handleSwitchPersonaSelect = useCallback(
     async (
@@ -899,21 +901,30 @@ export default function ChatScreen() {
       let profile = null
       if (!persona) profile = await getMyProfile();
       const currentMessages = useChatStore.getState().messages;
-      const serverIds = currentMessages
-        .filter((m) => m.id > 0)
-        .map((m) => m.id);
+      const serverIds = currentMessages.reduce<number[]>((acc, m) => {
+        if (m.id > 0) acc.push(m.id);
+        return acc;
+      }, []);
 
       try {
         // Delete all server messages
         const validIds = serverIds.filter(
           (id) => id > 0 && id <= 99000000000 && Number.isInteger(id),
         );
-        for (let i = 0; i < validIds.length; i += 256) {
-          const batch = validIds.slice(i, i + 256);
-          await apiClient.delete(`/chats/${chatId}/messages`, {
-            data: { message_ids: batch },
-          });
-        }
+        await Promise.all(
+          (() => {
+            const requests: Promise<unknown>[] = [];
+            for (let i = 0; i < validIds.length; i += 256) {
+              const batch = validIds.slice(i, i + 256);
+              requests.push(
+                apiClient.delete(`/chats/${chatId}/messages`, {
+                  data: { message_ids: batch },
+                }),
+              );
+            }
+            return requests;
+          })(),
+        );
 
         // Re-create all messages with new persona metadata, batches of 10
         const newPersonaId = persona?.id ?? null;
@@ -934,10 +945,7 @@ export default function ChatScreen() {
           created_at: m.created_at,
         }));
 
-        for (let i = 0; i < msgBodies.length; i += 10) {
-          const batch = msgBodies.slice(i, i + 10).reverse();
-          await apiClient.post(`/chats/${chatId}/messages`, batch);
-        }
+        await postMessageBatches(chatId, msgBodies);
 
         await loadMessages(chatId);
         toast("Persona switched successfully");
@@ -953,101 +961,732 @@ export default function ChatScreen() {
     [],
   );
 
-  const chatContent = (
-    <>
-      {error ? (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <Pressable
-            onPress={() => loadMessages(chatId)}
-            style={({ pressed }) => [
-              styles.retryBtn,
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <Text style={styles.retryText}>Retry</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <MessageList
-          messages={messages}
-          isLoading={isLoadingMessages}
-          currentUserId={user?.id}
-          chatId={chatId}
-          onEdit={handleEdit}
-          onDelete={handleDeleteBubble}
-          onMessageLongPress={handleMessageLongPress}
-          editingMessageId={editingMessageId}
-          onEditingDone={handleEditingDone}
-          personaName={personaName}
-          characterChatName={characterChatName}
-          personaPronouns={persona?.pronouns}
-          characterAvatar={characterAvatar}
-          personaAvatar={personaAvatar}
-          activeThinking={activeThinking}
-          enableThinking={enableThinking}
-          onReroll={handleSwipeReroll}
-        />
-      )}
-      <ChatInput
-        onSend={handleSend}
-        isSending={isSending}
-        isGenerating={isGenerating}
-        onCancel={cancelGeneration}
-        disabled={proxyBlocked}
-      />
-    </>
+  const handleRetry = useCallback(() => loadMessages(chatId), [
+    loadMessages,
+    chatId,
+  ]);
+
+  const handleLocalModeBannerDismiss = useCallback(() => {
+    setLocalModeBannerDismissed(true);
+  }, []);
+
+  const handleAllChatSelect = useCallback(
+    (item: ChatListItem) => {
+      setAllChatsVisible(false);
+      navigate("ChatScreen", {
+        chatId: item.id,
+        characterName: item.character.name || characterName,
+        characterId: item.character_id,
+      });
+    },
+    [navigate, characterName],
   );
 
-  return (
-    <View style={styles.container}>
+  return {
+    chatId,
+    characterName,
+    characterId,
+    user,
+    handleGoBack,
+    handleOpenSettings,
+    proxyBlocked,
+    localMode,
+    localModeBannerDismissed,
+    handleLocalModeBannerDismiss,
+    error,
+    handleRetry,
+    messages,
+    isLoadingMessages,
+    handleEdit,
+    handleDeleteBubble,
+    handleMessageLongPress,
+    editingMessageId,
+    handleEditingDone,
+    personaName,
+    characterChatName,
+    personaPronouns: persona?.pronouns,
+    characterAvatar,
+    personaAvatar,
+    activeThinking,
+    enableThinking,
+    handleSwipeReroll,
+    handleSend,
+    isSending,
+    isGenerating,
+    cancelGeneration,
+    isTablet,
+    chatCentered,
+    keyboardHeight,
+    settingsVisible,
+    handleSettingsClose,
+    creatorId: activeChatDetail?.character.creator_id,
+    creatorName: activeChatDetail?.character.creator_name,
+    allowProxy: activeChatDetail?.character.allow_proxy,
+    handleNewChatFromCog,
+    handleAllChats,
+    handleMessagesActionsOpen,
+    handleDeleteChatFromCog,
+    handleViewSystemPrompt,
+    handleAttemptViewSystemPrompt,
+    messagesActionsVisible,
+    handleMessagesActionsClose,
+    handleExport,
+    handleImport,
+    handleReset,
+    handleSwitchPersona,
+    actionsTarget,
+    isLastMessage,
+    handleActionsClose,
+    handleCopyMessage,
+    handleActionsEdit,
+    handleReformat,
+    handleRerollMessage,
+    handleFork,
+    handleReroll,
+    handleActionsDelete,
+    newChatPickerVisible,
+    handleNewChatPickerClose,
+    handleNewChatPersonaSelect,
+    switchPersonaPickerVisible,
+    handleSwitchPersonaPickerClose,
+    handleSwitchPersonaSelect,
+    deleteAlert,
+    dismissAlert,
+    allChatsVisible,
+    handleAllChatsClose,
+    handleAllChatsBack,
+    allChatsLoading,
+    allChats,
+    handleAllChatSelect,
+    systemPrompt,
+    handleSystemPromptClose,
+  };
+}
+
+const ChatScreenHeader = React.memo(
+  function ChatScreenHeader({
+    title,
+    onBack,
+    onOpenSettings,
+  }: {
+    title: string;
+    onBack: () => void;
+    onOpenSettings: () => void;
+  }) {
+    return (
       <ScreenHeader
-        title={characterName}
-        onBack={handleGoBack}
+        title={title}
+        onBack={onBack}
         rightElement={
-          <Pressable onPress={handleOpenSettings} style={styles.backBtn}>
+          <Pressable onPress={onOpenSettings} style={styles.backBtn}>
             <Settings size={22} color={colors.accent} />
           </Pressable>
         }
       />
+    );
+  },
+);
 
-      {proxyBlocked && (
-        <View style={styles.proxyWarningBanner}>
-          <Text style={styles.proxyWarningText}>
-            This character does not support proxies.
-          </Text>
-        </View>
-      )}
-      {localMode && !localModeBannerDismissed && (
-        <View style={styles.localModeBanner}>
-          <Text style={styles.localModeBannerText}>
-            Local mode enabled.
-          </Text>
-          <Pressable
-            onPress={() => setLocalModeBannerDismissed(true)}
-            style={styles.localModeBannerClose}
-          >
-            <Text style={styles.localModeBannerCloseText}>{"\u2715"}</Text>
-          </Pressable>
-        </View>
-      )}
-      {Platform.OS === "ios" ? (
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior="padding"
-          keyboardVerticalOffset={0}
+const ProxyBanner = React.memo(function ProxyBanner() {
+  return (
+    <View style={styles.proxyWarningBanner}>
+      <Text style={styles.proxyWarningText}>
+        This character does not support proxies.
+      </Text>
+    </View>
+  );
+});
+
+const LocalModeBanner = React.memo(
+  function LocalModeBanner({ onDismiss }: { onDismiss: () => void }) {
+    return (
+      <View style={styles.localModeBanner}>
+        <Text style={styles.localModeBannerText}>Local mode enabled.</Text>
+        <Pressable onPress={onDismiss} style={styles.localModeBannerClose}>
+          <Text style={styles.localModeBannerCloseText}>{"\u2715"}</Text>
+        </Pressable>
+      </View>
+    );
+  },
+);
+
+const ChatBodyArea = React.memo(
+  function ChatBodyArea({
+    flags,
+    error,
+    onRetry,
+    chatId,
+    messages,
+    currentUserId,
+    onEdit,
+    onDelete,
+    onMessageLongPress,
+    editingMessageId,
+    onEditingDone,
+    personaName,
+    characterChatName,
+    personaPronouns,
+    characterAvatar,
+    personaAvatar,
+    activeThinking,
+    onReroll,
+    onSend,
+    onCancel,
+    keyboardHeight,
+  }: {
+    flags: {
+      isLoading: boolean;
+      isSending: boolean;
+      isGenerating: boolean;
+      disabled: boolean;
+      isTablet: boolean;
+      chatCentered: boolean;
+      enableThinking: boolean;
+    };
+    error: string | null;
+    onRetry: () => void;
+    chatId: number;
+    messages: ChatMessage[];
+    currentUserId: string | undefined;
+    onEdit: (messageId: number, newContent: string) => void;
+    onDelete: (messageId: number) => void;
+    onMessageLongPress: (message: ChatMessage) => void;
+    editingMessageId: number | null;
+    onEditingDone: () => void;
+    personaName: string;
+    characterChatName: string;
+    personaPronouns: Pronouns | null | undefined;
+    characterAvatar: string;
+    personaAvatar: string;
+    activeThinking: string;
+    onReroll: () => void;
+    onSend: (content: string) => void;
+    onCancel: () => void;
+    keyboardHeight: number;
+  }) {
+    const {
+      isLoading,
+      isSending,
+      isGenerating,
+      disabled,
+      isTablet,
+      chatCentered,
+      enableThinking,
+    } = flags;
+    const content = (
+      <>
+        {error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+            <Pressable
+              onPress={onRetry}
+              style={({ pressed }) => [
+                styles.retryBtn,
+                pressed && { opacity: 0.7 },
+              ]}
+            >
+              <Text style={styles.retryText}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <MessageList
+            messages={messages}
+            isLoading={isLoading}
+            currentUserId={currentUserId}
+            chatId={chatId}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onMessageLongPress={onMessageLongPress}
+            editingMessageId={editingMessageId}
+            onEditingDone={onEditingDone}
+            personaName={personaName}
+            characterChatName={characterChatName}
+            personaPronouns={personaPronouns}
+            characterAvatar={characterAvatar}
+            personaAvatar={personaAvatar}
+            activeThinking={activeThinking}
+            enableThinking={enableThinking}
+            onReroll={onReroll}
+          />
+        )}
+        <ChatInput
+          onSend={onSend}
+          isSending={isSending}
+          isGenerating={isGenerating}
+          onCancel={onCancel}
+          disabled={disabled}
+        />
+      </>
+    );
+    return Platform.OS === "ios" ? (
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior="padding"
+        keyboardVerticalOffset={0}
+      >
+        <View
+          style={isTablet && chatCentered ? styles.chatCentered : { flex: 1 }}
         >
-          <View style={isTablet && chatCentered ? styles.chatCentered : { flex: 1 }}>
-            {chatContent}
+          {content}
+        </View>
+      </KeyboardAvoidingView>
+    ) : (
+      <View style={{ flex: 1, paddingBottom: keyboardHeight }}>
+        <View
+          style={isTablet && chatCentered ? styles.chatCentered : { flex: 1 }}
+        >
+          {content}
+        </View>
+      </View>
+    );
+  },
+);
+
+const ChatMessageActions = React.memo(
+  function ChatMessageActions({
+    visible,
+    actionsTarget,
+    isLastMessage,
+    onClose,
+    onCopy,
+    onEdit,
+    onReformat,
+    onRerollMessage,
+    onFork,
+    onReroll,
+    onDelete,
+  }: {
+    visible: boolean;
+    actionsTarget: { message: ChatMessage; isUser: boolean } | null;
+    isLastMessage: boolean;
+    onClose: () => void;
+    onCopy: () => void;
+    onEdit: () => void;
+    onReformat: () => void;
+    onRerollMessage: () => void;
+    onFork: () => void;
+    onReroll: () => void;
+    onDelete: () => void;
+  }) {
+    return (
+      <MessageActions
+        visible={visible}
+        onClose={onClose}
+        actions={[
+          ...(actionsTarget
+            ? [
+                {
+                  label: "Copy Message",
+                  onPress: onCopy,
+                },
+              ]
+            : []),
+          ...(actionsTarget && actionsTarget.message.id > 0
+            ? [
+                {
+                  label: "Edit Message",
+                  onPress: onEdit,
+                },
+              ]
+            : []),
+          ...(actionsTarget &&
+          !actionsTarget.isUser &&
+          actionsTarget.message.id > 0
+            ? [
+                {
+                  label: "Reformat Markdown",
+                  onPress: onReformat,
+                },
+              ]
+            : []),
+          ...(actionsTarget &&
+          actionsTarget.isUser &&
+          isLastMessage &&
+          actionsTarget.message.id > 0
+            ? [
+                {
+                  label: "Reroll message",
+                  onPress: onRerollMessage,
+                },
+              ]
+            : []),
+          ...(actionsTarget && actionsTarget.message.id > 0
+            ? [
+                {
+                  label: "Fork Chat",
+                  onPress: onFork,
+                },
+              ]
+            : []),
+          ...(actionsTarget && !actionsTarget.isUser
+            ? [
+                {
+                  label: "Reroll",
+                  onPress: onReroll,
+                },
+              ]
+            : []),
+          {
+            label: "Delete Message",
+            destructive: true,
+            onPress: onDelete,
+          },
+        ]}
+      />
+    );
+  },
+);
+
+const AllChatsSheet = React.memo(
+  function AllChatsSheet({
+    visible,
+    onClose,
+    onBack,
+    characterName,
+    loading,
+    chats,
+    onSelectChat,
+  }: {
+    visible: boolean;
+    onClose: () => void;
+    onBack: () => void;
+    characterName: string;
+    loading: boolean;
+    chats: ChatListItem[];
+    onSelectChat: (item: ChatListItem) => void;
+  }) {
+    const renderRow = useCallback(
+      ({ item }: { item: ChatListItem }) => (
+        <Pressable
+          style={({ pressed }) => [
+            styles.allChatsRow,
+            pressed && { opacity: 0.7 },
+          ]}
+          onPress={() => onSelectChat(item)}
+        >
+          <Avatar
+            uri={botAvatarUrl(item.character.avatar)}
+            name={item.character.name}
+            size={36}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.allChatsRowName} numberOfLines={1}>
+              {item.character.name}
+            </Text>
+            <Text style={styles.allChatsRowMeta}>
+              {item.chat_count} messages
+            </Text>
           </View>
-        </KeyboardAvoidingView>
-      ) : (
-        <View style={{ flex: 1, paddingBottom: keyboardHeight }}>
-          <View style={isTablet && chatCentered ? styles.chatCentered : { flex: 1 }}>
-            {chatContent}
+        </Pressable>
+      ),
+      [onSelectChat],
+    );
+    return (
+      <CustomBottomSheet visible={visible} onClose={onClose}>
+        <View style={styles.allChatsContent}>
+          <View style={styles.allChatsTitleRow}>
+            <Pressable
+              onPress={onBack}
+              style={styles.allChatsBackBtn}
+            >
+              <Text style={styles.allChatsBackText}>{"\u2190"}</Text>
+            </Pressable>
+            <Text style={styles.allChatsTitle}>{characterName}</Text>
+            <View style={styles.allChatsBackBtn} />
+          </View>
+          {loading ? (
+            <ActivityIndicator
+              color={colors.accent}
+              style={{ paddingVertical: 24 }}
+            />
+          ) : chats.length === 0 ? (
+            <Text style={styles.allChatsEmpty}>
+              No chats with this character
+            </Text>
+          ) : (
+            <FlashList
+              data={chats}
+              renderItem={renderRow}
+              keyExtractor={(item) => item.id.toString()}
+              style={styles.allChatsList}
+              showsVerticalScrollIndicator={false}
+            />
+          )}
+        </View>
+      </CustomBottomSheet>
+    );
+  },
+);
+
+const SystemPromptModal = React.memo(
+  function SystemPromptModal({
+    visible,
+    content,
+    botPersonality,
+    scenario,
+    loading,
+    error,
+    onClose,
+  }: {
+    visible: boolean;
+    content: string;
+    botPersonality: string;
+    scenario: string;
+    loading: boolean;
+    error: string | null;
+    onClose: () => void;
+  }) {
+    return (
+      <Modal
+        visible={visible}
+        transparent
+        animationType="fade"
+        onRequestClose={onClose}
+      >
+        <View style={styles.sysPromptOverlay}>
+          <View style={styles.sysPromptModal}>
+            <View style={styles.sysPromptHeader}>
+              <Text style={styles.sysPromptTitle}>System Prompt</Text>
+              <Pressable onPress={onClose}>
+                <Text style={styles.sysPromptClose}>{"\u2715"}</Text>
+              </Pressable>
+            </View>
+            {error ? (
+              <Text style={styles.sysPromptError}>{error}</Text>
+            ) : loading && !content && !botPersonality && !scenario ? (
+              <ActivityIndicator
+                color={colors.accent}
+                style={{ paddingVertical: 24 }}
+              />
+            ) : (
+              <ScrollView style={styles.sysPromptScroll}>
+                {loading && (
+                  <View style={styles.sysPromptLoadingBar}>
+                    <ActivityIndicator
+                      size="small"
+                      color={colors.accent}
+                    />
+                    <Text style={styles.sysPromptLoadingText}>
+                      Loading system prompt...
+                    </Text>
+                  </View>
+                )}
+                {content.length > 0 && (
+                  <CollapsibleSection title="System Prompt">
+                    <TextInput
+                      multiline
+                      label="Raw System Prompt"
+                      style={styles.sysPromptTextInput}
+                      editable={!loading}
+                    >
+                      {content}
+                    </TextInput>
+                    <Pressable
+                      style={styles.sysPromptCopyBtn}
+                      onPress={() => {
+                        try {
+                          const Clipboard = require("expo-clipboard");
+                          Clipboard.setStringAsync(content);
+                        } catch {}
+                      }}
+                    >
+                      <Text style={styles.sysPromptCopyText}>Copy</Text>
+                    </Pressable>
+                  </CollapsibleSection>
+                )}
+                {botPersonality.length > 0 && (
+                  <CollapsibleSection title="Personality">
+                    <TextInput
+                      multiline
+                      label="Bot Personality"
+                      style={styles.sysPromptTextInput}
+                      editable={!loading}
+                    >
+                      {botPersonality}
+                    </TextInput>
+
+                    <Pressable
+                      style={styles.sysPromptCopyBtn}
+                      onPress={() => {
+                        try {
+                          const Clipboard = require("expo-clipboard");
+                          Clipboard.setStringAsync(botPersonality);
+                        } catch {}
+                      }}
+                    >
+                      <Text style={styles.sysPromptCopyText}>Copy</Text>
+                    </Pressable>
+                  </CollapsibleSection>
+                )}
+                {scenario.length > 0 && (
+                  <CollapsibleSection title="Scenario">
+                    <TextInput
+                      multiline
+                      label="Scenario"
+                      style={styles.sysPromptTextInput}
+                      editable={!loading}
+                    >
+                      {scenario}
+                    </TextInput>
+
+                    <Pressable
+                      style={styles.sysPromptCopyBtn}
+                      onPress={() => {
+                        try {
+                          const Clipboard = require("expo-clipboard");
+                          Clipboard.setStringAsync(scenario);
+                        } catch {}
+                      }}
+                    >
+                      <Text style={styles.sysPromptCopyText}>Copy</Text>
+                    </Pressable>
+                  </CollapsibleSection>
+                )}
+              </ScrollView>
+            )}
           </View>
         </View>
+      </Modal>
+    );
+  },
+);
+
+export default function ChatScreen() {
+  const {
+    chatId,
+    characterName,
+    characterId,
+    user,
+    handleGoBack,
+    handleOpenSettings,
+    proxyBlocked,
+    localMode,
+    localModeBannerDismissed,
+    handleLocalModeBannerDismiss,
+    error,
+    handleRetry,
+    messages,
+    isLoadingMessages,
+    handleEdit,
+    handleDeleteBubble,
+    handleMessageLongPress,
+    editingMessageId,
+    handleEditingDone,
+    personaName,
+    characterChatName,
+    personaPronouns,
+    characterAvatar,
+    personaAvatar,
+    activeThinking,
+    enableThinking,
+    handleSwipeReroll,
+    handleSend,
+    isSending,
+    isGenerating,
+    cancelGeneration,
+    isTablet,
+    chatCentered,
+    keyboardHeight,
+    settingsVisible,
+    handleSettingsClose,
+    creatorId,
+    creatorName,
+    allowProxy,
+    handleNewChatFromCog,
+    handleAllChats,
+    handleMessagesActionsOpen,
+    handleDeleteChatFromCog,
+    handleViewSystemPrompt,
+    handleAttemptViewSystemPrompt,
+    messagesActionsVisible,
+    handleMessagesActionsClose,
+    handleExport,
+    handleImport,
+    handleReset,
+    handleSwitchPersona,
+    actionsTarget,
+    isLastMessage,
+    handleActionsClose,
+    handleCopyMessage,
+    handleActionsEdit,
+    handleReformat,
+    handleRerollMessage,
+    handleFork,
+    handleReroll,
+    handleActionsDelete,
+    newChatPickerVisible,
+    handleNewChatPickerClose,
+    handleNewChatPersonaSelect,
+    switchPersonaPickerVisible,
+    handleSwitchPersonaPickerClose,
+    handleSwitchPersonaSelect,
+    deleteAlert,
+    dismissAlert,
+    allChatsVisible,
+    handleAllChatsClose,
+    handleAllChatsBack,
+    allChatsLoading,
+    allChats,
+    handleAllChatSelect,
+    systemPrompt,
+    handleSystemPromptClose,
+  } = useChatScreen();
+
+  const bodyFlags = useMemo(
+    () => ({
+      isLoading: isLoadingMessages,
+      isSending,
+      isGenerating,
+      disabled: proxyBlocked,
+      isTablet,
+      chatCentered,
+      enableThinking,
+    }),
+    [
+      isLoadingMessages,
+      isSending,
+      isGenerating,
+      proxyBlocked,
+      isTablet,
+      chatCentered,
+      enableThinking,
+    ],
+  );
+
+  return (
+    <View style={styles.container}>
+      <ChatScreenHeader
+        title={characterName}
+        onBack={handleGoBack}
+        onOpenSettings={handleOpenSettings}
+      />
+      {proxyBlocked && <ProxyBanner />}
+      {localMode && !localModeBannerDismissed && (
+        <LocalModeBanner onDismiss={handleLocalModeBannerDismiss} />
       )}
+      <ChatBodyArea
+        flags={bodyFlags}
+        error={error}
+        onRetry={handleRetry}
+        chatId={chatId}
+        messages={messages}
+        currentUserId={user?.id}
+        onEdit={handleEdit}
+        onDelete={handleDeleteBubble}
+        onMessageLongPress={handleMessageLongPress}
+        editingMessageId={editingMessageId}
+        onEditingDone={handleEditingDone}
+        personaName={personaName}
+        characterChatName={characterChatName}
+        personaPronouns={personaPronouns}
+        characterAvatar={characterAvatar}
+        personaAvatar={personaAvatar}
+        activeThinking={activeThinking}
+        onReroll={handleSwipeReroll}
+        onSend={handleSend}
+        onCancel={cancelGeneration}
+        keyboardHeight={keyboardHeight}
+      />
 
       <ChatSettingsOverlay
         visible={settingsVisible}
@@ -1055,9 +1694,9 @@ export default function ChatScreen() {
         characterName={characterName}
         characterId={characterId}
         chatId={chatId}
-        creatorId={activeChatDetail?.character.creator_id}
-        creatorName={activeChatDetail?.character.creator_name}
-        allowProxy={activeChatDetail?.character.allow_proxy}
+        creatorId={creatorId}
+        creatorName={creatorName}
+        allowProxy={allowProxy}
         onNewChat={handleNewChatFromCog}
         onAllChats={handleAllChats}
         onMessagesActions={handleMessagesActionsOpen}
@@ -1075,32 +1714,18 @@ export default function ChatScreen() {
         onSwitchPersona={handleSwitchPersona}
       />
 
-      <MessageActions
+      <ChatMessageActions
         visible={actionsTarget !== null}
+        actionsTarget={actionsTarget}
+        isLastMessage={isLastMessage}
         onClose={handleActionsClose}
-        onEdit={handleActionsEdit}
-        onDelete={handleActionsDelete}
-        onReroll={handleReroll}
         onCopy={handleCopyMessage}
-        onFork={handleFork}
-        onRerollMessage={handleRerollMessage}
+        onEdit={handleActionsEdit}
         onReformat={handleReformat}
-        canEdit={actionsTarget ? actionsTarget.message.id > 0 : false}
-        canDelete={true}
-        canReroll={actionsTarget ? !actionsTarget.isUser : false}
-        canFork={actionsTarget ? actionsTarget.message.id > 0 : false}
-        canRerollMessage={
-          actionsTarget
-            ? actionsTarget.isUser &&
-              isLastMessage &&
-              actionsTarget.message.id > 0
-            : false
-        }
-        canReformat={
-          actionsTarget
-            ? !actionsTarget.isUser && actionsTarget.message.id > 0
-            : false
-        }
+        onRerollMessage={handleRerollMessage}
+        onFork={handleFork}
+        onReroll={handleReroll}
+        onDelete={handleActionsDelete}
       />
 
       <PersonaPicker
@@ -1120,188 +1745,32 @@ export default function ChatScreen() {
       />
 
       <CustomAlert
-        visible={deleteAlertVisible}
-        title={deleteAlertTitle}
-        message={deleteAlertMessage}
-        buttons={deleteAlertButtons}
-        onDismiss={handleAlertDismiss}
+        visible={deleteAlert.visible}
+        title={deleteAlert.title}
+        message={deleteAlert.message}
+        buttons={deleteAlert.buttons}
+        onDismiss={dismissAlert}
       />
 
-      <CustomBottomSheet
+      <AllChatsSheet
         visible={allChatsVisible}
         onClose={handleAllChatsClose}
-      >
-        <View style={styles.allChatsContent}>
-          <View style={styles.allChatsTitleRow}>
-            <Pressable
-              onPress={handleAllChatsBack}
-              style={styles.allChatsBackBtn}
-            >
-              <Text style={styles.allChatsBackText}>{"\u2190"}</Text>
-            </Pressable>
-            <Text style={styles.allChatsTitle}>{characterName}</Text>
-            <View style={styles.allChatsBackBtn} />
-          </View>
-          {allChatsLoading ? (
-            <ActivityIndicator
-              color={colors.accent}
-              style={{ paddingVertical: 24 }}
-            />
-          ) : allChats.length === 0 ? (
-            <Text style={styles.allChatsEmpty}>
-              No chats with this character
-            </Text>
-          ) : (
-            <ScrollView style={styles.allChatsList}>
-              {allChats.map((chat) => (
-                <Pressable
-                  key={chat.id}
-                  style={({ pressed }) => [
-                    styles.allChatsRow,
-                    pressed && { opacity: 0.7 },
-                  ]}
-                  onPress={() => {
-                    setAllChatsVisible(false);
-                    navigate("ChatScreen", {
-                      chatId: chat.id,
-                      characterName: chat.character.name || characterName,
-                      characterId: chat.character_id,
-                    });
-                  }}
-                >
-                  <Avatar
-                    uri={botAvatarUrl(chat.character.avatar)}
-                    name={chat.character.name}
-                    size={36}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.allChatsRowName} numberOfLines={1}>
-                      {chat.character.name}
-                    </Text>
-                    <Text style={styles.allChatsRowMeta}>
-                      {chat.chat_count} messages
-                    </Text>
-                  </View>
-                </Pressable>
-              ))}
-            </ScrollView>
-          )}
-        </View>
-      </CustomBottomSheet>
+        onBack={handleAllChatsBack}
+        characterName={characterName}
+        loading={allChatsLoading}
+        chats={allChats}
+        onSelectChat={handleAllChatSelect}
+      />
 
-      <Modal
-        visible={systemPromptVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={handleSystemPromptClose}
-      >
-        <View style={styles.sysPromptOverlay}>
-          <View style={styles.sysPromptModal}>
-            <View style={styles.sysPromptHeader}>
-              <Text style={styles.sysPromptTitle}>System Prompt</Text>
-              <Pressable onPress={handleSystemPromptClose}>
-                <Text style={styles.sysPromptClose}>{"\u2715"}</Text>
-              </Pressable>
-            </View>
-            {systemPromptError ? (
-              <Text style={styles.sysPromptError}>{systemPromptError}</Text>
-            ) : systemPromptLoading &&
-              !systemPromptContent &&
-              !botPersonalityContent &&
-              !scenarioContent ? (
-              <ActivityIndicator
-                color={colors.accent}
-                style={{ paddingVertical: 24 }}
-              />
-            ) : (
-              <ScrollView style={styles.sysPromptScroll}>
-                {systemPromptLoading && (
-                  <View style={styles.sysPromptLoadingBar}>
-                    <ActivityIndicator
-                      size="small"
-                      color={colors.accent}
-                    />
-                    <Text style={styles.sysPromptLoadingText}>
-                      Loading system prompt...
-                    </Text>
-                  </View>
-                )}
-                {systemPromptContent.length > 0 && (
-                  <CollapsibleSection title="System Prompt">
-                    <TextInput
-                      multiline
-                      label="Raw System Prompt"
-                      style={styles.sysPromptTextInput}
-                      editable={!systemPromptLoading}
-                    >
-                      {systemPromptContent}
-                    </TextInput>
-                    <Pressable
-                      style={styles.sysPromptCopyBtn}
-                      onPress={() => {
-                        try {
-                          const Clipboard = require("expo-clipboard");
-                          Clipboard.setStringAsync(systemPromptContent);
-                        } catch {}
-                      }}
-                    >
-                      <Text style={styles.sysPromptCopyText}>Copy</Text>
-                    </Pressable>
-                  </CollapsibleSection>
-                )}
-                {botPersonalityContent.length > 0 && (
-                  <CollapsibleSection title="Personality">
-                    <TextInput
-                      multiline
-                      label="Bot Personality"
-                      style={styles.sysPromptTextInput}
-                      editable={!systemPromptLoading}
-                    >
-                      {botPersonalityContent}
-                    </TextInput>
-
-                    <Pressable
-                      style={styles.sysPromptCopyBtn}
-                      onPress={() => {
-                        try {
-                          const Clipboard = require("expo-clipboard");
-                          Clipboard.setStringAsync(botPersonalityContent);
-                        } catch {}
-                      }}
-                    >
-                      <Text style={styles.sysPromptCopyText}>Copy</Text>
-                    </Pressable>
-                  </CollapsibleSection>
-                )}
-                {scenarioContent.length > 0 && (
-                  <CollapsibleSection title="Scenario">
-                    <TextInput
-                      multiline
-                      label="Scenario"
-                      style={styles.sysPromptTextInput}
-                      editable={!systemPromptLoading}
-                    >
-                      {scenarioContent}
-                    </TextInput>
-
-                    <Pressable
-                      style={styles.sysPromptCopyBtn}
-                      onPress={() => {
-                        try {
-                          const Clipboard = require("expo-clipboard");
-                          Clipboard.setStringAsync(scenarioContent);
-                        } catch {}
-                      }}
-                    >
-                      <Text style={styles.sysPromptCopyText}>Copy</Text>
-                    </Pressable>
-                  </CollapsibleSection>
-                )}
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
+      <SystemPromptModal
+        visible={systemPrompt.visible}
+        content={systemPrompt.content}
+        botPersonality={systemPrompt.botPersonality}
+        scenario={systemPrompt.scenario}
+        loading={systemPrompt.loading}
+        error={systemPrompt.error}
+        onClose={handleSystemPromptClose}
+      />
     </View>
   );
 }

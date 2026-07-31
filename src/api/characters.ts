@@ -39,12 +39,6 @@ export async function getCharacters(
     return response.data;
 }
 
-export async function getTrendingCharacters(
-    page: number = 1,
-): Promise<TrendingResponse> {
-    return getCharacters({ page, special_mode: "trending24", mode: "all" });
-}
-
 export async function getTags(): Promise<CharacterTag[]> {
     const response = await apiClient.get<CharacterTag[]>("/tags");
     return response.data;

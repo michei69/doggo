@@ -11,7 +11,3 @@ export async function getEmojiDefinitions(): Promise<EmojiDef[]> {
     emojiDefinitions = response.all;
     return emojiDefinitions;
 }
-
-export function clearEmojiDefinitions(): void {
-    emojiDefinitions = null;
-}

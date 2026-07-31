@@ -1,7 +1,8 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { runOnJS, useAnimatedStyle, withSpring } from "react-native-reanimated";
+import Animated, { useAnimatedStyle, withSpring } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import { MessageCircle, MessageSquare, BadgeCheck, CirclePlus } from "lucide-react-native";
 import Avatar from "../common/Avatar";
 import AvatarPreview from "../common/AvatarPreview";
@@ -39,7 +40,7 @@ export default function CharacterCard({
       Gesture.Pan()
         .activeOffsetX([-20, 20])
         .failOffsetY([-10, 10])
-        .onEnd(() => runOnJS(handleSwipe)()),
+        .onEnd(() => scheduleOnRN(handleSwipe)),
     [handleSwipe],
   );
 
@@ -76,7 +77,12 @@ export default function CharacterCard({
                   >
                     {character.name}
                   </Text>
-                  <View style={[styles.creatorRow, hidden && styles.textHidden]}>
+                  <View
+                    style={[
+                      styles.creatorRow,
+                      hidden ? styles.creatorRowHidden : null,
+                    ]}
+                  >
                     <Text
                       style={styles.creator}
                       numberOfLines={1}
@@ -197,6 +203,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
     marginTop: 6,
+  },
+  creatorRowHidden: {
+    opacity: 0.5,
   },
   creator: {
     color: colors.textFaint,

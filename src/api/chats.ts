@@ -10,7 +10,7 @@ import type {
 } from "../types/api";
 import { storage } from "../utils/storage";
 import { getUserAgent } from "../utils/userAgent";
-import { readSSEStream, SSECallbacks } from "./sse";
+import { readSSEStream, type SSECallbacks } from "./sse";
 
 export async function getChats(page: number = 1): Promise<ChatListItem[]> {
     const response = await apiClient.get<ChatListItem[]>("/chats/homepage", {
@@ -74,14 +74,23 @@ export async function deleteMessages(
     messageIds: number[],
 ): Promise<SuccessResponse> {
     let lastResponse: SuccessResponse | undefined;
-    for (let i = 0; i < messageIds.length; i += 100) {
-        const batch = messageIds.slice(i, i + 100);
-        const response = await apiClient.delete<SuccessResponse>(
-            `/chats/${chatId}/messages`,
-            { data: { message_ids: batch } },
-        );
-        lastResponse = response.data;
-    }
+    const batches: SuccessResponse[] = await Promise.all(
+        (() => {
+            const requests: Promise<SuccessResponse>[] = [];
+            for (let i = 0; i < messageIds.length; i += 100) {
+                const batch = messageIds.slice(i, i + 100);
+                requests.push(
+                    apiClient
+                        .delete<SuccessResponse>(`/chats/${chatId}/messages`, {
+                            data: { message_ids: batch },
+                        })
+                        .then((res) => res.data),
+                );
+            }
+            return requests;
+        })(),
+    );
+    if (batches.length > 0) lastResponse = batches[batches.length - 1];
     return lastResponse!;
 }
 
@@ -121,13 +130,20 @@ export async function clearAndResetMessages(
     const validIds = messageIds.filter(
         (id) => id > 0 && id <= 99000000000 && Number.isInteger(id),
     );
-    for (let i = 0; i < validIds.length; i += 256) {
-        const batch = validIds.slice(i, i + 256);
-        if (batch.length < 1) break;
-        await apiClient.delete(`/chats/${chatId}/messages`, {
-            data: { message_ids: batch },
-        });
-    }
+    await Promise.all(
+        (() => {
+            const requests: Promise<unknown>[] = [];
+            for (let i = 0; i < validIds.length; i += 256) {
+                const batch = validIds.slice(i, i + 256);
+                requests.push(
+                    apiClient.delete(`/chats/${chatId}/messages`, {
+                        data: { message_ids: batch },
+                    }),
+                );
+            }
+            return requests;
+        })(),
+    );
     if (firstMessages.length > 0) {
         const body = firstMessages.reverse().map((msg, i) => ({
             chat_id: chatId,
@@ -150,8 +166,6 @@ export async function forkChat(
     return response.data;
 }
 
-export { SSECallbacks };
-
 export async function generateAlpha(
     body: object,
     signal: AbortSignal,
@@ -160,15 +174,15 @@ export async function generateAlpha(
     apiKey?: string,
     realModel?: string,
 ): Promise<void> {
-    const token = await storage.getAccessToken();
-    const cfClearance = await storage.getCfClearance();
-    const cfBm = await storage.getCfBm();
+    const [token, cfClearance, cfBm] = await Promise.all([
+        storage.getAccessToken(),
+        storage.getCfClearance(),
+        storage.getCfBm(),
+    ]);
     const cookies: string[] = [];
     if (cfClearance) cookies.push(`cf_clearance=${cfClearance}`);
     if (cfBm) cookies.push(`__cf_bm=${cfBm}`);
     const ua = getUserAgent();
-
-    // console.log(JSON.stringify(body))
 
     let response: Response;
     try {
@@ -190,6 +204,19 @@ export async function generateAlpha(
     }
 
     const contentType = response.headers.get("content-type") || "";
+
+    if (!response.ok) {
+        let message = `HTTP ${response.status}`;
+        try {
+            const errJson = await response.json();
+            message = errJson?.message || errJson?.error || message;
+        } catch {
+            // non-JSON error body, keep status message
+        }
+        if (signal.aborted) return;
+        callbacks.onError(new Error(message));
+        return;
+    }
 
     if (contentType.includes("application/json") || !response.body) {
         const json = await response.json();
@@ -250,9 +277,11 @@ export async function cancelGeneration(): Promise<void> {
 }
 
 export async function fetchSystemPrompt(detail: ChatDetail): Promise<string> {
-    const token = await storage.getAccessToken();
-    const cfClearance = await storage.getCfClearance();
-    const cfBm = await storage.getCfBm();
+    const [token, cfClearance, cfBm] = await Promise.all([
+        storage.getAccessToken(),
+        storage.getCfClearance(),
+        storage.getCfBm(),
+    ]);
     const cookies: string[] = [];
     if (cfClearance) cookies.push(`cf_clearance=${cfClearance}`);
     if (cfBm) cookies.push(`__cf_bm=${cfBm}`);

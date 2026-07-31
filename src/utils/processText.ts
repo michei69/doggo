@@ -49,18 +49,17 @@ export function processText(
             if (clean.includes('"') || clean.includes("`")) {
                 const fragments = clean.split(/("[\s\S]*?"|`[\s\S]*?`)/);
                 return fragments
-                    .map((frag) => {
+                    .flatMap((frag) => {
                         if (
                             (frag.startsWith('"') && frag.endsWith('"')) ||
                             (frag.startsWith("`") && frag.endsWith("`"))
                         ) {
-                            return frag;
+                            return [frag];
                         }
                         return frag.trim() !== ""
-                            ? `${wrapper}${frag.trim()}${wrapper}`
-                            : "";
+                            ? [`${wrapper}${frag.trim()}${wrapper}`]
+                            : [];
                     })
-                    .filter(Boolean)
                     .join(" ");
             }
 

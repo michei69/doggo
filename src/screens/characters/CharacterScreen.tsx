@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -16,9 +16,9 @@ import CharacterMenuSheet from "../../components/character/CharacterMenuSheet";
 import CharacterSettingsModal from "../../components/character/CharacterSettingsModal";
 import CharacterReportModal from "../../components/character/CharacterReportModal";
 import PersonaPicker from "../../components/chat/PersonaPicker";
-import CustomAlert, {
-  type AlertButton,
-} from "../../components/common/CustomAlert";
+import CustomAlert from "../../components/common/CustomAlert";
+import type { AlertButton } from "../../components/common/CustomAlert";
+import { useAlert } from "../../hooks/useAlert";
 import type { CharactersStackParamList } from "../../navigation/types";
 import { useAuthStore } from "../../stores/authStore";
 import { useChatStore } from "../../stores/chatStore";
@@ -51,58 +51,200 @@ import { getEmojiDefinitions } from "../../stores/reviewStore";
 
 type Route = RouteProp<CharactersStackParamList, "CharacterScreen">;
 
-export default function CharacterScreen() {
-  const route = useRoute<Route>();
-  const { navigate, goBack } = useNavigation<any>();
-  const [loading, setLoading] = useState(false);
+const LoadingState = React.memo(function LoadingState() {
+  return (
+    <View style={styles.centered}>
+      <ActivityIndicator size="large" color={colors.accent} />
+    </View>
+  );
+});
+
+const ErrorState = React.memo(function ErrorState({
+  error,
+  onBack,
+}: {
+  error: string;
+  onBack: () => void;
+}) {
+  return (
+    <View style={styles.centered}>
+      <Text style={styles.errorText}>{error}</Text>
+      <Pressable onPress={onBack} style={styles.backBtn}>
+        <Text style={styles.backText}>Go back</Text>
+      </Pressable>
+    </View>
+  );
+});
+
+const FavoriteButton = React.memo(function FavoriteButton({
+  isFavorited,
+  favoriteCount,
+  onToggle,
+}: {
+  isFavorited: boolean;
+  favoriteCount: number;
+  onToggle: () => void;
+}) {
+  return (
+    <Pressable onPress={onToggle} style={styles.favBtn}>
+      <Text
+        style={[
+          styles.favCount,
+          { color: isFavorited ? colors.danger : colors.textSecondary },
+        ]}
+      >
+        {formatCount(favoriteCount)}
+      </Text>
+      <Heart
+        size={22}
+        color={isFavorited ? colors.danger : colors.textSecondary}
+        fill={isFavorited ? colors.danger : "transparent"}
+      />
+    </Pressable>
+  );
+});
+
+const ScreenHeader = React.memo(function ScreenHeader({
+  isFavorited,
+  favoriteCount,
+  onToggleFavorite,
+  onOpenMenu,
+  onBack,
+}: {
+  isFavorited: boolean;
+  favoriteCount: number;
+  onToggleFavorite: () => void;
+  onOpenMenu: () => void;
+  onBack: () => void;
+}) {
+  return (
+    <View style={styles.header}>
+      <Pressable onPress={onBack} style={styles.headerBack}>
+        <Text style={styles.arrow}>{"\u2190"} Back</Text>
+      </Pressable>
+      <View style={styles.headerActions}>
+        <FavoriteButton
+          isFavorited={isFavorited}
+          favoriteCount={favoriteCount}
+          onToggle={onToggleFavorite}
+        />
+        <Pressable onPress={onOpenMenu} style={styles.menuBtn}>
+          <Ellipsis size={26} color={colors.textSecondary} />
+        </Pressable>
+      </View>
+    </View>
+  );
+});
+
+const CopyOverlay = React.memo(function CopyOverlay() {
+  return (
+    <View style={styles.copyOverlay}>
+      <View style={styles.copyOverlayBox}>
+        <ActivityIndicator size="large" color={colors.accent} />
+        <Text style={styles.copyOverlayText}>Copying character...</Text>
+      </View>
+    </View>
+  );
+});
+
+async function buildCopyFormData(character: CharacterDetail) {
+  let personality = "";
+  let scenario = "";
+  const charName = character.chat_name || character.name;
+
+  if (character.allow_proxy) {
+    const minimalDetail = {
+      chat: { character_id: character.id },
+    } as ChatDetail;
+    const prompt = await fetchSystemPrompt(minimalDetail);
+    const processed = processSystemMessage(
+      prompt,
+      character.chat_name || character.name,
+    );
+    personality = generify(processed.personality ?? "", charName);
+    scenario = generify(processed.scenario ?? "", charName);
+  } else {
+    const abortController = new AbortController();
+    const characterName = character.chat_name || character.name;
+    const personaTag = `${characterName}'s Persona`;
+
+    try {
+      const raw = await attemptExtractSystemPrompt(
+        character.id,
+        personaTag,
+        abortController.signal,
+      );
+      personality = generify(cleanTags(raw, personaTag), charName);
+    } catch {
+      personality = generify(character.personality ?? "", charName);
+    }
+
+    try {
+      const raw = await attemptExtractSystemPrompt(
+        character.id,
+        "Scenario",
+        abortController.signal,
+      );
+      scenario = generify(cleanTags(raw, "Scenario"), charName);
+    } catch {
+      scenario = generify(character.scenario ?? "", charName);
+    }
+  }
+
+  const attribution = `Private clone of <a href='https://janitorai.com/characters/${character.id}'>${character.creator_name}'s original bot</a>\n\n`;
+  const description = attribution + (character.description ?? "");
+
+  let firstMessages: string[] =
+    character.first_messages.length > 0 ? character.first_messages : [""];
+
+  try {
+    const chat = await createChatApi(character.id);
+    const detail = await getChatDetail(chat.id);
+    if (
+      detail.character.first_messages &&
+      detail.character.first_messages.length > 0
+    ) {
+      firstMessages = detail.character.first_messages;
+    }
+    await deleteChat(chat.id);
+  } catch {
+    // Fall back to character.first_messages on any failure
+  }
+
+  return {
+    avatar: character.avatar ?? "",
+    name: character.name ?? "",
+    chat_name: character.chat_name ?? "",
+    description,
+    personality,
+    scenario,
+    example_dialogs: character.example_dialogs ?? "",
+    first_messages: firstMessages,
+    is_nsfw: character.is_nsfw,
+    tag_ids: character.tags.map((t) => t.id),
+    custom_tags: character.custom_tags ?? [],
+  };
+}
+
+function useCharacterData(characterId: string) {
   const [fetching, setFetching] = useState(true);
   const [character, setCharacter] = useState<CharacterDetail | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [pickerVisible, setPickerVisible] = useState(false);
-  const [latestChat, setLatestChat] = useState<ChatListItem | null>(null);
-  const [menuVisible, setMenuVisible] = useState(false);
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [alertTitle, setAlertTitle] = useState("");
-  const [alertMessage, setAlertMessage] = useState("");
-  const [alertButtons, setAlertButtons] = useState<AlertButton[]>([]);
-  const [copyLoading, setCopyLoading] = useState(false);
-  const [settingsVisible, setSettingsVisible] = useState(false);
-  const [settingsSaving, setSettingsSaving] = useState<string | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
-  const [favLoading, setFavLoading] = useState(false);
   const [favoriteCount, setFavoriteCount] = useState(0);
-  const [reportVisible, setReportVisible] = useState(false);
-  const [dateFormat, setDateFormat] = useState<"relative" | "absolute">("relative");
-  const user = useAuthStore((s) => s.user);
-  const createChat = useChatStore((s) => s.createChat);
-
-  const isTablet = useIsTablet();
-  const isOwner = character?.creator_id === user?.id;
-
-  useEffect(() => {
-    storage.getDateFormat().then(setDateFormat);
-  }, []);
-
-  useEffect(() => {
-    storage.getReviewReactionsEnabled().then((enabled) => {
-      if (enabled) {
-        getEmojiDefinitions().catch(() => {});
-      }
-    });
-  }, []);
+  const [latestChat, setLatestChat] = useState<ChatListItem | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setFetching(true);
     const fetchData = async () => {
       try {
-        let chats: ChatListItem[] = [];
-        try {
-          chats = await getCharacterChats(route.params.characterId);
-        } catch {}
-        const data = await getCharacterDetail(route.params.characterId);
-        const favStatus = await checkFavorite(route.params.characterId);
-        const favCountRes = await getFavoriteCount(route.params.characterId);
+        const [chats, data, favStatus, favCountRes] = await Promise.all([
+          getCharacterChats(characterId).catch(() => [] as ChatListItem[]),
+          getCharacterDetail(characterId),
+          checkFavorite(characterId),
+          getFavoriteCount(characterId),
+        ]);
         if (!cancelled) {
           setIsFavorited(favStatus);
           setFavoriteCount(favCountRes.favoritesCount);
@@ -126,7 +268,146 @@ export default function CharacterScreen() {
     return () => {
       cancelled = true;
     };
-  }, [route.params.characterId]);
+  }, [characterId]);
+
+  return {
+    fetching,
+    character,
+    fetchError,
+    latestChat,
+    isFavorited,
+    favoriteCount,
+    setCharacter,
+    setIsFavorited,
+    setFavoriteCount,
+  };
+}
+
+function useCopyCharacter(
+  character: CharacterDetail | null,
+  navigate: any,
+  showAlert: (title: string, message: string, buttons: AlertButton[]) => void,
+  dismissAlert: () => void,
+) {
+  const [copyLoading, setCopyLoading] = useState(false);
+
+  const doCopyCharacter = useCallback(async () => {
+    if (!character) return;
+    setCopyLoading(true);
+
+    try {
+      const formData = await buildCopyFormData(character);
+
+      await storage.removeCreateBotState();
+      await storage.removeEditBotState();
+      await storage.setCreateBotState(formData);
+
+      navigate("CreateTab", {
+        screen: "CreateBot",
+        params: undefined,
+      });
+    } catch (err: any) {
+      showAlert("Error", err?.message || "Failed to copy character", [
+        { text: "OK", onPress: dismissAlert },
+      ]);
+    } finally {
+      setCopyLoading(false);
+    }
+  }, [character, navigate, showAlert, dismissAlert]);
+
+  const confirmCopyCharacter = useCallback(() => {
+    if (!character) return;
+
+    showAlert(
+      "Copy Character",
+      "Please do not publish this copy publicly. " +
+        "Always credit the original creator if you share or use this character in any way. " +
+        "This is intended as a private backup for personal use.",
+      [
+        {
+          text: "Continue",
+          onPress: () => {
+            dismissAlert();
+            showAlert(
+              "Private Use Only",
+              "This copy should only be used privately, for yourself. " +
+                "Do not distribute, publish, or share it with others.",
+              [
+                {
+                  text: "I Understand",
+                  onPress: () => {
+                    dismissAlert();
+                    doCopyCharacter();
+                  },
+                },
+                {
+                  text: "Cancel",
+                  style: "cancel",
+                  onPress: dismissAlert,
+                },
+              ],
+            );
+          },
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: dismissAlert,
+        },
+      ],
+    );
+  }, [character, doCopyCharacter, showAlert, dismissAlert]);
+
+  return { copyLoading, confirmCopyCharacter };
+}
+
+export default function CharacterScreen() {
+  const route = useRoute<Route>();
+  const { navigate, goBack } = useNavigation<any>();
+  const [loading, setLoading] = useState(false);
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const { alert, showAlert, dismissAlert } = useAlert();
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState<string | null>(null);
+  const favLoadingRef = useRef(false);
+  const [reportVisible, setReportVisible] = useState(false);
+  const [dateFormat, setDateFormat] =
+    useState<"relative" | "absolute">("relative");
+  const user = useAuthStore((s) => s.user);
+  const createChat = useChatStore((s) => s.createChat);
+  const {
+    fetching,
+    character,
+    fetchError,
+    latestChat,
+    isFavorited,
+    favoriteCount,
+    setCharacter,
+    setIsFavorited,
+    setFavoriteCount,
+  } = useCharacterData(route.params.characterId);
+  const { copyLoading, confirmCopyCharacter } = useCopyCharacter(
+    character,
+    navigate,
+    showAlert,
+    dismissAlert,
+  );
+
+  const isTablet = useIsTablet();
+  const isOwner = character?.creator_id === user?.id;
+
+  useEffect(() => {
+    storage.getDateFormat().then(setDateFormat);
+  }, []);
+
+  useEffect(() => {
+    storage.getReviewReactionsEnabled().then((enabled) => {
+      if (enabled) {
+        getEmojiDefinitions().catch(() => {});
+      }
+    });
+  }, []);
 
   const handleStartChat = useCallback(() => {
     setPickerVisible(true);
@@ -187,137 +468,38 @@ export default function CharacterScreen() {
   const handleDeleteCharacter = useCallback(() => {
     setMenuVisible(false);
     if (!character) return;
-    setAlertTitle("Delete Character");
-    setAlertMessage(
+    showAlert(
+      "Delete Character",
       `Permanently delete ${character.name}? This cannot be undone.`,
-    );
-    setAlertButtons([
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          setAlertVisible(false);
-          try {
-            await deleteCharacter(character.id);
-            goBack();
-          } catch (err: any) {
-            setAlertTitle("Error");
-            setAlertMessage(err?.message || "Failed to delete character");
-            setAlertButtons([
-              { text: "OK", onPress: () => setAlertVisible(false) },
-            ]);
-            setAlertVisible(true);
-          }
+      [
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            dismissAlert();
+            try {
+              await deleteCharacter(character.id);
+              goBack();
+            } catch (err: any) {
+              showAlert("Error", err?.message || "Failed to delete character", [
+                { text: "OK", onPress: dismissAlert },
+              ]);
+            }
+          },
         },
-      },
-      {
-        text: "Cancel",
-        style: "cancel",
-        onPress: () => setAlertVisible(false),
-      },
-    ]);
-    setAlertVisible(true);
-  }, [character, goBack]);
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: dismissAlert,
+        },
+      ],
+    );
+  }, [character, goBack, showAlert, dismissAlert]);
 
-  const doCopyCharacter = useCallback(async () => {
-    if (!character) return;
-    setCopyLoading(true);
-
-    try {
-      let personality = "";
-      let scenario = "";
-      const charName = character.chat_name || character.name;
-
-      if (character.allow_proxy) {
-        const minimalDetail = {
-          chat: { character_id: character.id },
-        } as ChatDetail;
-        const prompt = await fetchSystemPrompt(minimalDetail);
-        const processed = processSystemMessage(
-          prompt,
-          character.chat_name || character.name,
-        );
-        personality = generify(processed.personality ?? "", charName);
-        scenario = generify(processed.scenario ?? "", charName);
-      } else {
-        const abortController = new AbortController();
-        const characterName = character.chat_name || character.name;
-        const personaTag = `${characterName}'s Persona`;
-
-        try {
-          const raw = await attemptExtractSystemPrompt(
-            character.id,
-            personaTag,
-            abortController.signal,
-          );
-          personality = generify(cleanTags(raw, personaTag), charName);
-        } catch {
-          personality = generify(character.personality ?? "", charName);
-        }
-
-        try {
-          const raw = await attemptExtractSystemPrompt(
-            character.id,
-            "Scenario",
-            abortController.signal,
-          );
-          scenario = generify(cleanTags(raw, "Scenario"), charName);
-        } catch {
-          scenario = generify(character.scenario ?? "", charName);
-        }
-      }
-
-      const attribution = `Private clone of <a href='https://janitorai.com/characters/${character.id}'>${character.creator_name}'s original bot</a>\n\n`;
-      const description = attribution + (character.description ?? "");
-
-      let firstMessages: string[] =
-        character.first_messages.length > 0 ? character.first_messages : [""];
-
-      try {
-        const chat = await createChatApi(character.id);
-        const detail = await getChatDetail(chat.id);
-        if (
-          detail.character.first_messages &&
-          detail.character.first_messages.length > 0
-        ) {
-          firstMessages = detail.character.first_messages;
-        }
-        await deleteChat(chat.id);
-      } catch {
-        // Fall back to character.first_messages on any failure
-      }
-
-      const formData = {
-        avatar: character.avatar ?? "",
-        name: character.name ?? "",
-        chat_name: character.chat_name ?? "",
-        description,
-        personality,
-        scenario,
-        example_dialogs: character.example_dialogs ?? "",
-        first_messages: firstMessages,
-        is_nsfw: character.is_nsfw,
-        tag_ids: character.tags.map((t) => t.id),
-        custom_tags: character.custom_tags ?? [],
-      };
-
-      await storage.removeCreateBotState();
-      await storage.removeEditBotState();
-      await storage.setCreateBotState(formData);
-
-      navigate("CreateTab", {
-        screen: "CreateBot",
-        params: undefined,
-      });
-    } catch (err: any) {
-      setAlertTitle("Error");
-      setAlertMessage(err?.message || "Failed to copy character");
-      setAlertButtons([{ text: "OK", onPress: () => setAlertVisible(false) }]);
-      setAlertVisible(true);
-    } finally {
-      setCopyLoading(false);
-    }
-  }, [character, navigate]);
+  const handleCopyCharacter = useCallback(() => {
+    setMenuVisible(false);
+    confirmCopyCharacter();
+  }, [confirmCopyCharacter]);
 
   const handleOpenSettings = useCallback(() => {
     setMenuVisible(false);
@@ -344,61 +526,15 @@ export default function CharacterScreen() {
         setSettingsSaving(null);
       }
     },
-    [character],
+    [character, setCharacter, setSettingsSaving],
   );
 
-  const handleCopyCharacter = useCallback(() => {
-    setMenuVisible(false);
-    if (!character) return;
-
-    setAlertTitle("Copy Character");
-    setAlertMessage(
-      "Please do not publish this copy publicly. " +
-        "Always credit the original creator if you share or use this character in any way. " +
-        "This is intended as a private backup for personal use.",
-    );
-    setAlertButtons([
-      {
-        text: "Continue",
-        onPress: () => {
-          setAlertVisible(false);
-          setAlertTitle("Private Use Only");
-          setAlertMessage(
-            "This copy should only be used privately, for yourself. " +
-              "Do not distribute, publish, or share it with others.",
-          );
-          setAlertButtons([
-            {
-              text: "I Understand",
-              onPress: () => {
-                setAlertVisible(false);
-                doCopyCharacter();
-              },
-            },
-            {
-              text: "Cancel",
-              style: "cancel",
-              onPress: () => setAlertVisible(false),
-            },
-          ]);
-          setAlertVisible(true);
-        },
-      },
-      {
-        text: "Cancel",
-        style: "cancel",
-        onPress: () => setAlertVisible(false),
-      },
-    ]);
-    setAlertVisible(true);
-  }, [character, doCopyCharacter]);
-
   const handleToggleFavorite = useCallback(async () => {
-    if (!character || favLoading) return;
+    if (!character || favLoadingRef.current) return;
     const wasFavorited = isFavorited;
     setIsFavorited(!wasFavorited);
     setFavoriteCount((c) => c + (wasFavorited ? -1 : 1));
-    setFavLoading(true);
+    favLoadingRef.current = true;
     try {
       if (wasFavorited) {
         await unfavoriteCharacter(character.id);
@@ -409,9 +545,9 @@ export default function CharacterScreen() {
       setIsFavorited(wasFavorited);
       setFavoriteCount((c) => c + (wasFavorited ? 1 : -1));
     } finally {
-      setFavLoading(false);
+      favLoadingRef.current = false;
     }
-  }, [character, isFavorited, favLoading]);
+  }, [character, isFavorited, setIsFavorited, setFavoriteCount]);
 
   const handleReportCharacter = useCallback(() => {
     setMenuVisible(false);
@@ -422,55 +558,29 @@ export default function CharacterScreen() {
     setReportVisible(false);
   }, []);
 
+  const handleOpenMenu = useCallback(() => {
+    setMenuVisible(true);
+  }, []);
+
   if (fetching) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.accent} />
-      </View>
-    );
+    return <LoadingState />;
   }
 
   if (fetchError || !character) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>
-          {fetchError || "Character not found"}
-        </Text>
-        <Pressable onPress={() => goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>Go back</Text>
-        </Pressable>
-      </View>
+      <ErrorState error={fetchError || "Character not found"} onBack={goBack} />
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Pressable onPress={() => goBack()} style={styles.headerBack}>
-          <Text style={styles.arrow}>{"\u2190"} Back</Text>
-        </Pressable>
-        <View style={styles.headerActions}>
-          <Pressable onPress={handleToggleFavorite} style={styles.favBtn}>
-            <Text
-              style={[
-                styles.favCount,
-                { color: isFavorited ? colors.danger : colors.textSecondary },
-              ]}
-            >
-              {formatCount(favoriteCount)}
-            </Text>
-            <Heart
-              size={22}
-              color={isFavorited ? colors.danger : colors.textSecondary}
-              fill={isFavorited ? colors.danger : "transparent"}
-            />
-          </Pressable>
-          <Pressable onPress={() => setMenuVisible(true)} style={styles.menuBtn}>
-            <Ellipsis size={26} color={colors.textSecondary} />
-          </Pressable>
-        </View>
-      </View>
-
+      <ScreenHeader
+        isFavorited={isFavorited}
+        favoriteCount={favoriteCount}
+        onToggleFavorite={handleToggleFavorite}
+        onOpenMenu={handleOpenMenu}
+        onBack={goBack}
+      />
       <CharacterHeader
         character={character}
         onStartChat={handleStartChat}
@@ -480,14 +590,12 @@ export default function CharacterScreen() {
         isOwner={isOwner}
         dateFormat={dateFormat}
       />
-
       <PersonaPicker
         visible={pickerVisible}
         onClose={() => setPickerVisible(false)}
         onSelect={handlePersonaSelect}
         characterName={character.name}
       />
-
       <CharacterMenuSheet
         visible={menuVisible}
         isOwner={isOwner}
@@ -501,41 +609,26 @@ export default function CharacterScreen() {
         characterId={character.id}
         characterName={character.name}
       />
-
       <CustomAlert
-        visible={alertVisible}
-        title={alertTitle}
-        message={alertMessage}
-        buttons={alertButtons}
-        onDismiss={() => setAlertVisible(false)}
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        buttons={alert.buttons}
+        onDismiss={dismissAlert}
       />
-
-      {character && (
-        <CharacterSettingsModal
-          visible={settingsVisible}
-          character={character}
-          savingKey={settingsSaving}
-          onToggle={handleToggleSetting}
-          onClose={() => setSettingsVisible(false)}
-        />
-      )}
-
-      {character && (
-        <CharacterReportModal
-          visible={reportVisible}
-          characterId={character.id}
-          onClose={handleCloseReport}
-        />
-      )}
-
-      {copyLoading && (
-        <View style={styles.copyOverlay}>
-          <View style={styles.copyOverlayBox}>
-            <ActivityIndicator size="large" color={colors.accent} />
-            <Text style={styles.copyOverlayText}>Copying character...</Text>
-          </View>
-        </View>
-      )}
+      <CharacterSettingsModal
+        visible={settingsVisible}
+        character={character}
+        savingKey={settingsSaving}
+        onToggle={handleToggleSetting}
+        onClose={() => setSettingsVisible(false)}
+      />
+      <CharacterReportModal
+        visible={reportVisible}
+        characterId={character.id}
+        onClose={handleCloseReport}
+      />
+      {copyLoading && <CopyOverlay />}
     </View>
   );
 }

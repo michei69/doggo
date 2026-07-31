@@ -40,7 +40,7 @@ export default function CustomAlert({
               const isLast = i === buttons.length - 1 && buttons.length > 1;
               return (
                 <Pressable
-                  key={i}
+                  key={btn.text}
                   style={({ pressed }) => [
                     styles.btn,
                     btn.style === "destructive" && styles.btnDestructive,

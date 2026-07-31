@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import {
   Modal,
   Pressable,
@@ -37,13 +37,6 @@ export default function AdvancedSearchModal({
 }) {
   const [keywordInput, setKeywordInput] = useState("");
   const [blacklistInput, setBlacklistInput] = useState("");
-
-  useEffect(() => {
-    if (visible) {
-      setKeywordInput("");
-      setBlacklistInput("");
-    }
-  }, [visible]);
 
   const handleAddKeyword = useCallback(() => {
     const trimmed = keywordInput.trim();

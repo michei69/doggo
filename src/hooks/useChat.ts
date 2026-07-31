@@ -6,7 +6,7 @@ import { sseClient, type SSECallbacks } from "../api/sse";
 import { getMyProfile } from "../api/profile";
 import type { CreateMessageRequest } from "../types/api";
 import { useTurnstile } from "../components/turnstile/TurnstileProvider";
-import { groupMessages } from "../components/chat/MessageList";
+import { groupMessages } from "../utils/messages";
 import { processText } from "../utils/processText";
 import { storage } from "../utils/storage";
 import { toast } from "../utils/toast";
@@ -882,6 +882,7 @@ export function useChat() {
         [
             storeSetSending,
             storeAddMessage,
+            storeRemoveMessages,
             storeUpdateOptimistically,
             showChallenge,
             showTurnstile,

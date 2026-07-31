@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, memo } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { EnrichedMarkdownText } from "react-native-enriched-markdown";
@@ -50,61 +50,24 @@ const SCRIPT_THEMES: Record<string, { light: string; dark: string }> = {
   thunder: { light: "#6366f1", dark: "#312e81" },
 };
 
-export default function CharacterHeader({
+type LinkPressHandler = ({ url }: { url: string }) => void;
+
+const CharIdentity = memo(function CharIdentity({
   character,
-  onStartChat,
-  onContinueChat,
-  isLoading,
-  isTablet = false,
-  isOwner = false,
-  dateFormat = "relative",
+  dateFormat,
+  onAvatarPress,
+  onCreatorPress,
 }: {
   character: CharacterDetail;
-  onStartChat: () => void;
-  onContinueChat?: () => void;
-  isLoading: boolean;
-  isTablet?: boolean;
-  isOwner?: boolean;
-  dateFormat?: "relative" | "absolute";
+  dateFormat: "relative" | "absolute";
+  onAvatarPress: () => void;
+  onCreatorPress: () => void;
 }) {
-  const [descExpanded, setDescExpanded] = useState(false);
-  const [descTruncated, setDescTruncated] = useState(false);
-  const [preview, setPreview] = useState<{ uri: string; name: string } | null>(
-    null,
-  );
-  const [altIndex, setAltIndex] = useState(0);
-  const nav = useNavigation<any>();
-  const onLinkPress = useNavigateToJanitorLink();
-
-  const altMessages = character.first_messages?.slice(1) ?? [];
-
-  const descriptionMarkdown = useMemo(
-    () => htmlToMarkdown(character.description || ""),
-    [character.description],
-  );
-
-  const handleDescLayout = useCallback(
-    (e: any) => {
-      if (!descExpanded && !descTruncated) {
-        const { height } = e.nativeEvent.layout;
-        if (height >= 495) {
-          setDescTruncated(true);
-        }
-      }
-    },
-    [descExpanded, descTruncated],
-  );
-
-  const charInfo = (
+  return (
     <>
       <Avatar
         uri={character.avatar ? botAvatarUrl(character.avatar) : ""}
-        onPress={() =>
-          setPreview({
-            uri: botAvatarUrl(character.avatar),
-            name: character.name,
-          })
-        }
+        onPress={onAvatarPress}
         name={character.name}
         size={96}
       />
@@ -114,29 +77,21 @@ export default function CharacterHeader({
         <Text style={styles.chatName}>{character.chat_name}</Text>
       ) : null}
 
-      <Pressable
-        onPress={() =>
-          nav.navigate("CreatorScreen", {
-            userId: character.creator_id,
-            userName: character.creator_name,
-          })
-        }
-        hitSlop={8}
-      >
+      <Pressable onPress={onCreatorPress} hitSlop={8}>
         <View style={styles.creatorRow}>
-        <Text style={styles.creator}>
-          by {character.creator_name}
-        </Text>
-        {character.creator_verified && (
-          <BadgeCheck size={14} color={colors.accent} />
-        )}
-        {character.creator_subscriber_badge && (
-          <View style={styles.subscriberRow}>
-            <CirclePlus size={14} color={colors.accent} />
-            <Text style={styles.subscriberBadge}> Subscriber</Text>
-          </View>
-        )}
-      </View>
+          <Text style={styles.creator}>
+            by {character.creator_name}
+          </Text>
+          {character.creator_verified && (
+            <BadgeCheck size={14} color={colors.accent} />
+          )}
+          {character.creator_subscriber_badge && (
+            <View style={styles.subscriberRow}>
+              <CirclePlus size={14} color={colors.accent} />
+              <Text style={styles.subscriberBadge}> Subscriber</Text>
+            </View>
+          )}
+        </View>
       </Pressable>
 
       <View style={styles.badges}>
@@ -153,7 +108,7 @@ export default function CharacterHeader({
           {character.tags?.map((tag) => (
             <Tag key={tag.id} label={tag.name} />
           ))}
-          {character.custom_tags?.map((tag, _) => (
+          {character.custom_tags?.map((tag) => (
             <Tag key={`custom-${tag}`} label={tag} variant="custom" />
           ))}
         </View>
@@ -205,33 +160,59 @@ export default function CharacterHeader({
           <Text style={styles.statLabel}>Tokens</Text>
         </View>
       </View>
+    </>
+  );
+});
 
-      {character.description ? (
-        <View style={styles.descSection}>
-          <View
-            style={!descExpanded && styles.descCollapsed}
-            onLayout={handleDescLayout}
-          >
-            <EnrichedMarkdownText
-              markdown={descriptionMarkdown}
-              markdownStyle={markdownStyle}
-              selectable={false}
-              onLinkPress={onLinkPress}
-            />
-          </View>
-          {descTruncated && (
-            <Pressable
-              style={styles.showMoreBtn}
-              onPress={() => setDescExpanded((e) => !e)}
-            >
-              <Text style={styles.showMoreText}>
-                {descExpanded ? "Show less" : "Show more"}
-              </Text>
-            </Pressable>
-          )}
-        </View>
-      ) : null}
+const CharacterDescription = memo(function CharacterDescription({
+  markdown,
+  expanded,
+  truncated,
+  onLayout,
+  onToggle,
+  onLinkPress,
+}: {
+  markdown: string;
+  expanded: boolean;
+  truncated: boolean;
+  onLayout: (e: any) => void;
+  onToggle: () => void;
+  onLinkPress: LinkPressHandler;
+}) {
+  return (
+    <View style={styles.descSection}>
+      <View style={!expanded && styles.descCollapsed} onLayout={onLayout}>
+        <EnrichedMarkdownText
+          markdown={markdown}
+          markdownStyle={markdownStyle}
+          selectable={false}
+          onLinkPress={onLinkPress}
+        />
+      </View>
+      {truncated && (
+        <Pressable style={styles.showMoreBtn} onPress={onToggle}>
+          <Text style={styles.showMoreText}>
+            {expanded ? "Show less" : "Show more"}
+          </Text>
+        </Pressable>
+      )}
+    </View>
+  );
+});
 
+const ChatActionButtons = memo(function ChatActionButtons({
+  chatName,
+  onStartChat,
+  onContinueChat,
+  isLoading,
+}: {
+  chatName: string;
+  onStartChat: () => void;
+  onContinueChat?: () => void;
+  isLoading: boolean;
+}) {
+  return (
+    <>
       {onContinueChat && (
         <Button
           title="Continue latest chat"
@@ -240,158 +221,286 @@ export default function CharacterHeader({
           style={styles.continueBtn}
         />
       )}
-
       <Button
-        title={`Start chatting with ${character.chat_name || character.name}`}
+        title={`Start chatting with ${chatName}`}
         onPress={onStartChat}
         loading={isLoading}
         style={onContinueChat ? [styles.startBtn, styles.startBtnWithContinue] : styles.startBtn}
       />
     </>
   );
+});
 
-  const charDetails = (
+const MarkdownSection = memo(function MarkdownSection({
+  title,
+  markdown,
+  onLinkPress,
+}: {
+  title: string;
+  markdown: string;
+  onLinkPress: LinkPressHandler;
+}) {
+  return (
+    <CollapsibleSection title={title}>
+      <EnrichedMarkdownText
+        markdown={markdown}
+        markdownStyle={markdownStyle}
+        selectable={false}
+        onLinkPress={onLinkPress}
+      />
+    </CollapsibleSection>
+  );
+});
+
+const AlternateMessagesSection = memo(function AlternateMessagesSection({
+  messages,
+  index,
+  onPrev,
+  onNext,
+  onLinkPress,
+}: {
+  messages: string[];
+  index: number;
+  onPrev: () => void;
+  onNext: () => void;
+  onLinkPress: LinkPressHandler;
+}) {
+  return (
+    <CollapsibleSection title={`Alternate Messages (${messages.length})`}>
+      <EnrichedMarkdownText
+        markdown={htmlToMarkdown(messages[index])}
+        markdownStyle={markdownStyle}
+        selectable={false}
+        onLinkPress={onLinkPress}
+      />
+      <View style={styles.altNav}>
+        <Pressable
+          style={[
+            styles.altNavBtn,
+            index === 0 && styles.altNavBtnDisabled,
+          ]}
+          onPress={onPrev}
+          disabled={index === 0}
+        >
+          <Text
+            style={[
+              styles.altNavText,
+              index === 0 && styles.altNavTextDisabled,
+            ]}
+          >
+            ← Prev
+          </Text>
+        </Pressable>
+        <Text style={styles.altNavCount}>
+          {index + 1} / {messages.length}
+        </Text>
+        <Pressable
+          style={[
+            styles.altNavBtn,
+            index === messages.length - 1 && styles.altNavBtnDisabled,
+          ]}
+          onPress={onNext}
+          disabled={index === messages.length - 1}
+        >
+          <Text
+            style={[
+              styles.altNavText,
+              index === messages.length - 1 &&
+                styles.altNavTextDisabled,
+            ]}
+          >
+            Next →
+          </Text>
+        </Pressable>
+      </View>
+    </CollapsibleSection>
+  );
+});
+
+const ScriptsList = memo(function ScriptsList({
+  scripts,
+  dateFormat,
+}: {
+  scripts: CharacterDetail["scripts"];
+  dateFormat: "relative" | "absolute";
+}) {
+  return (
+    <View style={styles.scriptsSection}>
+      <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>Scripts</Text>
+      {scripts.map((script) => {
+        const theme = SCRIPT_THEMES[script.theme] ?? { light: colors.accent, dark: colors.card };
+        const ScriptIcon = script.type === "simple" ? ScrollText : Code;
+        return (
+          <View
+            key={script.id}
+            style={[
+              styles.scriptCard,
+              { borderColor: theme.light, backgroundColor: theme.dark },
+            ]}
+          >
+            <View style={styles.scriptHeaderRow}>
+              <ScriptIcon size={16} color={theme.light} />
+              <Text style={[styles.scriptTitle, { color: theme.light }]}>{script.title}</Text>
+              {!script.is_public && (
+                <Lock size={14} color={theme.light} style={{ marginLeft: "auto" }} />
+              )}
+            </View>
+            <Text style={[styles.scriptDesc, { color: theme.light }]}>{script.description}</Text>
+            <View style={styles.scriptFooterRow}>
+              <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
+                <Clock size={12} color={theme.light} />
+                <Text style={{ color: theme.light, fontSize: 11 }}>
+                  {formatDate(script.updated_at, dateFormat)}
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
+                <MessageCircle size={12} color={theme.light} />
+                <Text style={{ color: theme.light, fontSize: 11 }}>
+                  {script.message_count}
+                </Text>
+              </View>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+});
+
+const CharacterDetails = memo(function CharacterDetails({
+  character,
+  altMessages,
+  altIndex,
+  onAltPrev,
+  onAltNext,
+  onLinkPress,
+  dateFormat,
+}: {
+  character: CharacterDetail;
+  altMessages: string[];
+  altIndex: number;
+  onAltPrev: () => void;
+  onAltNext: () => void;
+  onLinkPress: LinkPressHandler;
+  dateFormat: "relative" | "absolute";
+}) {
+  const personalityMarkdown = useMemo(
+    () => htmlToMarkdown(character.personality || ""),
+    [character.personality],
+  );
+  const scenarioMarkdown = useMemo(
+    () => htmlToMarkdown(character.scenario || ""),
+    [character.scenario],
+  );
+  const dialogsMarkdown = useMemo(
+    () => htmlToMarkdown(character.example_dialogs || ""),
+    [character.example_dialogs],
+  );
+  const firstMessageMarkdown = useMemo(
+    () => htmlToMarkdown(character.first_message || ""),
+    [character.first_message],
+  );
+
+  return (
     <>
       {character.personality ? (
-        <CollapsibleSection title="Personality">
-          <EnrichedMarkdownText
-            markdown={htmlToMarkdown(character.personality)}
-            markdownStyle={markdownStyle}
-            selectable={false}
-            onLinkPress={onLinkPress}
-          />
-        </CollapsibleSection>
+        <MarkdownSection title="Personality" markdown={personalityMarkdown} onLinkPress={onLinkPress} />
       ) : null}
       {character.scenario ? (
-        <CollapsibleSection title="Scenario">
-          <EnrichedMarkdownText
-            markdown={htmlToMarkdown(character.scenario)}
-            markdownStyle={markdownStyle}
-            selectable={false}
-            onLinkPress={onLinkPress}
-          />
-        </CollapsibleSection>
+        <MarkdownSection title="Scenario" markdown={scenarioMarkdown} onLinkPress={onLinkPress} />
       ) : null}
       {character.example_dialogs ? (
-        <CollapsibleSection title="Example Dialogue">
-          <EnrichedMarkdownText
-            markdown={htmlToMarkdown(character.example_dialogs)}
-            markdownStyle={markdownStyle}
-            selectable={false}
-            onLinkPress={onLinkPress}
-          />
-        </CollapsibleSection>
+        <MarkdownSection title="Example Dialogue" markdown={dialogsMarkdown} onLinkPress={onLinkPress} />
       ) : null}
-
       {character.first_message ? (
-        <CollapsibleSection title="First Message">
-          <EnrichedMarkdownText
-            markdown={htmlToMarkdown(character.first_message)}
-            markdownStyle={markdownStyle}
-            selectable={false}
-            onLinkPress={onLinkPress}
-          />
-        </CollapsibleSection>
+        <MarkdownSection title="First Message" markdown={firstMessageMarkdown} onLinkPress={onLinkPress} />
       ) : null}
-
       {altMessages.length > 0 && (
-        <CollapsibleSection
-          title={`Alternate Messages (${altMessages.length})`}
-        >
-          <EnrichedMarkdownText
-            markdown={htmlToMarkdown(altMessages[altIndex])}
-            markdownStyle={markdownStyle}
-            selectable={false}
-            onLinkPress={onLinkPress}
-          />
-          <View style={styles.altNav}>
-            <Pressable
-              style={[
-                styles.altNavBtn,
-                altIndex === 0 && styles.altNavBtnDisabled,
-              ]}
-              onPress={() => setAltIndex((i) => Math.max(0, i - 1))}
-              disabled={altIndex === 0}
-            >
-              <Text
-                style={[
-                  styles.altNavText,
-                  altIndex === 0 && styles.altNavTextDisabled,
-                ]}
-              >
-                ← Prev
-              </Text>
-            </Pressable>
-            <Text style={styles.altNavCount}>
-              {altIndex + 1} / {altMessages.length}
-            </Text>
-            <Pressable
-              style={[
-                styles.altNavBtn,
-                altIndex === altMessages.length - 1 && styles.altNavBtnDisabled,
-              ]}
-              onPress={() =>
-                setAltIndex((i) => Math.min(altMessages.length - 1, i + 1))
-              }
-              disabled={altIndex === altMessages.length - 1}
-            >
-              <Text
-                style={[
-                  styles.altNavText,
-                  altIndex === altMessages.length - 1 &&
-                    styles.altNavTextDisabled,
-                ]}
-              >
-                Next →
-              </Text>
-            </Pressable>
-          </View>
-        </CollapsibleSection>
+        <AlternateMessagesSection
+          messages={altMessages}
+          index={altIndex}
+          onPrev={onAltPrev}
+          onNext={onAltNext}
+          onLinkPress={onLinkPress}
+        />
       )}
-
-      {character.scripts?.length > 0 && (
-        <View style={styles.scriptsSection}>
-          <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>Scripts</Text>
-          {character.scripts.map((script) => {
-            const theme = SCRIPT_THEMES[script.theme] ?? { light: colors.accent, dark: colors.card };
-            const ScriptIcon = script.type === "simple" ? ScrollText : Code;
-            return (
-              <View
-                key={script.id}
-                style={[
-                  styles.scriptCard,
-                  { borderColor: theme.light, backgroundColor: theme.dark },
-                ]}
-              >
-                <View style={styles.scriptHeaderRow}>
-                  <ScriptIcon size={16} color={theme.light} />
-                  <Text style={[styles.scriptTitle, { color: theme.light }]}>{script.title}</Text>
-                  {!script.is_public && (
-                    <Lock size={14} color={theme.light} style={{ marginLeft: "auto" }} />
-                  )}
-                </View>
-                <Text style={[styles.scriptDesc, { color: theme.light }]}>{script.description}</Text>
-                <View style={styles.scriptFooterRow}>
-                  <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
-                    <Clock size={12} color={theme.light} />
-                    <Text style={{ color: theme.light, fontSize: 11 }}>
-                      {formatDate(script.updated_at, dateFormat)}
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
-                    <MessageCircle size={12} color={theme.light} />
-                    <Text style={{ color: theme.light, fontSize: 11 }}>
-                      {script.message_count}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            );
-          })}
-        </View>
+      {character.scripts.length > 0 && (
+        <ScriptsList scripts={character.scripts} dateFormat={dateFormat} />
       )}
     </>
   );
+});
+
+export default function CharacterHeader({
+  character,
+  onStartChat,
+  onContinueChat,
+  isLoading,
+  isTablet = false,
+  isOwner = false,
+  dateFormat = "relative",
+}: {
+  character: CharacterDetail;
+  onStartChat: () => void;
+  onContinueChat?: () => void;
+  isLoading: boolean;
+  isTablet?: boolean;
+  isOwner?: boolean;
+  dateFormat?: "relative" | "absolute";
+}) {
+  const [descExpanded, setDescExpanded] = useState(false);
+  const [descTruncated, setDescTruncated] = useState(false);
+  const [preview, setPreview] = useState<{ uri: string; name: string } | null>(
+    null,
+  );
+  const [altIndex, setAltIndex] = useState(0);
+  const nav = useNavigation<any>();
+  const onLinkPress = useNavigateToJanitorLink();
+
+  const altMessages = character.first_messages?.slice(1) ?? [];
+  const chatName = character.chat_name || character.name;
+
+  const descriptionMarkdown = useMemo(
+    () => htmlToMarkdown(character.description || ""),
+    [character.description],
+  );
+
+  const handleDescLayout = useCallback(
+    (e: any) => {
+      if (!descExpanded && !descTruncated) {
+        const { height } = e.nativeEvent.layout;
+        if (height >= 495) {
+          setDescTruncated(true);
+        }
+      }
+    },
+    [descExpanded, descTruncated],
+  );
+
+  const toggleDesc = useCallback(() => setDescExpanded((e) => !e), []);
+
+  const handleAltPrev = useCallback(
+    () => setAltIndex((i) => Math.max(0, i - 1)),
+    [],
+  );
+
+  const handleAltNext = useCallback(
+    () => setAltIndex((i) => Math.min(altMessages.length - 1, i + 1)),
+    [altMessages.length],
+  );
+
+  const handleAvatarPress = useCallback(() => {
+    setPreview({ uri: botAvatarUrl(character.avatar), name: character.name });
+  }, [character.avatar, character.name]);
+
+  const handleCreatorPress = useCallback(() => {
+    nav.navigate("CreatorScreen", {
+      userId: character.creator_id,
+      userName: character.creator_name,
+    });
+  }, [nav, character.creator_id, character.creator_name]);
+
+  const closePreview = useCallback(() => setPreview(null), []);
 
   return (
     <>
@@ -402,14 +511,43 @@ export default function CharacterHeader({
             contentContainerStyle={styles.tabletLeftInner}
             showsVerticalScrollIndicator={false}
           >
-            {charInfo}
+            <CharIdentity
+              character={character}
+              dateFormat={dateFormat}
+              onAvatarPress={handleAvatarPress}
+              onCreatorPress={handleCreatorPress}
+            />
+            {character.description ? (
+              <CharacterDescription
+                markdown={descriptionMarkdown}
+                expanded={descExpanded}
+                truncated={descTruncated}
+                onLayout={handleDescLayout}
+                onToggle={toggleDesc}
+                onLinkPress={onLinkPress}
+              />
+            ) : null}
+            <ChatActionButtons
+              chatName={chatName}
+              onStartChat={onStartChat}
+              onContinueChat={onContinueChat}
+              isLoading={isLoading}
+            />
           </ScrollView>
           <ScrollView
             style={styles.tabletRight}
             contentContainerStyle={styles.tabletRightInner}
             showsVerticalScrollIndicator={false}
           >
-            {charDetails}
+            <CharacterDetails
+              character={character}
+              altMessages={altMessages}
+              altIndex={altIndex}
+              onAltPrev={handleAltPrev}
+              onAltNext={handleAltNext}
+              onLinkPress={onLinkPress}
+              dateFormat={dateFormat}
+            />
             <ReviewsSection characterId={character.id} isOwner={isOwner} />
           </ScrollView>
         </View>
@@ -418,15 +556,44 @@ export default function CharacterHeader({
           style={styles.container}
           contentContainerStyle={styles.content}
         >
-          {charInfo}
-          {charDetails}
+          <CharIdentity
+            character={character}
+            dateFormat={dateFormat}
+            onAvatarPress={handleAvatarPress}
+            onCreatorPress={handleCreatorPress}
+          />
+          {character.description ? (
+            <CharacterDescription
+              markdown={descriptionMarkdown}
+              expanded={descExpanded}
+              truncated={descTruncated}
+              onLayout={handleDescLayout}
+              onToggle={toggleDesc}
+              onLinkPress={onLinkPress}
+            />
+          ) : null}
+          <ChatActionButtons
+            chatName={chatName}
+            onStartChat={onStartChat}
+            onContinueChat={onContinueChat}
+            isLoading={isLoading}
+          />
+          <CharacterDetails
+            character={character}
+            altMessages={altMessages}
+            altIndex={altIndex}
+            onAltPrev={handleAltPrev}
+            onAltNext={handleAltNext}
+            onLinkPress={onLinkPress}
+            dateFormat={dateFormat}
+          />
           <ReviewsSection characterId={character.id} isOwner={isOwner} />
         </ScrollView>
       )}
       <AvatarPreview
         visible={preview !== null}
         uri={preview?.uri ?? ""}
-        onClose={() => setPreview(null)}
+        onClose={closePreview}
       />
     </>
   );

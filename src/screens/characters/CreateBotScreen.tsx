@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo, memo } from "react";
 import {
   View,
   Text,
@@ -100,10 +100,9 @@ function clearPersistedForm(isEditMode: boolean): void {
   }
 }
 
-export default function CreateBotScreen() {
+function useCreateBotForm() {
   const route = useRoute<Route>();
   const { navigate, goBack } = useNavigation<Nav>();
-  const onLinkPress = useNavigateToJanitorLink();
   const characterId = route.params?.characterId;
   const isEditMode = !!characterId;
 
@@ -123,14 +122,17 @@ export default function CreateBotScreen() {
   const [tagSearch, setTagSearch] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
     const loadState = async () => {
       try {
         if (isEditMode && characterId) {
           const savedEdit = await storage.getEditBotState<BotFormState>();
+          if (cancelled) return;
           if (savedEdit && savedEdit.editCharacterId === characterId) {
             setForm(savedEdit);
           } else {
             const char = await getCharacterDetail(characterId);
+            if (cancelled) return;
             const editState: BotFormState = {
               avatar: char.avatar ?? "",
               name: char.name ?? "",
@@ -151,6 +153,7 @@ export default function CreateBotScreen() {
           }
         } else {
           const saved = await storage.getCreateBotState<BotFormState>();
+          if (cancelled) return;
           if (saved) {
             setForm(saved);
           }
@@ -158,10 +161,14 @@ export default function CreateBotScreen() {
       } catch {
         // Failed to load persisted state — start fresh
       } finally {
+        if (cancelled) return;
         setLoaded(true);
       }
     };
     loadState();
+    return () => {
+      cancelled = true;
+    };
   }, [isEditMode, characterId]);
 
   useFocusEffect(
@@ -395,6 +402,28 @@ export default function CreateBotScreen() {
     setPreviewVisible(true);
   }, []);
 
+  const closePreview = useCallback(() => {
+    setPreviewVisible(false);
+  }, []);
+
+  const goToPrevFirstMessage = useCallback(() => {
+    setFirstMsgIndex((i) => Math.max(0, i - 1));
+  }, []);
+
+  const goToNextFirstMessage = useCallback(() => {
+    setFirstMsgIndex((i) =>
+      Math.min(form.first_messages.length - 1, i + 1),
+    );
+  }, [form.first_messages.length]);
+
+  const selectLimited = useCallback(() => {
+    setField("is_nsfw", false);
+  }, [setField]);
+
+  const selectLimitless = useCallback(() => {
+    setField("is_nsfw", true);
+  }, [setField]);
+
   const buildRequest = useCallback((): CreateCharacterRequest => {
     const nonEmptyMessages = form.first_messages.filter((m) => m.trim());
     return {
@@ -486,11 +515,472 @@ export default function CreateBotScreen() {
     setAlertVisible(true);
   }, [isEditMode]);
 
-  const filteredTags = allTags.filter(
-    (t) =>
-      !tagSearch ||
-      t.name.toLowerCase().includes(tagSearch.toLowerCase()) ||
-      t.slug.toLowerCase().includes(tagSearch.toLowerCase()),
+  const filteredTags = useMemo(
+    () =>
+      allTags.filter(
+        (t) =>
+          !tagSearch ||
+          t.name.toLowerCase().includes(tagSearch.toLowerCase()) ||
+          t.slug.toLowerCase().includes(tagSearch.toLowerCase()),
+      ),
+    [allTags, tagSearch],
+  );
+
+  const selectedTagIdsSet = useMemo(
+    () => new Set(form.tag_ids),
+    [form.tag_ids],
+  );
+
+  return {
+    addCustomTag,
+    addFirstMessage,
+    alertButtons,
+    alertMessage,
+    alertTitle,
+    alertVisible,
+    closePreview,
+    firstMsgIndex,
+    filteredTags,
+    form,
+    goBack,
+    goToNextFirstMessage,
+    goToPrevFirstMessage,
+    handleDeleteFirstMessage,
+    handlePickAndUploadAvatar,
+    handlePreviewFirstMessage,
+    handleRefresh,
+    handleReset,
+    handleSave,
+    isEditMode,
+    keyboardHeight,
+    loaded,
+    previewVisible,
+    refreshing,
+    removeCustomTag,
+    saving,
+    selectLimited,
+    selectLimitless,
+    selectedTagIdsSet,
+    setAlertVisible,
+    setField,
+    setTagSearch,
+    tagSearch,
+    toggleTag,
+    updateFirstMessage,
+    uploading,
+  };
+}
+
+function AvatarPicker({
+  uri,
+  name,
+  uploading,
+  onPress,
+}: {
+  uri: string;
+  name: string;
+  uploading: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable onPress={onPress} style={styles.avatarRow}>
+      <View style={styles.avatarWrap}>
+        <Avatar uri={uri} name={name} size={80} />
+      </View>
+      <View style={styles.avatarTextCol}>
+        <Text style={styles.avatarLabel}>Avatar</Text>
+        <Text style={styles.avatarHint}>
+          {uploading ? "Uploading..." : "Tap to upload (256×256)"}
+        </Text>
+      </View>
+      {uploading && <ActivityIndicator color={colors.accent} size="small" />}
+    </Pressable>
+  );
+}
+
+const AvatarPickerMemo = memo(AvatarPicker);
+
+function MultilineField({
+  label,
+  value,
+  placeholder,
+  onChangeText,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  onChangeText: (text: string) => void;
+}) {
+  return (
+    <View style={styles.fieldContainer}>
+      <Text style={styles.label}>{label}</Text>
+      <RNTextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={colors.textDimAlt}
+        multiline
+        textAlignVertical="top"
+        style={[styles.input, styles.multilineInput]}
+      />
+    </View>
+  );
+}
+
+const MultilineFieldMemo = memo(MultilineField);
+
+function FirstMessageEditor({
+  value,
+  index,
+  count,
+  onChange,
+  onPreview,
+  onAdd,
+  onDelete,
+  onPrev,
+  onNext,
+}: {
+  value: string;
+  index: number;
+  count: number;
+  onChange: (index: number, value: string) => void;
+  onPreview: () => void;
+  onAdd: () => void;
+  onDelete: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.label}>
+          First Messages ({index + 1}/{count})
+        </Text>
+        <View style={styles.firstMsgActions}>
+          <Pressable onPress={onPreview} style={styles.previewBtn}>
+            <Text style={styles.previewBtnText}>Preview</Text>
+          </Pressable>
+          {count < 10 && (
+            <Pressable onPress={onAdd} style={styles.addBtn}>
+              <Text style={styles.addBtnText}>+ Add</Text>
+            </Pressable>
+          )}
+          {count > 1 && (
+            <Pressable onPress={onDelete} style={styles.removeBtn}>
+              <Text style={styles.removeBtnText}>- Del</Text>
+            </Pressable>
+          )}
+        </View>
+      </View>
+      <View style={styles.firstMsgRow}>
+        <RNTextInput
+          value={value}
+          onChangeText={(v) => onChange(index, v)}
+          placeholder={`Message ${index + 1}`}
+          placeholderTextColor={colors.textDimAlt}
+          multiline
+          textAlignVertical="top"
+          style={[styles.input, styles.firstMsgInput]}
+        />
+      </View>
+      {count > 1 && (
+        <View style={styles.firstMsgNav}>
+          <Pressable
+            onPress={onPrev}
+            disabled={index === 0}
+            style={[styles.navBtn, index === 0 && styles.navBtnDisabled]}
+          >
+            <Text
+              style={[
+                styles.navBtnText,
+                index === 0 && styles.navBtnTextDisabled,
+              ]}
+            >
+              ← Prev
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={onNext}
+            disabled={index >= count - 1}
+            style={[
+              styles.navBtn,
+              index >= count - 1 && styles.navBtnDisabled,
+            ]}
+          >
+            <Text
+              style={[
+                styles.navBtnText,
+                index >= count - 1 && styles.navBtnTextDisabled,
+              ]}
+            >
+              Next →
+            </Text>
+          </Pressable>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const FirstMessageEditorMemo = memo(FirstMessageEditor);
+
+function ContentRatingToggle({
+  isNsfw,
+  onSelectLimited,
+  onSelectLimitless,
+}: {
+  isNsfw: boolean;
+  onSelectLimited: () => void;
+  onSelectLimitless: () => void;
+}) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.label}>Content Rating</Text>
+      <View style={styles.toggleRow}>
+        <Pressable
+          style={[styles.toggleOption, !isNsfw && styles.toggleActive]}
+          onPress={onSelectLimited}
+        >
+          <Text
+            style={[styles.toggleText, !isNsfw && styles.toggleTextActive]}
+          >
+            Limited
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.toggleOption, isNsfw && styles.toggleActive]}
+          onPress={onSelectLimitless}
+        >
+          <Text style={[styles.toggleText, isNsfw && styles.toggleTextActive]}>
+            Limitless
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const ContentRatingToggleMemo = memo(ContentRatingToggle);
+
+function TagEditor({
+  customTags,
+  selectedCount,
+  tagSearch,
+  selectedTagIdsSet,
+  filteredTags,
+  onRemoveTag,
+  onAddTag,
+  onToggleTag,
+  onSearchChange,
+}: {
+  customTags: string[];
+  selectedCount: number;
+  tagSearch: string;
+  selectedTagIdsSet: Set<number>;
+  filteredTags: TagEntry[];
+  onRemoveTag: (tag: string) => void;
+  onAddTag: () => void;
+  onToggleTag: (tagId: number) => void;
+  onSearchChange: (text: string) => void;
+}) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.label}>
+        Tags ({customTags.length + selectedCount}/10)
+      </Text>
+
+      {customTags.length > 0 && (
+        <View style={styles.chipRow}>
+          {customTags.map((tag) => (
+            <Pressable
+              key={`custom-${tag}`}
+              style={styles.chipSelected}
+              onPress={() => onRemoveTag(tag)}
+            >
+              <Text style={styles.chipSelectedText}>{tag} ✕</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
+      <View style={styles.customTagRow}>
+        <RNTextInput
+          value={tagSearch}
+          onChangeText={onSearchChange}
+          placeholder="Add custom tag..."
+          placeholderTextColor={colors.textDimAlt}
+          style={[styles.input, styles.customTagInput]}
+          onSubmitEditing={onAddTag}
+          returnKeyType="done"
+        />
+        <Pressable onPress={onAddTag} style={styles.addTagBtn}>
+          <Text style={styles.addTagBtnText}>Add</Text>
+        </Pressable>
+      </View>
+
+      {filteredTags.length > 0 && (
+        <View style={styles.chipRow}>
+          {filteredTags.map((tag) => {
+            const selected = selectedTagIdsSet.has(tag.id);
+            return (
+              <Pressable
+                key={tag.id}
+                style={selected ? styles.chipSelected : styles.chip}
+                onPress={() => onToggleTag(tag.id)}
+              >
+                <Text
+                  style={
+                    selected ? styles.chipSelectedText : styles.chipText
+                  }
+                >
+                  {tag.name}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const TagEditorMemo = memo(TagEditor);
+
+function SaveBar({
+  isEditMode,
+  saving,
+  onSave,
+  onReset,
+}: {
+  isEditMode: boolean;
+  saving: boolean;
+  onSave: () => void;
+  onReset: () => void;
+}) {
+  return (
+    <>
+      <Button
+        title={isEditMode ? "Save Changes" : "Create Bot"}
+        onPress={onSave}
+        loading={saving}
+        style={styles.saveBtn}
+      />
+      <Button
+        title="Reset"
+        onPress={onReset}
+        variant="outline"
+        style={styles.resetBtn}
+      />
+    </>
+  );
+}
+
+const SaveBarMemo = memo(SaveBar);
+
+function PreviewModal({
+  visible,
+  message,
+  index,
+  onClose,
+  onLinkPress,
+}: {
+  visible: boolean;
+  message: string;
+  index: number;
+  onClose: () => void;
+  onLinkPress: ({ url }: { url: string }) => void;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.previewOverlay}>
+        <View style={styles.previewModal}>
+          <View style={styles.previewHeader}>
+            <Text style={styles.previewTitle}>
+              Preview — Message {index + 1}
+            </Text>
+            <Pressable onPress={onClose}>
+              <Text style={styles.previewClose}>✕</Text>
+            </Pressable>
+          </View>
+          <ScrollView style={styles.previewScroll}>
+            <View style={styles.previewBubble}>
+              <EnrichedMarkdownText
+                markdown={message}
+                markdownStyle={markdownStyle}
+                onLinkPress={onLinkPress}
+              />
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const PreviewModalMemo = memo(PreviewModal);
+
+export default function CreateBotScreen() {
+  const onLinkPress = useNavigateToJanitorLink();
+
+  const {
+    addCustomTag,
+    addFirstMessage,
+    alertButtons,
+    alertMessage,
+    alertTitle,
+    alertVisible,
+    closePreview,
+    firstMsgIndex,
+    filteredTags,
+    form,
+    goBack,
+    goToNextFirstMessage,
+    goToPrevFirstMessage,
+    handleDeleteFirstMessage,
+    handlePickAndUploadAvatar,
+    handlePreviewFirstMessage,
+    handleRefresh,
+    handleReset,
+    handleSave,
+    isEditMode,
+    keyboardHeight,
+    loaded,
+    previewVisible,
+    refreshing,
+    removeCustomTag,
+    saving,
+    selectLimited,
+    selectLimitless,
+    selectedTagIdsSet,
+    setAlertVisible,
+    setField,
+    setTagSearch,
+    tagSearch,
+    toggleTag,
+    updateFirstMessage,
+    uploading,
+  } = useCreateBotForm();
+
+  const onDescriptionChange = useCallback(
+    (v: string) => setField("description", v),
+    [setField],
+  );
+  const onPersonalityChange = useCallback(
+    (v: string) => setField("personality", v),
+    [setField],
+  );
+  const onScenarioChange = useCallback(
+    (v: string) => setField("scenario", v),
+    [setField],
+  );
+  const onExampleDialogsChange = useCallback(
+    (v: string) => setField("example_dialogs", v),
+    [setField],
   );
 
   if (!loaded) {
@@ -528,298 +1018,81 @@ export default function CreateBotScreen() {
             />
           }
         >
-          {/* Avatar */}
-          <Pressable
+          <AvatarPickerMemo
+            uri={form.avatar ? botAvatarUrl(form.avatar) : ""}
+            name={form.name}
+            uploading={uploading}
             onPress={handlePickAndUploadAvatar}
-            style={styles.avatarRow}
-          >
-            <View style={styles.avatarWrap}>
-              <Avatar
-                uri={form.avatar ? botAvatarUrl(form.avatar) : ""}
-                name={form.name || ""}
-                size={80}
-              />
-            </View>
-            <View style={styles.avatarTextCol}>
-              <Text style={styles.avatarLabel}>Avatar</Text>
-              <Text style={styles.avatarHint}>
-                {uploading ? "Uploading..." : "Tap to upload (256×256)"}
-              </Text>
-            </View>
-            {uploading && (
-              <ActivityIndicator color={colors.accent} size="small" />
-            )}
-          </Pressable>
-
-          {/* Name */}
+          />
           <TextInput
             label="Name"
             value={form.name}
             onChangeText={(v) => setField("name", v)}
             placeholder="Character name"
           />
-
-          {/* Chat Name */}
           <TextInput
             label="Chat Name (optional)"
             value={form.chat_name}
             onChangeText={(v) => setField("chat_name", v)}
             placeholder="Name shown in chat"
           />
-
-          {/* Description */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.label}>Description</Text>
-            <RNTextInput
-              value={form.description}
-              onChangeText={(v) => setField("description", v)}
-              placeholder="Describe the character..."
-              placeholderTextColor={colors.textDimAlt}
-              multiline
-              textAlignVertical="top"
-              style={[styles.input, styles.multilineInput]}
-            />
-          </View>
-
-          {/* Personality */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.label}>Personality</Text>
-            <RNTextInput
-              value={form.personality}
-              onChangeText={(v) => setField("personality", v)}
-              placeholder="Character personality traits..."
-              placeholderTextColor={colors.textDimAlt}
-              multiline
-              textAlignVertical="top"
-              style={[styles.input, styles.multilineInput]}
-            />
-          </View>
-
-          {/* Scenario */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.label}>Scenario</Text>
-            <RNTextInput
-              value={form.scenario}
-              onChangeText={(v) => setField("scenario", v)}
-              placeholder="Roleplay scenario..."
-              placeholderTextColor={colors.textDimAlt}
-              multiline
-              textAlignVertical="top"
-              style={[styles.input, styles.multilineInput]}
-            />
-          </View>
-
-          {/* Example Dialogs */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.label}>Example Dialogs</Text>
-            <RNTextInput
-              value={form.example_dialogs}
-              onChangeText={(v) => setField("example_dialogs", v)}
-              placeholder="{{char}}: ...\n{{user}}: ..."
-              placeholderTextColor={colors.textDimAlt}
-              multiline
-              textAlignVertical="top"
-              style={[styles.input, styles.multilineInput]}
-            />
-          </View>
-
-          {/* First Messages */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.label}>
-                First Messages ({firstMsgIndex + 1}/{form.first_messages.length}
-                )
-              </Text>
-              <View style={styles.firstMsgActions}>
-                <Pressable
-                  onPress={handlePreviewFirstMessage}
-                  style={styles.previewBtn}
-                >
-                  <Text style={styles.previewBtnText}>Preview</Text>
-                </Pressable>
-                {form.first_messages.length < 10 && (
-                  <Pressable onPress={addFirstMessage} style={styles.addBtn}>
-                    <Text style={styles.addBtnText}>+ Add</Text>
-                  </Pressable>
-                )}
-                {form.first_messages.length > 1 && (
-                  <Pressable onPress={handleDeleteFirstMessage} style={styles.removeBtn}>
-                    <Text style={styles.removeBtnText}>- Del</Text>
-                  </Pressable>
-                )}
-              </View>
-            </View>
-            <View style={styles.firstMsgRow}>
-              <RNTextInput
-                value={form.first_messages[firstMsgIndex] ?? ""}
-                onChangeText={(v) => updateFirstMessage(firstMsgIndex, v)}
-                placeholder={`Message ${firstMsgIndex + 1}`}
-                placeholderTextColor={colors.textDimAlt}
-                multiline
-                textAlignVertical="top"
-                style={[styles.input, styles.firstMsgInput]}
-              />
-            </View>
-            {form.first_messages.length > 1 && (
-              <View style={styles.firstMsgNav}>
-                <Pressable
-                  onPress={() => setFirstMsgIndex((i) => Math.max(0, i - 1))}
-                  disabled={firstMsgIndex === 0}
-                  style={[
-                    styles.navBtn,
-                    firstMsgIndex === 0 && styles.navBtnDisabled,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.navBtnText,
-                      firstMsgIndex === 0 && styles.navBtnTextDisabled,
-                    ]}
-                  >
-                    ← Prev
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() =>
-                    setFirstMsgIndex((i) =>
-                      Math.min(form.first_messages.length - 1, i + 1),
-                    )
-                  }
-                  disabled={firstMsgIndex >= form.first_messages.length - 1}
-                  style={[
-                    styles.navBtn,
-                    firstMsgIndex >= form.first_messages.length - 1 &&
-                      styles.navBtnDisabled,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.navBtnText,
-                      firstMsgIndex >= form.first_messages.length - 1 &&
-                        styles.navBtnTextDisabled,
-                    ]}
-                  >
-                    Next →
-                  </Text>
-                </Pressable>
-              </View>
-            )}
-          </View>
-
-          {/* NSFW Toggle */}
-          <View style={styles.section}>
-            <Text style={styles.label}>Content Rating</Text>
-            <View style={styles.toggleRow}>
-              <Pressable
-                style={[
-                  styles.toggleOption,
-                  !form.is_nsfw && styles.toggleActive,
-                ]}
-                onPress={() => setField("is_nsfw", false)}
-              >
-                <Text
-                  style={[
-                    styles.toggleText,
-                    !form.is_nsfw && styles.toggleTextActive,
-                  ]}
-                >
-                  Limited
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.toggleOption,
-                  form.is_nsfw && styles.toggleActive,
-                ]}
-                onPress={() => setField("is_nsfw", true)}
-              >
-                <Text
-                  style={[
-                    styles.toggleText,
-                    form.is_nsfw && styles.toggleTextActive,
-                  ]}
-                >
-                  Limitless
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-
-          {/* Tags */}
-          <View style={styles.section}>
-            <Text style={styles.label}>Tags ({form.custom_tags.length + form.tag_ids.length}/10)</Text>
-
-            {/* Selected custom tags */}
-            {form.custom_tags.length > 0 && (
-              <View style={styles.chipRow}>
-                {form.custom_tags.map((tag) => (
-                  <Pressable
-                    key={`custom-${tag}`}
-                    style={styles.chipSelected}
-                    onPress={() => removeCustomTag(tag)}
-                  >
-                    <Text style={styles.chipSelectedText}>{tag} ✕</Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-
-            {/* Custom tag input */}
-            <View style={styles.customTagRow}>
-              <RNTextInput
-                value={tagSearch}
-                onChangeText={setTagSearch}
-                placeholder="Add custom tag..."
-                placeholderTextColor={colors.textDimAlt}
-                style={[styles.input, styles.customTagInput]}
-                onSubmitEditing={addCustomTag}
-                returnKeyType="done"
-              />
-              <Pressable onPress={addCustomTag} style={styles.addTagBtn}>
-                <Text style={styles.addTagBtnText}>Add</Text>
-              </Pressable>
-            </View>
-
-            {/* Server tags */}
-            {filteredTags.length > 0 && (
-              <View style={styles.chipRow}>
-                {filteredTags.map((tag) => {
-                  const selected = form.tag_ids.includes(tag.id);
-                  return (
-                    <Pressable
-                      key={tag.id}
-                      style={selected ? styles.chipSelected : styles.chip}
-                      onPress={() => toggleTag(tag.id)}
-                    >
-                      <Text
-                        style={
-                          selected ? styles.chipSelectedText : styles.chipText
-                        }
-                      >
-                        {tag.name}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            )}
-          </View>
-
-          {/* Save */}
-          <Button
-            title={isEditMode ? "Save Changes" : "Create Bot"}
-            onPress={handleSave}
-            loading={saving}
-            style={styles.saveBtn}
+          <MultilineFieldMemo
+            label="Description"
+            value={form.description}
+            placeholder="Describe the character..."
+            onChangeText={onDescriptionChange}
           />
-
-          <Button
-            title="Reset"
-            onPress={handleReset}
-            variant="outline"
-            style={styles.resetBtn}
+          <MultilineFieldMemo
+            label="Personality"
+            value={form.personality}
+            placeholder="Character personality traits..."
+            onChangeText={onPersonalityChange}
           />
-
+          <MultilineFieldMemo
+            label="Scenario"
+            value={form.scenario}
+            placeholder="Roleplay scenario..."
+            onChangeText={onScenarioChange}
+          />
+          <MultilineFieldMemo
+            label="Example Dialogs"
+            value={form.example_dialogs}
+            placeholder="{{char}}: ...\n{{user}}: ..."
+            onChangeText={onExampleDialogsChange}
+          />
+          <FirstMessageEditorMemo
+            value={form.first_messages[firstMsgIndex] ?? ""}
+            index={firstMsgIndex}
+            count={form.first_messages.length}
+            onChange={updateFirstMessage}
+            onPreview={handlePreviewFirstMessage}
+            onAdd={addFirstMessage}
+            onDelete={handleDeleteFirstMessage}
+            onPrev={goToPrevFirstMessage}
+            onNext={goToNextFirstMessage}
+          />
+          <ContentRatingToggleMemo
+            isNsfw={form.is_nsfw}
+            onSelectLimited={selectLimited}
+            onSelectLimitless={selectLimitless}
+          />
+          <TagEditorMemo
+            customTags={form.custom_tags}
+            selectedCount={form.tag_ids.length}
+            tagSearch={tagSearch}
+            selectedTagIdsSet={selectedTagIdsSet}
+            filteredTags={filteredTags}
+            onRemoveTag={removeCustomTag}
+            onAddTag={addCustomTag}
+            onToggleTag={toggleTag}
+            onSearchChange={setTagSearch}
+          />
+          <SaveBarMemo
+            isEditMode={isEditMode}
+            saving={saving}
+            onSave={handleSave}
+            onReset={handleReset}
+          />
           <View style={styles.bottomSpacer} />
         </ScrollView>
       </KeyboardAvoidingView>
@@ -832,34 +1105,13 @@ export default function CreateBotScreen() {
         onDismiss={() => setAlertVisible(false)}
       />
 
-      <Modal
+      <PreviewModalMemo
         visible={previewVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPreviewVisible(false)}
-      >
-        <View style={styles.previewOverlay}>
-          <View style={styles.previewModal}>
-            <View style={styles.previewHeader}>
-              <Text style={styles.previewTitle}>
-                Preview — Message {firstMsgIndex + 1}
-              </Text>
-              <Pressable onPress={() => setPreviewVisible(false)}>
-                <Text style={styles.previewClose}>✕</Text>
-              </Pressable>
-            </View>
-            <ScrollView style={styles.previewScroll}>
-              <View style={styles.previewBubble}>
-                <EnrichedMarkdownText
-                  markdown={form.first_messages[firstMsgIndex] ?? ""}
-                  markdownStyle={markdownStyle}
-                  onLinkPress={onLinkPress}
-                />
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+        message={form.first_messages[firstMsgIndex] ?? ""}
+        index={firstMsgIndex}
+        onClose={closePreview}
+        onLinkPress={onLinkPress}
+      />
     </View>
   );
 }

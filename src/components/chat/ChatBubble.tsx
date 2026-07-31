@@ -19,7 +19,7 @@ import { useChatStore } from "../../stores/chatStore";
 import { colors } from "../../utils/colors";
 
 const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/g;
-export function extractThinking(content: string): {
+function extractThinking(content: string): {
   thinking: string;
   rest: string;
 } {

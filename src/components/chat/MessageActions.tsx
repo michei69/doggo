@@ -3,139 +3,43 @@ import { View, Text, Pressable, StyleSheet } from "react-native";
 import CustomBottomSheet from "../common/CustomBottomSheet";
 import { colors } from "../../utils/colors";
 
+export interface MessageAction {
+  label: string;
+  onPress: () => void;
+  destructive?: boolean;
+}
+
 export default function MessageActions({
   visible,
   onClose,
-  onEdit,
-  onDelete,
-  onReroll,
-  onCopy,
-  onFork,
-  onRerollMessage,
-  onReformat,
-  canEdit,
-  canDelete,
-  canReroll,
-  canFork,
-  canRerollMessage,
-  canReformat,
+  actions,
 }: {
   visible: boolean;
   onClose: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-  onReroll?: () => void;
-  onCopy?: () => void;
-  onFork?: () => void;
-  onRerollMessage?: () => void;
-  onReformat?: () => void;
-  canEdit: boolean;
-  canDelete: boolean;
-  canReroll?: boolean;
-  canFork?: boolean;
-  canRerollMessage?: boolean;
-  canReformat?: boolean;
+  actions: MessageAction[];
 }) {
   return (
     <CustomBottomSheet visible={visible} onClose={onClose}>
       <View style={styles.content}>
-        {onCopy && (
+        {actions.map((action) => (
           <Pressable
+            key={action.label}
             style={({ pressed }) => [
               styles.option,
               pressed && { opacity: 0.7 },
             ]}
-            onPress={() => {
-              onCopy();
-              onClose();
-            }}
+            onPress={action.onPress}
           >
-            <Text style={styles.optionText}>Copy Message</Text>
-          </Pressable>
-        )}
-        {canEdit && (
-          <Pressable
-            style={({ pressed }) => [
-              styles.option,
-              pressed && { opacity: 0.7 },
-            ]}
-            onPress={onEdit}
-          >
-            <Text style={styles.optionText}>Edit Message</Text>
-          </Pressable>
-        )}
-        {canReformat && onReformat && (
-          <Pressable
-            style={({ pressed }) => [
-              styles.option,
-              pressed && { opacity: 0.7 },
-            ]}
-            onPress={() => {
-              onReformat();
-              onClose();
-            }}
-          >
-            <Text style={styles.optionText}>Reformat Markdown</Text>
-          </Pressable>
-        )}
-        {canRerollMessage && onRerollMessage && (
-          <Pressable
-            style={({ pressed }) => [
-              styles.option,
-              pressed && { opacity: 0.7 },
-            ]}
-            onPress={() => {
-              onRerollMessage();
-              onClose();
-            }}
-          >
-            <Text style={styles.optionText}>Reroll message</Text>
-          </Pressable>
-        )}
-        {canFork && onFork && (
-          <Pressable
-            style={({ pressed }) => [
-              styles.option,
-              pressed && { opacity: 0.7 },
-            ]}
-            onPress={() => {
-              onFork();
-              onClose();
-            }}
-          >
-            <Text style={styles.optionText}>Fork Chat</Text>
-          </Pressable>
-        )}
-        {canReroll && onReroll && (
-          <Pressable
-            style={({ pressed }) => [
-              styles.option,
-              pressed && { opacity: 0.7 },
-            ]}
-            onPress={() => {
-              onReroll();
-              onClose();
-            }}
-          >
-            <Text style={styles.optionText}>Reroll</Text>
-          </Pressable>
-        )}
-        {canDelete && (
-          <Pressable
-            style={({ pressed }) => [
-              styles.option,
-              pressed && { opacity: 0.7 },
-            ]}
-            onPress={() => {
-              onDelete();
-              onClose();
-            }}
-          >
-            <Text style={[styles.optionText, styles.deleteText]}>
-              Delete Message
+            <Text
+              style={[
+                styles.optionText,
+                action.destructive && styles.deleteText,
+              ]}
+            >
+              {action.label}
             </Text>
           </Pressable>
-        )}
+        ))}
       </View>
     </CustomBottomSheet>
   );

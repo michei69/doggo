@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useReducer, useRef, memo } from "react";
 import {
   View,
   Text,
@@ -23,6 +23,70 @@ import { useAuthStore } from "../../stores/authStore";
 import { colors } from "../../utils/colors";
 import ReviewCard from "./ReviewCard";
 
+interface ReviewsListState {
+  reviews: Review[];
+  hasMore: boolean;
+  listLoading: boolean;
+}
+
+type ReviewsListAction =
+  | { type: "REPLACE"; reviews: Review[]; hasMore: boolean }
+  | { type: "APPEND"; reviews: Review[]; hasMore: boolean }
+  | { type: "LIST_LOADING"; loading: boolean }
+  | { type: "ADD"; review: Review }
+  | { type: "REMOVE"; id: string }
+  | { type: "PIN"; id: string; pinnedAt: string }
+  | { type: "UNPIN"; id: string };
+
+function reviewsListReducer(
+  state: ReviewsListState,
+  action: ReviewsListAction,
+): ReviewsListState {
+  switch (action.type) {
+    case "REPLACE":
+      return {
+        reviews: action.reviews,
+        hasMore: action.hasMore,
+        listLoading: false,
+      };
+    case "APPEND":
+      return {
+        reviews: [...state.reviews, ...action.reviews],
+        hasMore: action.hasMore,
+        listLoading: false,
+      };
+    case "LIST_LOADING":
+      return { ...state, listLoading: action.loading };
+    case "ADD":
+      return { ...state, reviews: [action.review, ...state.reviews] };
+    case "REMOVE":
+      return {
+        ...state,
+        reviews: state.reviews.filter((r) => r.id !== action.id),
+      };
+    case "PIN":
+      return {
+        ...state,
+        reviews: state.reviews.map((r) =>
+          r.id === action.id
+            ? { ...r, is_pinned: true, pinned_at: action.pinnedAt }
+            : r,
+        ),
+      };
+    case "UNPIN":
+      return {
+        ...state,
+        reviews: state.reviews.map((r) =>
+          r.id === action.id
+            ? { ...r, is_pinned: false, pinned_at: null }
+            : r,
+        ),
+      };
+    default:
+      return state;
+  }
+}
+
 export default function ReviewsSection({
   characterId,
   isOwner,
@@ -33,14 +97,18 @@ export default function ReviewsSection({
   const user = useAuthStore((s) => s.user);
   const [settings, setSettings] = useState<ReviewSettings | null>(null);
   const [counts, setCounts] = useState<ReviewCounts | null>(null);
-  const [reviews, setReviews] = useState<Review[]>([]);
   const [sortBy, setSortBy] = useState<ReviewSort>("likes");
-  const [page, setPage] = useState(1);
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [listLoading, setListLoading] = useState(false);
+  const pageRef = useRef(1);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [list, dispatchList] = useReducer(reviewsListReducer, {
+    reviews: [],
+    hasMore: true,
+    listLoading: false,
+  });
+  const { reviews, hasMore, listLoading } = list;
+
+  const initialLoading = settings === null && error === null;
 
   // Review form
   const [showForm, setShowForm] = useState(false);
@@ -63,13 +131,15 @@ export default function ReviewsSection({
         if (cancelled) return;
         setSettings(settingsData);
         setCounts(countsData);
-        setReviews(reviewsData);
-        setHasMore(reviewsData.length === 20);
-        setPage(1);
+        dispatchList({
+          type: "REPLACE",
+          reviews: reviewsData,
+          hasMore: reviewsData.length === 20,
+        });
+        pageRef.current = 1;
       } catch (err: any) {
-        if (!cancelled) setError(err.message || "Failed to load reviews");
-      } finally {
-        if (!cancelled) setInitialLoading(false);
+        if (cancelled) return;
+        setError(err.message || "Failed to load reviews");
       }
     };
     load();
@@ -83,7 +153,7 @@ export default function ReviewsSection({
     if (initialLoading) return;
     let cancelled = false;
     const fetch = async () => {
-      setListLoading(true);
+      dispatchList({ type: "LIST_LOADING", loading: true });
       try {
         const data = await getReviews(characterId, {
           page: 1,
@@ -91,13 +161,14 @@ export default function ReviewsSection({
           sortBy,
         });
         if (cancelled) return;
-        setReviews(data);
-        setHasMore(data.length === 20);
-        setPage(1);
+        dispatchList({
+          type: "REPLACE",
+          reviews: data,
+          hasMore: data.length === 20,
+        });
+        pageRef.current = 1;
       } catch {
-        // silently fail
-      } finally {
-        if (!cancelled) setListLoading(false);
+        if (!cancelled) dispatchList({ type: "LIST_LOADING", loading: false });
       }
     };
     fetch();
@@ -110,21 +181,20 @@ export default function ReviewsSection({
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
     try {
-      const nextPage = page + 1;
+      const nextPage = pageRef.current + 1;
       const data = await getReviews(characterId, {
         page: nextPage,
         size: 20,
         sortBy,
       });
-      setReviews((prev) => [...prev, ...data]);
-      setHasMore(data.length === 20);
-      setPage(nextPage);
+      dispatchList({ type: "APPEND", reviews: data, hasMore: data.length === 20 });
+      pageRef.current = nextPage;
     } catch {
       // silently fail
     } finally {
       setLoadingMore(false);
     }
-  }, [characterId, page, sortBy, loadingMore, hasMore]);
+  }, [characterId, sortBy, loadingMore, hasMore]);
 
   const handleSortChange = useCallback((newSort: ReviewSort) => {
     setSortBy(newSort);
@@ -163,7 +233,7 @@ export default function ReviewsSection({
           user_name: user?.user_metadata?.email ?? "",
         },
       };
-      setReviews((prev) => [optimistic, ...prev]);
+      dispatchList({ type: "ADD", review: optimistic });
       setReviewContent("");
       setShowForm(false);
       // Refresh counts
@@ -180,7 +250,7 @@ export default function ReviewsSection({
     async (reviewId: string) => {
       try {
         await deleteReview(reviewId);
-        setReviews((prev) => prev.filter((r) => r.id !== reviewId));
+        dispatchList({ type: "REMOVE", id: reviewId });
         const c = await getReviewCounts(characterId);
         setCounts(c);
       } catch {
@@ -193,13 +263,11 @@ export default function ReviewsSection({
   const handlePinReview = useCallback(async (reviewId: string) => {
     try {
       await pinReview(reviewId);
-      setReviews((prev) =>
-        prev.map((r) =>
-          r.id === reviewId
-            ? { ...r, is_pinned: true, pinned_at: new Date().toISOString() }
-            : r,
-        ),
-      );
+      dispatchList({
+        type: "PIN",
+        id: reviewId,
+        pinnedAt: new Date().toISOString(),
+      });
     } catch {
       // silently fail
     }
@@ -208,14 +276,20 @@ export default function ReviewsSection({
   const handleUnpinReview = useCallback(async (reviewId: string) => {
     try {
       await unpinReview(reviewId);
-      setReviews((prev) =>
-        prev.map((r) =>
-          r.id === reviewId ? { ...r, is_pinned: false, pinned_at: null } : r,
-        ),
-      );
+      dispatchList({ type: "UNPIN", id: reviewId });
     } catch {
       // silently fail
     }
+  }, []);
+
+  const handleCancelForm = useCallback(() => {
+    setShowForm(false);
+    setReviewContent("");
+    setFormError(null);
+  }, []);
+
+  const handleOpenForm = useCallback(() => {
+    setShowForm(true);
   }, []);
 
   const commentModeOpen = settings?.comment_mode === "open";
@@ -238,164 +312,264 @@ export default function ReviewsSection({
 
   return (
     <View style={styles.container}>
-      {/* Header with counts and sort */}
-      <View style={styles.header}>
-        <Text style={styles.heading}>
-          Reviews
-          {counts ? (
-            <Text style={styles.countText}> ({counts.total})</Text>
-          ) : null}
-        </Text>
-        <View style={styles.sortRow}>
-          {(["likes", "latest", "oldest"] as ReviewSort[]).map((s) => (
-            <Pressable
-              key={s}
-              onPress={() => handleSortChange(s)}
-              disabled={listLoading}
-              style={[styles.sortBtn, sortBy === s && styles.sortBtnActive]}
-            >
-              <Text
-                style={[styles.sortText, sortBy === s && styles.sortTextActive]}
-              >
-                {s === "likes" ? "Top" : s === "latest" ? "New" : "Old"}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      {/* Write review button */}
+      <ReviewsHeader
+        counts={counts}
+        sortBy={sortBy}
+        listLoading={listLoading}
+        onSortChange={handleSortChange}
+      />
       {commentModeOpen && !showForm && (
-        <Pressable style={styles.writeBtn} onPress={() => setShowForm(true)}>
-          <MessageSquarePlus size={16} color={colors.accent} />
-          <Text style={styles.writeBtnText}>Write a review</Text>
-        </Pressable>
+        <WriteReviewButton onPress={handleOpenForm} />
       )}
-
-      {/* Review form */}
       {showForm && (
-        <View style={styles.formCard}>
-          <View style={styles.likeToggle}>
-            <Pressable
-              style={[
-                styles.likeOption,
-                reviewIsLike && styles.likeOptionActive,
-              ]}
-              onPress={() => setReviewIsLike(true)}
-            >
-              <ThumbsUp
-                size={16}
-                color={reviewIsLike ? colors.accent : colors.textDim}
-              />
-              <Text
-                style={[
-                  styles.likeOptionText,
-                  reviewIsLike && styles.likeOptionTextActive,
-                ]}
-              >
-                Like
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.likeOption,
-                !reviewIsLike && styles.dislikeOptionActive,
-              ]}
-              onPress={() => setReviewIsLike(false)}
-            >
-              <ThumbsDown
-                size={16}
-                color={!reviewIsLike ? colors.danger : colors.textDim}
-              />
-              <Text
-                style={[
-                  styles.likeOptionText,
-                  !reviewIsLike && styles.dislikeOptionTextActive,
-                ]}
-              >
-                Dislike
-              </Text>
-            </Pressable>
-          </View>
-          <TextInput
-            style={styles.input}
-            value={reviewContent}
-            onChangeText={setReviewContent}
-            placeholder="Write your review..."
-            placeholderTextColor={colors.textPlaceholder}
-            multiline
-            numberOfLines={3}
-          />
-          {formError ? <Text style={styles.formError}>{formError}</Text> : null}
-          <View style={styles.formActions}>
-            <Pressable
-              style={styles.cancelBtn}
-              onPress={() => {
-                setShowForm(false);
-                setReviewContent("");
-                setFormError(null);
-              }}
-            >
-              <Text style={styles.cancelText}>Cancel</Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.submitBtn,
-                (!reviewContent.trim() || submitting) &&
-                  styles.submitBtnDisabled,
-              ]}
-              onPress={handleSubmitReview}
-              disabled={!reviewContent.trim() || submitting}
-            >
-              {submitting ? (
-                <ActivityIndicator size="small" color={colors.white} />
-              ) : (
-                <Text style={styles.submitText}>Submit</Text>
-              )}
-            </Pressable>
-          </View>
-        </View>
+        <ReviewForm
+          reviewContent={reviewContent}
+          reviewIsLike={reviewIsLike}
+          submitting={submitting}
+          formError={formError}
+          onChangeText={setReviewContent}
+          onToggleLike={setReviewIsLike}
+          onSubmit={handleSubmitReview}
+          onCancel={handleCancelForm}
+        />
       )}
-
-      {/* Reviews list */}
-      {listLoading ? (
-        <View style={styles.listLoader}>
-          <ActivityIndicator size="small" color={colors.accent} />
-        </View>
-      ) : reviews.length === 0 ? (
-        <Text style={styles.emptyText}>No reviews yet. Be the first!</Text>
-      ) : (
-        <View style={styles.list}>
-          {reviews.map((review) => (
-            <ReviewCard
-              key={review.id}
-              review={review}
-              isOwner={isOwner}
-              onDelete={handleDeleteReview}
-              onPin={handlePinReview}
-              onUnpin={handleUnpinReview}
-            />
-          ))}
-        </View>
-      )}
-
-      {/* Load more */}
-      {hasMore && !listLoading && (
-        <Pressable
-          style={styles.loadMoreBtn}
-          onPress={handleLoadMore}
-          disabled={loadingMore}
-        >
-          {loadingMore ? (
-            <ActivityIndicator size="small" color={colors.accent} />
-          ) : (
-            <Text style={styles.loadMoreText}>Load more</Text>
-          )}
-        </Pressable>
-      )}
+      <ReviewsList
+        listLoading={listLoading}
+        reviews={reviews}
+        isOwner={isOwner}
+        onDelete={handleDeleteReview}
+        onPin={handlePinReview}
+        onUnpin={handleUnpinReview}
+      />
+      <LoadMoreButton
+        hasMore={hasMore}
+        listLoading={listLoading}
+        loadingMore={loadingMore}
+        onLoadMore={handleLoadMore}
+      />
     </View>
   );
 }
+
+const WriteReviewButton = memo(function WriteReviewButton({
+  onPress,
+}: {
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={styles.writeBtn} onPress={onPress}>
+      <MessageSquarePlus size={16} color={colors.accent} />
+      <Text style={styles.writeBtnText}>Write a review</Text>
+    </Pressable>
+  );
+});
+
+const ReviewsHeader = memo(function ReviewsHeader({
+  counts,
+  sortBy,
+  listLoading,
+  onSortChange,
+}: {
+  counts: ReviewCounts | null;
+  sortBy: ReviewSort;
+  listLoading: boolean;
+  onSortChange: (sort: ReviewSort) => void;
+}) {
+  return (
+    <View style={styles.header}>
+      {/* Header with counts and sort */}
+      <Text style={styles.heading}>
+        Reviews
+        {counts ? (
+          <Text style={styles.countText}> ({counts.total})</Text>
+        ) : null}
+      </Text>
+      <View style={styles.sortRow}>
+        {(["likes", "latest", "oldest"] as ReviewSort[]).map((s) => (
+          <Pressable
+            key={s}
+            onPress={() => onSortChange(s)}
+            disabled={listLoading}
+            style={[styles.sortBtn, sortBy === s && styles.sortBtnActive]}
+          >
+            <Text
+              style={[styles.sortText, sortBy === s && styles.sortTextActive]}
+            >
+              {s === "likes" ? "Top" : s === "latest" ? "New" : "Old"}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+});
+
+const ReviewForm = memo(function ReviewForm({
+  reviewContent,
+  reviewIsLike,
+  submitting,
+  formError,
+  onChangeText,
+  onToggleLike,
+  onSubmit,
+  onCancel,
+}: {
+  reviewContent: string;
+  reviewIsLike: boolean;
+  submitting: boolean;
+  formError: string | null;
+  onChangeText: (text: string) => void;
+  onToggleLike: (value: boolean) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <View style={styles.formCard}>
+      <View style={styles.likeToggle}>
+        <Pressable
+          style={[
+            styles.likeOption,
+            reviewIsLike && styles.likeOptionActive,
+          ]}
+          onPress={() => onToggleLike(true)}
+        >
+          <ThumbsUp
+            size={16}
+            color={reviewIsLike ? colors.accent : colors.textDim}
+          />
+          <Text
+            style={[
+              styles.likeOptionText,
+              reviewIsLike && styles.likeOptionTextActive,
+            ]}
+          >
+            Like
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[
+            styles.likeOption,
+            !reviewIsLike && styles.dislikeOptionActive,
+          ]}
+          onPress={() => onToggleLike(false)}
+        >
+          <ThumbsDown
+            size={16}
+            color={!reviewIsLike ? colors.danger : colors.textDim}
+          />
+          <Text
+            style={[
+              styles.likeOptionText,
+              !reviewIsLike && styles.dislikeOptionTextActive,
+            ]}
+          >
+            Dislike
+          </Text>
+        </Pressable>
+      </View>
+      <TextInput
+        style={styles.input}
+        value={reviewContent}
+        onChangeText={onChangeText}
+        placeholder="Write your review..."
+        placeholderTextColor={colors.textPlaceholder}
+        multiline
+        numberOfLines={3}
+      />
+      {formError ? <Text style={styles.formError}>{formError}</Text> : null}
+      <View style={styles.formActions}>
+        <Pressable style={styles.cancelBtn} onPress={onCancel}>
+          <Text style={styles.cancelText}>Cancel</Text>
+        </Pressable>
+        <Pressable
+          style={[
+            styles.submitBtn,
+            (!reviewContent.trim() || submitting) &&
+              styles.submitBtnDisabled,
+          ]}
+          onPress={onSubmit}
+          disabled={!reviewContent.trim() || submitting}
+        >
+          {submitting ? (
+            <ActivityIndicator size="small" color={colors.white} />
+          ) : (
+            <Text style={styles.submitText}>Submit</Text>
+          )}
+        </Pressable>
+      </View>
+    </View>
+  );
+});
+
+const ReviewsList = memo(function ReviewsList({
+  listLoading,
+  reviews,
+  isOwner,
+  onDelete,
+  onPin,
+  onUnpin,
+}: {
+  listLoading: boolean;
+  reviews: Review[];
+  isOwner: boolean;
+  onDelete: (id: string) => void;
+  onPin: (id: string) => void;
+  onUnpin: (id: string) => void;
+}) {
+  if (listLoading) {
+    return (
+      <View style={styles.listLoader}>
+        <ActivityIndicator size="small" color={colors.accent} />
+      </View>
+    );
+  }
+  if (reviews.length === 0) {
+    return (
+      <Text style={styles.emptyText}>No reviews yet. Be the first!</Text>
+    );
+  }
+  return (
+    <View style={styles.list}>
+      {reviews.map((review) => (
+        <ReviewCard
+          key={review.id}
+          review={review}
+          isOwner={isOwner}
+          onDelete={onDelete}
+          onPin={onPin}
+          onUnpin={onUnpin}
+        />
+      ))}
+    </View>
+  );
+});
+
+const LoadMoreButton = memo(function LoadMoreButton({
+  hasMore,
+  listLoading,
+  loadingMore,
+  onLoadMore,
+}: {
+  hasMore: boolean;
+  listLoading: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
+}) {
+  if (!hasMore || listLoading) return null;
+  return (
+    <Pressable
+      style={styles.loadMoreBtn}
+      onPress={onLoadMore}
+      disabled={loadingMore}
+    >
+      {loadingMore ? (
+        <ActivityIndicator size="small" color={colors.accent} />
+      ) : (
+        <Text style={styles.loadMoreText}>Load more</Text>
+      )}
+    </Pressable>
+  );
+});
 
 const styles = StyleSheet.create({
   container: {

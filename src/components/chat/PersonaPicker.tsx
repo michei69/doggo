@@ -1,13 +1,13 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import {
   View,
   Text,
   Pressable,
   Modal,
-  ScrollView,
   ActivityIndicator,
   StyleSheet,
 } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import { getMyProfile, getMyPersonas } from "../../api/profile";
 import Avatar from "../common/Avatar";
 import { avatarUrl } from "../../utils/assets";
@@ -46,6 +46,7 @@ export default function PersonaPicker({
   useEffect(() => {
     if (visible && !profile) {
       setLoading(true);
+      let cancelled = false;
       const fetchData = async () => {
         try {
           let ps: Persona[] = [];
@@ -53,14 +54,18 @@ export default function PersonaPicker({
             ps = await getMyPersonas();
           } catch {}
           const p = await getMyProfile();
+          if (cancelled) return;
           setProfile(p);
           setPersonas(ps);
         } catch {
         } finally {
-          setLoading(false);
+          if (!cancelled) setLoading(false);
         }
       };
       fetchData();
+      return () => {
+        cancelled = true;
+      };
     }
   }, [visible, profile]);
 
@@ -83,6 +88,40 @@ export default function PersonaPicker({
     return [main, ...others].sort((a, b) => a.order - b.order);
   }, [profile, personas]);
 
+  const renderPersona = useCallback(
+    ({ item }: { item: PersonaEntry }) => (
+      <Pressable
+        style={({ pressed }) => [
+          styles.persona,
+          pressed && { opacity: 0.7 },
+        ]}
+        onPress={() => {
+          onClose();
+          onSelect(
+            item.id === "__main__"
+              ? null
+              : { id: item.id, name: item.name, avatar: item.avatar },
+          );
+        }}
+      >
+        <Avatar
+          uri={item.avatar ? avatarUrl(item.avatar) : undefined}
+          name={item.name}
+          size={44}
+        />
+        <View style={styles.personaInfo}>
+          <Text style={styles.personaName}>{item.name}</Text>
+          {item.id === "__main__" ? (
+            <Text style={styles.personaMeta}>Main persona</Text>
+          ) : (
+            <Text style={styles.personaMeta}>Persona</Text>
+          )}
+        </View>
+      </Pressable>
+    ),
+    [onClose, onSelect],
+  );
+
   return (
     <Modal
       visible={visible}
@@ -103,39 +142,13 @@ export default function PersonaPicker({
           ) : entries.length === 0 ? (
             <Text style={styles.empty}>No personas available</Text>
           ) : (
-            <ScrollView style={styles.list}>
-              {entries.map((p) => (
-                <Pressable
-                  key={p.id}
-                  style={({ pressed }) => [
-                    styles.persona,
-                    pressed && { opacity: 0.7 },
-                  ]}
-                  onPress={() => {
-                    onClose();
-                    onSelect(
-                      p.id === "__main__"
-                        ? null
-                        : { id: p.id, name: p.name, avatar: p.avatar },
-                    );
-                  }}
-                >
-                  <Avatar
-                    uri={p.avatar ? avatarUrl(p.avatar) : undefined}
-                    name={p.name}
-                    size={44}
-                  />
-                  <View style={styles.personaInfo}>
-                    <Text style={styles.personaName}>{p.name}</Text>
-                    {p.id === "__main__" ? (
-                      <Text style={styles.personaMeta}>Main persona</Text>
-                    ) : (
-                      <Text style={styles.personaMeta}>Persona</Text>
-                    )}
-                  </View>
-                </Pressable>
-              ))}
-            </ScrollView>
+            <FlashList
+              data={entries}
+              renderItem={renderPersona}
+              keyExtractor={(item) => item.id}
+              style={styles.list}
+              showsVerticalScrollIndicator={false}
+            />
           )}
 
           <Pressable

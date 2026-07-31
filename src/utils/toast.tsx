@@ -42,11 +42,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
     marginHorizontal: 16,
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    boxShadow: "0 4px 8px rgba(0, 0, 0, 0.3)",
   },
   toastText: {
     color: colors.textSecondary,

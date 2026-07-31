@@ -15,8 +15,8 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  Image,
 } from "react-native";
+import { Image } from "expo-image";
 import { FlashList } from "@shopify/flash-list";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
@@ -27,6 +27,7 @@ import CharacterReportModal from "../../components/character/CharacterReportModa
 import { getCharacters, getTags, searchProfiles } from "../../api/characters";
 import { getBlockedContent, updateBlockedContent } from "../../api/profile";
 import type { CharacterSearchParams } from "../../api/characters";
+import type { CharacterAvatarPreview } from "../../api/characters";
 import type { ProfileSearchResult } from "../../api/characters";
 import type { TrendingCharacter, TrendingResponse } from "../../types/api";
 import type { CharactersStackParamList } from "../../navigation/types";
@@ -34,7 +35,6 @@ import { storage } from "../../utils/storage";
 import Avatar from "../../components/common/Avatar";
 import SortModal, {
   type SortModalHandle,
-  SORT_OPTIONS,
 } from "../../components/discover/SortModal";
 import TagsModal, {
   type TagsModalHandle,
@@ -42,11 +42,10 @@ import TagsModal, {
 } from "../../components/discover/TagsModal";
 import FilterModal, {
   type FilterModalHandle,
-  type FilterState,
-  INITIAL_FILTERS,
 } from "../../components/discover/FilterModal";
 import { colors } from "../../utils/colors";
 import { avatarUrl, botAvatarUrl } from "../../utils/assets";
+import { SORT_OPTIONS, type FilterState, INITIAL_FILTERS } from "../../utils/discover";
 import { useIsTablet } from "../../hooks/useIsTablet";
 import { SlidersHorizontal, Filter } from "lucide-react-native";
 import AdvancedSearchModal from "../../components/discover/AdvancedSearchModal";
@@ -60,6 +59,8 @@ type Nav = NativeStackNavigationProp<
 >;
 
 type SearchRoute = RouteProp<CharactersStackParamList, "CharacterSearch">;
+
+type DiscoveryMode = "characters" | "creators";
 
 interface ListState {
   characters: TrendingCharacter[];
@@ -116,7 +117,7 @@ function listReducer(state: ListState, action: ListAction): ListState {
   }
 }
 
-export function buildParams(
+function buildParams(
   sortMode: string,
   searchText: string,
   selectedTagIds: Set<string>,
@@ -168,66 +169,64 @@ export function buildParams(
   return params;
 }
 
-export default function CharacterSearchScreen() {
-  const { navigate } = useNavigation<Nav>();
-  const route = useRoute<SearchRoute>();
-  const isTablet = useIsTablet();
-  const [state, dispatch] = useReducer(listReducer, {
-    characters: [],
-    page: 1,
-    loading: true,
-    refreshing: false,
-    total: 0,
-    error: null,
-  });
-  const pageRef = useRef(1);
-  const initialLoadRef = useRef(false);
-  const loadingMoreRef = useRef(false);
+function mergeTags(
+  topCustomTags: TagEntry[],
+  allTags: TagEntry[],
+): TagEntry[] {
+  const seen = new Set<string>();
+  const result: TagEntry[] = [];
+  for (const t of topCustomTags) {
+    if (!seen.has(t.slug)) {
+      seen.add(t.slug);
+      result.push(t);
+    }
+  }
+  for (const t of allTags) {
+    if (!seen.has(t.slug)) {
+      seen.add(t.slug);
+      result.push(t);
+    }
+  }
+  return result;
+}
 
-  const [allTags, setAllTags] = useState<TagEntry[]>([]);
-  const [topCustomTags, setTopCustomTags] = useState<TagEntry[]>([]);
-  const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
-  const selectedTagsRef = useRef<Set<string>>(new Set());
+function filterDisplayCharacters(
+  characters: TrendingCharacter[],
+  advancedKeywords: string[],
+  advancedBlacklist: string[],
+  keywordMatchMode: "any" | "all",
+  hideDarkened: boolean,
+  hiddenIds: Set<string>,
+): TrendingCharacter[] {
+  let result = characters;
+  if (advancedKeywords.length > 0) {
+    result = result.filter((c) => {
+      const text =
+        `${c.name} ${c.description || ""} ${(c.tags || []).map((t) => t.name).join(" ")} ${(c.custom_tags || []).join(" ")}`.toLowerCase();
+      if (keywordMatchMode === "all") {
+        return advancedKeywords.every((kw) =>
+          text.includes(kw.toLowerCase()),
+        );
+      }
+      return advancedKeywords.some((kw) => text.includes(kw.toLowerCase()));
+    });
+  }
+  if (advancedBlacklist.length > 0) {
+    result = result.filter((c) => {
+      const text =
+        `${c.name} ${c.description || ""} ${(c.tags || []).map((t) => t.name).join(" ")} ${(c.custom_tags || []).join(" ")}`.toLowerCase();
+      return !advancedBlacklist.some((kw) => text.includes(kw.toLowerCase()));
+    });
+  }
+  if (hideDarkened) {
+    result = result.filter((c) => !hiddenIds.has(c.id));
+  }
+  return result;
+}
 
-  const [sortMode, setSortMode] = useState("trending24");
-  const sortModeRef = useRef("trending24");
-  const [searchText, setSearchText] = useState("");
-  const searchRef = useRef("");
-
-  const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
-  const filtersRef = useRef<FilterState>(INITIAL_FILTERS);
-  const filtersLoadedRef = useRef(false);
-  const firstRenderRef = useRef(true);
-
-  const [advancedKeywords, setAdvancedKeywords] = useState<string[]>([]);
-  const [advancedBlacklist, setAdvancedBlacklist] = useState<string[]>([]);
-  const [keywordMatchMode, setKeywordMatchMode] = useState<"any" | "all">(
-    "any",
-  );
-  const [advancedSearchVisible, setAdvancedSearchVisible] = useState(false);
-  const [hideDarkened, setHideDarkened] = useState(false);
-
-  const [longPressCharacter, setLongPressCharacter] = useState<TrendingCharacter | null>(null);
-  const [actionsVisible, setActionsVisible] = useState(false);
-  const [reportVisible, setReportVisible] = useState(false);
-
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [alertTitle, setAlertTitle] = useState("");
-  const [alertMessage, setAlertMessage] = useState("");
-  const [alertButtons, setAlertButtons] = useState<AlertButton[]>([]);
-
+function useHiddenCharacters() {
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const hiddenLoadedRef = useRef(false);
-
-  const [discoveryMode, setDiscoveryMode] = useState<"characters" | "creators">("characters");
-
-  const [creators, setCreators] = useState<ProfileSearchResult[]>([]);
-  const [creatorsPage, setCreatorsPage] = useState(1);
-  const [creatorsTotal, setCreatorsTotal] = useState(0);
-  const [creatorsLoading, setCreatorsLoading] = useState(false);
-  const [creatorsRefreshing, setCreatorsRefreshing] = useState(false);
-  const creatorsPageRef = useRef(1);
-  const loadingMoreCreatorsRef = useRef(false);
 
   useEffect(() => {
     if (hiddenLoadedRef.current) return;
@@ -245,25 +244,96 @@ export default function CharacterSearchScreen() {
       } else {
         next.add(characterId);
       }
-      storage.setHiddenCharacters([...next]);
       return next;
     });
   }, []);
 
   useEffect(() => {
-    if (filtersLoadedRef.current) return;
-    filtersLoadedRef.current = true;
+    storage.setHiddenCharacters([...hiddenIds]);
+  }, [hiddenIds]);
+
+  return { hiddenIds, handleToggleHidden };
+}
+
+function hasFilterOverrides(p?: SearchRoute["params"]): boolean {
+  if (!p) return false;
+  return (
+    p.messages !== undefined ||
+    p.messages_mode === "lte" ||
+    p.messages_mode === "gte" ||
+    p.tokens !== undefined ||
+    p.tokens_mode === "lte" ||
+    p.tokens_mode === "gte" ||
+    p.mode === "sfw" ||
+    p.mode === "all" ||
+    p.proxyenabled === "true"
+  );
+}
+
+function initialTagsFromParams(p?: SearchRoute["params"]): Set<string> {
+  const tags = new Set<string>();
+  if (!p) return tags;
+  if (p.tag) {
+    tags.add(`top_${p.tag}`);
+  }
+  if (p.tag_id) {
+    for (const id of p.tag_id.split(",").map((s) => s.trim()).filter(Boolean)) {
+      tags.add(id);
+    }
+  }
+  return tags;
+}
+
+function initialFiltersFromParams(p?: SearchRoute["params"]): FilterState {
+  if (!p) return INITIAL_FILTERS;
+  const f = { ...INITIAL_FILTERS };
+  if (p.messages !== undefined) f.messages = p.messages;
+  if (p.messages_mode === "lte" || p.messages_mode === "gte") {
+    f.messagesMode = p.messages_mode;
+  }
+  if (p.tokens !== undefined) f.tokens = p.tokens;
+  if (p.tokens_mode === "lte" || p.tokens_mode === "gte") {
+    f.tokensMode = p.tokens_mode;
+  }
+  if (p.mode === "sfw") {
+    f.limitlessMode = false;
+  } else if (p.mode === "all") {
+    f.limitlessMode = true;
+  }
+  if (p.proxyenabled === "true") {
+    f.proxyOnly = true;
+  }
+  return f;
+}
+
+function useDiscoverState(params: SearchRoute["params"]) {
+  const [filters, setFilters] = useState<FilterState>(() =>
+    initialFiltersFromParams(params),
+  );
+  const [searchText, setSearchText] = useState(params?.search ?? "");
+  const [sortMode, setSortMode] = useState(params?.sort ?? "trending24");
+  const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(() =>
+    initialTagsFromParams(params),
+  );
+  const firstRenderRef = useRef(true);
+
+  // Storage-loaded filters never override deep link filter params.
+  useEffect(() => {
+    if (hasFilterOverrides(params)) return;
+    let cancelled = false;
     const loadFilters = async () => {
       try {
         const saved = await storage.getDiscoverFilters<FilterState>();
-        if (saved) {
+        if (saved && !cancelled) {
           setFilters(saved);
-          filtersRef.current = saved;
         }
       } catch {}
     };
     loadFilters();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [params]);
 
   useEffect(() => {
     if (firstRenderRef.current) {
@@ -272,276 +342,6 @@ export default function CharacterSearchScreen() {
     }
     storage.setDiscoverFilters(filters);
   }, [filters]);
-
-  const sortModalRef = useRef<SortModalHandle>(null);
-  const tagsModalRef = useRef<TagsModalHandle>(null);
-  const filterModalRef = useRef<FilterModalHandle>(null);
-
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const doFetch = useCallback(async (pageNum: number, isRefresh = false) => {
-    if (isRefresh) {
-      dispatch({ type: "REFRESHING" });
-    } else if (pageNum === 1) {
-      dispatch({ type: "RESET" });
-    } else {
-      dispatch({ type: "LOADING" });
-    }
-
-    try {
-      const params = buildParams(
-        sortModeRef.current,
-        searchRef.current,
-        selectedTagsRef.current,
-        filtersRef.current,
-        pageNum,
-      );
-      const response: TrendingResponse = await getCharacters(params);
-      let filteredData = response.data;
-      if (filtersRef.current.customAvatar) {
-        filteredData = filteredData.filter(
-          (c) =>
-            c.avatar !== "placeholder-nsfw.webp" &&
-            c.avatar !== "countdown.webp",
-        );
-      }
-      dispatch({
-        type: "LOADED",
-        payload: { data: filteredData, total: response.total, page: pageNum },
-      });
-      pageRef.current = pageNum;
-
-      if (response.top_custom_tags && response.top_custom_tags.length > 0) {
-        const custom: TagEntry[] = response.top_custom_tags.map((slug) => ({
-          id: `top_${slug}`,
-          name: slug,
-          slug,
-        }));
-        setTopCustomTags(custom);
-      }
-
-      loadingMoreRef.current = false;
-    } catch (err: any) {
-      loadingMoreRef.current = false;
-      dispatch({ type: "ERROR", payload: err.message });
-    }
-  }, []);
-
-  const doFetchCreators = useCallback(async (pageNum: number, isRefresh = false) => {
-    if (isRefresh) {
-      setCreatorsRefreshing(true);
-    } else if (pageNum === 1) {
-      setCreators([]);
-      setCreatorsLoading(true);
-    } else {
-      setCreatorsLoading(true);
-    }
-
-    try {
-      const response = await searchProfiles({ page: pageNum, mode: "foryou" });
-      if (pageNum === 1) {
-        setCreators(response.data);
-      } else {
-        setCreators((prev) => [...prev, ...response.data]);
-      }
-      setCreatorsPage(pageNum);
-      setCreatorsTotal(response.total);
-      creatorsPageRef.current = pageNum;
-      setCreatorsLoading(false);
-      setCreatorsRefreshing(false);
-      loadingMoreCreatorsRef.current = false;
-    } catch {
-      setCreatorsLoading(false);
-      setCreatorsRefreshing(false);
-      loadingMoreCreatorsRef.current = false;
-    }
-  }, []);
-
-  const handleToggleMode = useCallback(() => {
-    setDiscoveryMode((prev) => {
-      const next = prev === "characters" ? "creators" : "characters";
-      if (next === "creators" && creators.length === 0) {
-        doFetchCreators(1);
-      }
-      return next;
-    });
-  }, [creators.length, doFetchCreators]);
-
-  // Handle deep link params on mount
-  useEffect(() => {
-    const p = route.params;
-    if (!p) return;
-
-    // Prevent storage-loaded filters from overriding deep link filters
-    filtersLoadedRef.current = true;
-
-    if (p.search) {
-      searchRef.current = p.search;
-      setSearchText(p.search);
-    }
-
-    if (p.sort) {
-      sortModeRef.current = p.sort;
-      setSortMode(p.sort);
-    }
-
-    if (p.tag) {
-      const newTags = new Set(selectedTagsRef.current);
-      newTags.add(`top_${p.tag}`);
-      selectedTagsRef.current = newTags;
-      setSelectedTagIds(newTags);
-    }
-
-    if (p.tag_id) {
-      const ids = p.tag_id
-        .split(",")
-        .map((id) => id.trim())
-        .filter(Boolean);
-      if (ids.length > 0) {
-        const newTags = new Set(selectedTagsRef.current);
-        ids.forEach((id) => newTags.add(id));
-        selectedTagsRef.current = newTags;
-        setSelectedTagIds(newTags);
-      }
-    }
-
-    const newFilters = { ...filtersRef.current };
-    let filtersChanged = false;
-
-    if (p.messages !== undefined) {
-      newFilters.messages = p.messages;
-      filtersChanged = true;
-    }
-    if (p.messages_mode === "lte" || p.messages_mode === "gte") {
-      newFilters.messagesMode = p.messages_mode;
-      filtersChanged = true;
-    }
-    if (p.tokens !== undefined) {
-      newFilters.tokens = p.tokens;
-      filtersChanged = true;
-    }
-    if (p.tokens_mode === "lte" || p.tokens_mode === "gte") {
-      newFilters.tokensMode = p.tokens_mode;
-      filtersChanged = true;
-    }
-    if (p.mode === "sfw") {
-      newFilters.limitlessMode = false;
-      filtersChanged = true;
-    } else if (p.mode === "all") {
-      newFilters.limitlessMode = true;
-      filtersChanged = true;
-    }
-    if (p.proxyenabled === "true") {
-      newFilters.proxyOnly = true;
-      filtersChanged = true;
-    }
-
-    if (filtersChanged) {
-      filtersRef.current = newFilters;
-      setFilters(newFilters);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (initialLoadRef.current) return;
-    initialLoadRef.current = true;
-    doFetch(1);
-  }, [doFetch]);
-
-  useEffect(() => {
-    const fetchTags = async () => {
-      try {
-        const tags = await getTags();
-        setAllTags(
-          tags.map((t) => ({ id: String(t.id), name: t.name, slug: t.slug })),
-        );
-      } catch {}
-    };
-    fetchTags();
-  }, []);
-
-  const handleSearchChange = useCallback(
-    (text: string) => {
-      setSearchText(text);
-      searchRef.current = text;
-
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-
-      searchTimeoutRef.current = setTimeout(() => {
-        doFetch(1);
-      }, 500);
-    },
-    [doFetch],
-  );
-
-  const handleLoadMore = useCallback(() => {
-    if (loadingMoreRef.current) return;
-    if (!state.loading && state.characters.length < state.total) {
-      loadingMoreRef.current = true;
-      const nextPage = pageRef.current + 1;
-      doFetch(nextPage);
-    }
-  }, [state.loading, state.characters.length, state.total, doFetch]);
-
-  const handleRefresh = useCallback(() => {
-    if (discoveryMode === "characters") {
-      doFetch(1, true);
-    } else {
-      doFetchCreators(1, true);
-    }
-  }, [doFetch, doFetchCreators, discoveryMode]);
-
-  const handleLoadMoreCreators = useCallback(() => {
-    if (loadingMoreCreatorsRef.current) return;
-    if (!creatorsLoading && creators.length < creatorsTotal) {
-      loadingMoreCreatorsRef.current = true;
-      const nextPage = creatorsPageRef.current + 1;
-      doFetchCreators(nextPage);
-    }
-  }, [creatorsLoading, creators.length, creatorsTotal, doFetchCreators]);
-
-  const handleSortSelect = useCallback(
-    (value: string) => {
-      setSortMode(value);
-      sortModeRef.current = value;
-      doFetch(1);
-    },
-    [doFetch],
-  );
-
-  const handleApplyTags = useCallback(() => {
-    selectedTagsRef.current = selectedTagIds;
-    doFetch(1);
-  }, [selectedTagIds, doFetch]);
-
-  const handleApplyFilters = useCallback(
-    (newFilters: FilterState) => {
-      setFilters(newFilters);
-      filtersRef.current = newFilters;
-      doFetch(1);
-    },
-    [doFetch],
-  );
-
-  const mergedTags: TagEntry[] = useMemo(() => {
-    const seen = new Set<string>();
-    const result: TagEntry[] = [];
-    for (const t of topCustomTags) {
-      if (!seen.has(t.slug)) {
-        seen.add(t.slug);
-        result.push(t);
-      }
-    }
-    for (const t of allTags) {
-      if (!seen.has(t.slug)) {
-        seen.add(t.slug);
-        result.push(t);
-      }
-    }
-    return result;
-  }, [topCustomTags, allTags]);
 
   const toggleTag = useCallback((tagId: string) => {
     setSelectedTagIds((prev) => {
@@ -555,35 +355,149 @@ export default function CharacterSearchScreen() {
     });
   }, []);
 
-  const hasAdvancedFilters =
-    advancedKeywords.length > 0 || advancedBlacklist.length > 0;
+  return {
+    filters,
+    setFilters,
+    searchText,
+    setSearchText,
+    sortMode,
+    setSortMode,
+    selectedTagIds,
+    setSelectedTagIds,
+    toggleTag,
+  };
+}
 
-  const displayCharacters = useMemo(() => {
-    let result = state.characters;
-    if (advancedKeywords.length > 0) {
-      result = result.filter((c) => {
-        const text =
-          `${c.name} ${c.description || ""} ${(c.tags || []).map((t) => t.name).join(" ")} ${(c.custom_tags || []).join(" ")}`.toLowerCase();
-        if (keywordMatchMode === "all") {
-          return advancedKeywords.every((kw) =>
-            text.includes(kw.toLowerCase()),
-          );
+function useAdvancedSearch() {
+  const [advancedKeywords, setAdvancedKeywords] = useState<string[]>([]);
+  const [advancedBlacklist, setAdvancedBlacklist] = useState<string[]>([]);
+  const [keywordMatchMode, setKeywordMatchMode] = useState<"any" | "all">(
+    "any",
+  );
+  const [advancedSearchVisible, setAdvancedSearchVisible] = useState(false);
+  const [hideDarkened, setHideDarkened] = useState(false);
+
+  return {
+    advancedKeywords,
+    setAdvancedKeywords,
+    advancedBlacklist,
+    setAdvancedBlacklist,
+    keywordMatchMode,
+    setKeywordMatchMode,
+    advancedSearchVisible,
+    setAdvancedSearchVisible,
+    hideDarkened,
+    setHideDarkened,
+  };
+}
+
+function useAlert() {
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+  const [alertButtons, setAlertButtons] = useState<AlertButton[]>([]);
+
+  const showBlockAlert = useCallback((character: TrendingCharacter) => {
+    setAlertTitle("Block Character");
+    setAlertMessage(
+      `Block "${character.name}"? Hidden characters won't appear in your discover feed.`,
+    );
+    setAlertButtons([
+      {
+        text: "Block",
+        style: "destructive",
+        onPress: async () => {
+          setAlertVisible(false);
+          try {
+            const blocked = await getBlockedContent();
+            if (!blocked.bots.includes(character.id)) {
+              blocked.bots.push(character.id);
+            }
+            await updateBlockedContent(blocked);
+          } catch {}
+        },
+      },
+      { text: "Cancel", style: "cancel", onPress: () => setAlertVisible(false) },
+    ]);
+    setAlertVisible(true);
+  }, []);
+
+  const handleAlertDismiss = useCallback(() => setAlertVisible(false), []);
+
+  return {
+    alertVisible,
+    alertTitle,
+    alertMessage,
+    alertButtons,
+    showBlockAlert,
+    handleAlertDismiss,
+  };
+}
+
+function useCreators() {
+  const [creators, setCreators] = useState<ProfileSearchResult[]>([]);
+  const [creatorsTotal, setCreatorsTotal] = useState(0);
+  const [creatorsLoading, setCreatorsLoading] = useState(false);
+  const [creatorsRefreshing, setCreatorsRefreshing] = useState(false);
+  const creatorsPageRef = useRef(1);
+  const loadingMoreCreatorsRef = useRef(false);
+
+  const doFetchCreators = useCallback(
+    async (pageNum: number, isRefresh = false) => {
+      if (isRefresh) {
+        setCreatorsRefreshing(true);
+      } else if (pageNum === 1) {
+        setCreators([]);
+        setCreatorsLoading(true);
+      } else {
+        setCreatorsLoading(true);
+      }
+
+      try {
+        const response = await searchProfiles({ page: pageNum, mode: "foryou" });
+        if (pageNum === 1) {
+          setCreators(response.data);
+        } else {
+          setCreators((prev) => [...prev, ...response.data]);
         }
-        return advancedKeywords.some((kw) => text.includes(kw.toLowerCase()));
-      });
+        setCreatorsTotal(response.total);
+        creatorsPageRef.current = pageNum;
+        setCreatorsLoading(false);
+        setCreatorsRefreshing(false);
+        loadingMoreCreatorsRef.current = false;
+      } catch {
+        setCreatorsLoading(false);
+        setCreatorsRefreshing(false);
+        loadingMoreCreatorsRef.current = false;
+      }
+    },
+    [],
+  );
+
+  const handleLoadMoreCreators = useCallback(() => {
+    if (loadingMoreCreatorsRef.current) return;
+    if (!creatorsLoading && creators.length < creatorsTotal) {
+      loadingMoreCreatorsRef.current = true;
+      const nextPage = creatorsPageRef.current + 1;
+      doFetchCreators(nextPage);
     }
-    if (advancedBlacklist.length > 0) {
-      result = result.filter((c) => {
-        const text =
-          `${c.name} ${c.description || ""} ${(c.tags || []).map((t) => t.name).join(" ")} ${(c.custom_tags || []).join(" ")}`.toLowerCase();
-        return !advancedBlacklist.some((kw) => text.includes(kw.toLowerCase()));
-      });
-    }
-    if (hideDarkened) {
-      result = result.filter((c) => !hiddenIds.has(c.id));
-    }
-    return result;
-  }, [state.characters, advancedKeywords, advancedBlacklist, keywordMatchMode, hideDarkened, hiddenIds]);
+  }, [creatorsLoading, creators.length, creatorsTotal, doFetchCreators]);
+
+  return {
+    creators,
+    creatorsTotal,
+    creatorsLoading,
+    creatorsRefreshing,
+    doFetchCreators,
+    handleLoadMoreCreators,
+  };
+}
+
+function useLongPressActions(navigate: Nav["navigate"]) {
+  const [longPressCharacter, setLongPressCharacter] =
+    useState<TrendingCharacter | null>(null);
+  const [actionsVisible, setActionsVisible] = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
 
   const handleLongPress = useCallback((item: TrendingCharacter) => {
     setLongPressCharacter(item);
@@ -606,32 +520,6 @@ export default function CharacterSearchScreen() {
     });
   }, [longPressCharacter, navigate]);
 
-  const handleBlockCharacter = useCallback(() => {
-    if (!longPressCharacter) return;
-    setAlertTitle("Block Character");
-    setAlertMessage(
-      `Block "${longPressCharacter.name}"? Hidden characters won't appear in your discover feed.`,
-    );
-    setAlertButtons([
-      {
-        text: "Block",
-        style: "destructive",
-        onPress: async () => {
-          setAlertVisible(false);
-          try {
-            const blocked = await getBlockedContent();
-            if (!blocked.bots.includes(longPressCharacter.id)) {
-              blocked.bots.push(longPressCharacter.id);
-            }
-            await updateBlockedContent(blocked);
-          } catch {}
-        },
-      },
-      { text: "Cancel", style: "cancel", onPress: () => setAlertVisible(false) },
-    ]);
-    setAlertVisible(true);
-  }, [longPressCharacter]);
-
   const handleReportCharacter = useCallback(() => {
     setActionsVisible(false);
     setReportVisible(true);
@@ -645,9 +533,130 @@ export default function CharacterSearchScreen() {
     setActionsVisible(false);
   }, []);
 
-  const handleAlertDismiss = useCallback(() => setAlertVisible(false), []);
+  return {
+    longPressCharacter,
+    actionsVisible,
+    reportVisible,
+    handleLongPress,
+    handleViewCharacter,
+    handleViewCreator,
+    handleReportCharacter,
+    handleCloseReport,
+    handleActionsClose,
+  };
+}
 
-  const renderItem = useCallback(
+
+function useCharactersList() {
+  const [state, dispatch] = useReducer(listReducer, {
+    characters: [],
+    page: 1,
+    loading: true,
+    refreshing: false,
+    total: 0,
+    error: null,
+  });
+  const [topCustomTags, setTopCustomTags] = useState<TagEntry[]>([]);
+  const pageRef = useRef(1);
+  const initialLoadRef = useRef(false);
+  const loadingMoreRef = useRef(false);
+
+  const doFetch = useCallback(
+    async (
+      pageNum: number,
+      current: {
+        sort: string;
+        search: string;
+        tags: Set<string>;
+        filters: FilterState;
+      },
+      isRefresh = false,
+    ) => {
+      if (isRefresh) {
+        dispatch({ type: "REFRESHING" });
+      } else if (pageNum === 1) {
+        dispatch({ type: "RESET" });
+      } else {
+        dispatch({ type: "LOADING" });
+      }
+
+      try {
+        const params = buildParams(
+          current.sort,
+          current.search,
+          current.tags,
+          current.filters,
+          pageNum,
+        );
+        const response: TrendingResponse = await getCharacters(params);
+        let filteredData = response.data;
+        if (current.filters.customAvatar) {
+          filteredData = filteredData.filter(
+            (c) =>
+              c.avatar !== "placeholder-nsfw.webp" &&
+              c.avatar !== "countdown.webp",
+          );
+        }
+        dispatch({
+          type: "LOADED",
+          payload: { data: filteredData, total: response.total, page: pageNum },
+        });
+        pageRef.current = pageNum;
+
+        if (response.top_custom_tags && response.top_custom_tags.length > 0) {
+          const custom: TagEntry[] = response.top_custom_tags.map((slug) => ({
+            id: `top_${slug}`,
+            name: slug,
+            slug,
+          }));
+          setTopCustomTags(custom);
+        }
+
+        loadingMoreRef.current = false;
+      } catch (err: any) {
+        loadingMoreRef.current = false;
+        dispatch({ type: "ERROR", payload: err.message });
+      }
+    },
+    [setTopCustomTags],
+  );
+
+  useEffect(() => {
+    if (initialLoadRef.current) return;
+    initialLoadRef.current = true;
+    doFetch(1, { sort: "", search: "", tags: new Set(), filters: INITIAL_FILTERS });
+  }, [doFetch]);
+
+  const handleLoadMore = useCallback(
+    (
+      current: {
+        sort: string;
+        search: string;
+        tags: Set<string>;
+        filters: FilterState;
+      },
+    ) => {
+      if (loadingMoreRef.current) return;
+      if (!state.loading && state.characters.length < state.total) {
+        loadingMoreRef.current = true;
+        const nextPage = pageRef.current + 1;
+        doFetch(nextPage, current);
+      }
+    },
+    [state.loading, state.characters.length, state.total, doFetch],
+  );
+
+  return { state, doFetch, handleLoadMore, topCustomTags };
+}
+
+function useCharacterCardRenderer(
+  navigate: Nav["navigate"],
+  isTablet: boolean,
+  handleLongPress: (item: TrendingCharacter) => void,
+  hiddenIds: Set<string>,
+  handleToggleHidden: (characterId: string) => void,
+) {
+  return useCallback(
     ({ item }: { item: TrendingCharacter }) => (
       <CharacterCard
         character={item}
@@ -665,83 +674,51 @@ export default function CharacterSearchScreen() {
     ),
     [navigate, isTablet, handleLongPress, hiddenIds, handleToggleHidden],
   );
+}
 
-  const renderCreatorItem = useCallback(
+function useCreatorCardRenderer(navigate: Nav["navigate"]) {
+  return useCallback(
     ({ item }: { item: ProfileSearchResult }) => (
-      <Pressable
-        style={styles.creatorCard}
+      <CreatorCard
+        item={item}
         onPress={() =>
           navigate("CreatorScreen", {
             userId: item.id,
             userName: item.user_name,
           })
         }
-      >
-        <View style={styles.creatorRow}>
-          <Avatar uri={avatarUrl(item.avatar)} name={item.user_name} size={48} />
-          <View style={styles.creatorInfo}>
-            <Text style={styles.creatorName} numberOfLines={1}>
-              {item.user_name}
-            </Text>
-            <Text style={styles.creatorMeta}>
-              {item.followers_count} followers · {item.character_count} characters
-            </Text>
-          </View>
-        </View>
-        {item.character_avatar_previews.length > 0 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.charPreviewScroll}
-            contentContainerStyle={styles.charPreviewContent}
-          >
-            {item.character_avatar_previews.slice(0, 3).map((char) => (
-              <Pressable
-                key={char.id}
-                style={styles.charPreviewItem}
-                onPress={() =>
-                  navigate("CharacterScreen", {
-                    characterId: char.id,
-                    characterName: char.name,
-                  })
-                }
-              >
-                <Image
-                  source={{ uri: botAvatarUrl(char.avatar) }}
-                  style={styles.charPreviewAvatar}
-                />
-                <Text
-                  style={styles.charPreviewName}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  {char.name}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        )}
-      </Pressable>
+        onPressCharacter={(char) =>
+          navigate("CharacterScreen", {
+            characterId: char.id,
+            characterName: char.name,
+          })
+        }
+      />
     ),
     [navigate],
   );
+}
 
-  const sortLabel =
-    SORT_OPTIONS.find((o) => o.value === sortMode)?.label ?? "Trending 24h";
-  const tagsLabel =
-    selectedTagIds.size > 0 ? `Tags (${selectedTagIds.size})` : "Tags";
-
-  const isLoading = state.loading && state.characters.length === 0;
-  const isEmptyError = state.error && state.characters.length === 0;
-
+const SearchHeader = React.memo(function SearchHeader({
+  discoveryMode,
+  hasAdvancedFilters,
+  displayCount,
+  totalCount,
+  creatorsTotal,
+  onToggleMode,
+}: {
+  discoveryMode: "characters" | "creators";
+  hasAdvancedFilters: boolean;
+  displayCount: number;
+  totalCount: number;
+  creatorsTotal: number;
+  onToggleMode: () => void;
+}) {
   return (
-    <View style={styles.container}>
+    <>
       <View style={styles.titleRow}>
         <Text style={styles.title}>Discover</Text>
-        <Pressable
-          style={styles.modeToggle}
-          onPress={handleToggleMode}
-        >
+        <Pressable style={styles.modeToggle} onPress={onToggleMode}>
           <Text style={styles.modeToggleText}>
             {discoveryMode === "characters" ? "Creators" : "Characters"}
           </Text>
@@ -750,8 +727,8 @@ export default function CharacterSearchScreen() {
       {discoveryMode === "characters" && (
         <Text style={styles.subtitle}>
           {hasAdvancedFilters
-            ? `${displayCharacters.length.toLocaleString()} / ${state.total.toLocaleString()} characters`
-            : `${state.total.toLocaleString()} characters`}
+            ? `${displayCount.toLocaleString()} / ${totalCount.toLocaleString()} characters`
+            : `${totalCount.toLocaleString()} characters`}
         </Text>
       )}
       {discoveryMode === "creators" && (
@@ -759,184 +736,337 @@ export default function CharacterSearchScreen() {
           {creatorsTotal.toLocaleString()} creators
         </Text>
       )}
+    </>
+  );
+});
 
-      {discoveryMode === "characters" && (
-        <View style={styles.searchRow}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search characters..."
-            placeholderTextColor={colors.textDim}
-            value={searchText}
-            onChangeText={handleSearchChange}
-            returnKeyType="search"
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
-          <Pressable
-            style={styles.advancedButton}
-            onPress={() => setAdvancedSearchVisible(true)}
-          >
-            <SlidersHorizontal size={18} color={colors.textSecondary} />
-          </Pressable>
-        </View>
-      )}
+const SearchInputRow = React.memo(function SearchInputRow({
+  searchText,
+  onSearchChange,
+  onOpenAdvanced,
+}: {
+  searchText: string;
+  onSearchChange: (text: string) => void;
+  onOpenAdvanced: () => void;
+}) {
+  return (
+    <View style={styles.searchRow}>
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Search characters..."
+        placeholderTextColor={colors.textDim}
+        value={searchText}
+        onChangeText={onSearchChange}
+        returnKeyType="search"
+        autoCorrect={false}
+        autoCapitalize="none"
+      />
+      <Pressable style={styles.advancedButton} onPress={onOpenAdvanced}>
+        <SlidersHorizontal size={18} color={colors.textSecondary} />
+      </Pressable>
+    </View>
+  );
+});
 
-      {discoveryMode === "characters" && (
-        <View style={styles.controlsRow}>
-          <Pressable
-            style={styles.controlButton}
-            onPress={() => sortModalRef.current?.open()}
-          >
-            <Text style={styles.controlButtonText}>{sortLabel}</Text>
-          </Pressable>
+const ControlsRow = React.memo(function ControlsRow({
+  sortLabel,
+  tagsLabel,
+  onOpenSort,
+  onOpenTags,
+  onOpenFilters,
+}: {
+  sortLabel: string;
+  tagsLabel: string;
+  onOpenSort: () => void;
+  onOpenTags: () => void;
+  onOpenFilters: () => void;
+}) {
+  return (
+    <View style={styles.controlsRow}>
+      <Pressable style={styles.controlButton} onPress={onOpenSort}>
+        <Text style={styles.controlButtonText}>{sortLabel}</Text>
+      </Pressable>
 
-          <Pressable
-            style={styles.controlButton}
-            onPress={() => tagsModalRef.current?.open()}
-          >
-            <Text style={styles.controlButtonText}>{tagsLabel}</Text>
-          </Pressable>
+      <Pressable style={styles.controlButton} onPress={onOpenTags}>
+        <Text style={styles.controlButtonText}>{tagsLabel}</Text>
+      </Pressable>
 
-          <Pressable
-            style={styles.controlButtonIcon}
-            onPress={() => filterModalRef.current?.open()}
-          >
-            <Filter size={18} color={colors.textSecondary} />
-          </Pressable>
-        </View>
-      )}
+      <Pressable style={styles.controlButtonIcon} onPress={onOpenFilters}>
+        <Filter size={18} color={colors.textSecondary} />
+      </Pressable>
+    </View>
+  );
+});
 
-      {discoveryMode === "characters" ? (
-        isLoading ? (
-          <View style={styles.listLoader}>
-            <ActivityIndicator size="large" color={colors.accent} />
-          </View>
-        ) : isEmptyError ? (
-          <View style={styles.listLoader}>
-            <Text style={styles.errorText}>{state.error}</Text>
-          </View>
-        ) : (
-          <FlashList
-            data={displayCharacters}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.id}
-            numColumns={isTablet ? 2 : 1}
-            key={isTablet ? "tablet-2col" : "phone-1col"}
-            columnWrapperStyle={isTablet ? styles.columnWrapper : undefined}
-            estimatedItemSize={260}
-            onEndReached={handleLoadMore}
-            onEndReachedThreshold={0.5}
-            drawDistance={800}
-            refreshControl={
-              <RefreshControl
-                refreshing={state.refreshing}
-                onRefresh={handleRefresh}
-                tintColor={colors.accent}
-              />
-            }
-            contentContainerStyle={styles.list}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              !state.loading && !state.error ? (
-                <View style={styles.listLoader}>
-                  <Text style={styles.emptyText}>No characters found</Text>
-                </View>
-              ) : null
-            }
-            ListFooterComponent={
-              state.loading && state.characters.length > 0 ? (
-                <ActivityIndicator
-                  style={styles.footerLoader}
-                  color={colors.accent}
-                />
-              ) : null
-            }
-          />
-        )
-      ) : creatorsLoading && creators.length === 0 ? (
-        <View style={styles.listLoader}>
-          <ActivityIndicator size="large" color={colors.accent} />
-        </View>
-      ) : (
-        <FlashList
-          data={creators}
-          renderItem={renderCreatorItem}
-          keyExtractor={(item) => item.id}
-          onEndReached={handleLoadMoreCreators}
-          onEndReachedThreshold={0.5}
-          drawDistance={800}
-          refreshControl={
-            <RefreshControl
-              refreshing={creatorsRefreshing}
-              onRefresh={handleRefresh}
-              tintColor={colors.accent}
-            />
-          }
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            !creatorsLoading ? (
-              <View style={styles.listLoader}>
-                <Text style={styles.emptyText}>No creators found</Text>
-              </View>
-            ) : null
-          }
-          ListFooterComponent={
-            creatorsLoading && creators.length > 0 ? (
-              <ActivityIndicator
-                style={styles.footerLoader}
-                color={colors.accent}
-              />
-            ) : null
-          }
+const CharacterList = React.memo(function CharacterList({
+  data,
+  renderItem,
+  isTablet,
+  refreshing,
+  onRefresh,
+  onEndReached,
+  loading,
+  error,
+  hasMore,
+}: {
+  data: TrendingCharacter[];
+  renderItem: ({
+    item,
+  }: {
+    item: TrendingCharacter;
+  }) => React.ReactElement;
+  isTablet: boolean;
+  refreshing: boolean;
+  onRefresh: () => void;
+  onEndReached: () => void;
+  loading: boolean;
+  error: string | null;
+  hasMore: boolean;
+}) {
+  if (loading && data.length === 0) {
+    return (
+      <View style={styles.listLoader}>
+        <ActivityIndicator size="large" color={colors.accent} />
+      </View>
+    );
+  }
+  if (error && data.length === 0) {
+    return (
+      <View style={styles.listLoader}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
+  return (
+    <FlashList
+      data={data}
+      renderItem={renderItem}
+      keyExtractor={(item) => item.id}
+      numColumns={isTablet ? 2 : 1}
+      key={isTablet ? "tablet-2col" : "phone-1col"}
+      onEndReached={onEndReached}
+      onEndReachedThreshold={0.5}
+      drawDistance={800}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.accent}
         />
-      )}
+      }
+      contentContainerStyle={styles.list}
+      showsVerticalScrollIndicator={false}
+      ListEmptyComponent={
+        !loading && !error ? (
+          <View style={styles.listLoader}>
+            <Text style={styles.emptyText}>No characters found</Text>
+          </View>
+        ) : null
+      }
+      ListFooterComponent={
+        hasMore ? (
+          <ActivityIndicator style={styles.footerLoader} color={colors.accent} />
+        ) : null
+      }
+    />
+  );
+});
 
+const CreatorList = React.memo(function CreatorList({
+  data,
+  renderItem,
+  refreshing,
+  onRefresh,
+  onEndReached,
+  loading,
+  hasMore,
+}: {
+  data: ProfileSearchResult[];
+  renderItem: ({
+    item,
+  }: {
+    item: ProfileSearchResult;
+  }) => React.ReactElement;
+  refreshing: boolean;
+  onRefresh: () => void;
+  onEndReached: () => void;
+  loading: boolean;
+  hasMore: boolean;
+}) {
+  if (loading && data.length === 0) {
+    return (
+      <View style={styles.listLoader}>
+        <ActivityIndicator size="large" color={colors.accent} />
+      </View>
+    );
+  }
+  return (
+    <FlashList
+      data={data}
+      renderItem={renderItem}
+      keyExtractor={(item) => item.id}
+      onEndReached={onEndReached}
+      onEndReachedThreshold={0.5}
+      drawDistance={800}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.accent}
+        />
+      }
+      contentContainerStyle={styles.list}
+      showsVerticalScrollIndicator={false}
+      ListEmptyComponent={
+        !loading ? (
+          <View style={styles.listLoader}>
+            <Text style={styles.emptyText}>No creators found</Text>
+          </View>
+        ) : null
+      }
+      ListFooterComponent={
+        hasMore ? (
+          <ActivityIndicator style={styles.footerLoader} color={colors.accent} />
+        ) : null
+      }
+    />
+  );
+});
+
+const DiscoverModals = React.memo(function DiscoverModals({
+  sortModalRef,
+  currentSort,
+  onSortSelect,
+  tagsModalRef,
+  mergedTags,
+  selectedTagIds,
+  onToggleTag,
+  onApplyTags,
+  filterModalRef,
+  filters,
+  onApplyFilters,
+}: {
+  sortModalRef: React.RefObject<SortModalHandle | null>;
+  currentSort: string;
+  onSortSelect: (value: string) => void;
+  tagsModalRef: React.RefObject<TagsModalHandle | null>;
+  mergedTags: TagEntry[];
+  selectedTagIds: Set<string>;
+  onToggleTag: (tagId: string) => void;
+  onApplyTags: () => void;
+  filterModalRef: React.RefObject<FilterModalHandle | null>;
+  filters: FilterState;
+  onApplyFilters: (filters: FilterState) => void;
+}) {
+  return (
+    <>
       <SortModal
         ref={sortModalRef}
-        currentSort={sortMode}
-        onSelect={handleSortSelect}
+        currentSort={currentSort}
+        onSelect={onSortSelect}
       />
       <TagsModal
         ref={tagsModalRef}
         mergedTags={mergedTags}
         selectedTagIds={selectedTagIds}
-        onToggleTag={toggleTag}
-        onApply={handleApplyTags}
+        onToggleTag={onToggleTag}
+        onApply={onApplyTags}
       />
       <FilterModal
         ref={filterModalRef}
         filters={filters}
-        onApply={handleApplyFilters}
+        onApply={onApplyFilters}
       />
+    </>
+  );
+});
+
+const ActionOverlays = React.memo(function ActionOverlays({
+  advancedSearchVisible,
+  advancedKeywords,
+  onKeywordsChange,
+  advancedBlacklist,
+  onBlacklistedChange,
+  keywordMatchMode,
+  onMatchModeChange,
+  hideDarkened,
+  onHideDarkenedChange,
+  onCloseAdvancedSearch,
+  actionsVisible,
+  characterName,
+  hasCreator,
+  onActionsClose,
+  onViewCharacter,
+  onViewCreator,
+  onBlockCharacter,
+  onReportCharacter,
+  reportVisible,
+  characterId,
+  onCloseReport,
+  alertVisible,
+  alertTitle,
+  alertMessage,
+  alertButtons,
+  onAlertDismiss,
+}: {
+  advancedSearchVisible: boolean;
+  advancedKeywords: string[];
+  onKeywordsChange: (value: string[]) => void;
+  advancedBlacklist: string[];
+  onBlacklistedChange: (value: string[]) => void;
+  keywordMatchMode: "any" | "all";
+  onMatchModeChange: (value: "any" | "all") => void;
+  hideDarkened: boolean;
+  onHideDarkenedChange: (value: boolean) => void;
+  onCloseAdvancedSearch: () => void;
+  actionsVisible: boolean;
+  characterName: string;
+  hasCreator: boolean;
+  onActionsClose: () => void;
+  onViewCharacter: () => void;
+  onViewCreator: () => void;
+  onBlockCharacter: () => void;
+  onReportCharacter: () => void;
+  reportVisible: boolean;
+  characterId: string;
+  onCloseReport: () => void;
+  alertVisible: boolean;
+  alertTitle: string;
+  alertMessage: string;
+  alertButtons: AlertButton[];
+  onAlertDismiss: () => void;
+}) {
+  return (
+    <>
       <AdvancedSearchModal
+        key={advancedSearchVisible ? "open" : "closed"}
         visible={advancedSearchVisible}
         keywords={advancedKeywords}
         blacklisted={advancedBlacklist}
         matchMode={keywordMatchMode}
         hideDarkened={hideDarkened}
-        onKeywordsChange={setAdvancedKeywords}
-        onBlacklistedChange={setAdvancedBlacklist}
-        onMatchModeChange={setKeywordMatchMode}
-        onHideDarkenedChange={setHideDarkened}
-        onClose={() => setAdvancedSearchVisible(false)}
+        onKeywordsChange={onKeywordsChange}
+        onBlacklistedChange={onBlacklistedChange}
+        onMatchModeChange={onMatchModeChange}
+        onHideDarkenedChange={onHideDarkenedChange}
+        onClose={onCloseAdvancedSearch}
       />
 
       <CharacterDiscoverActionsSheet
         visible={actionsVisible}
-        characterName={longPressCharacter?.name || ""}
-        hasCreator={!!longPressCharacter?.creator_id}
-        onClose={handleActionsClose}
-        onViewCharacter={handleViewCharacter}
-        onViewCreator={handleViewCreator}
-        onBlockCharacter={handleBlockCharacter}
-        onReportCharacter={handleReportCharacter}
+        characterName={characterName}
+        hasCreator={hasCreator}
+        onClose={onActionsClose}
+        onViewCharacter={onViewCharacter}
+        onViewCreator={onViewCreator}
+        onBlockCharacter={onBlockCharacter}
+        onReportCharacter={onReportCharacter}
       />
 
       <CharacterReportModal
         visible={reportVisible}
-        characterId={longPressCharacter?.id ?? ""}
-        onClose={handleCloseReport}
+        characterId={characterId}
+        onClose={onCloseReport}
       />
 
       <CustomAlert
@@ -944,7 +1074,353 @@ export default function CharacterSearchScreen() {
         title={alertTitle}
         message={alertMessage}
         buttons={alertButtons}
-        onDismiss={handleAlertDismiss}
+        onDismiss={onAlertDismiss}
+      />
+    </>
+  );
+});
+
+const CreatorCard = React.memo(function CreatorCard({
+  item,
+  onPress,
+  onPressCharacter,
+}: {
+  item: ProfileSearchResult;
+  onPress: () => void;
+  onPressCharacter: (char: CharacterAvatarPreview) => void;
+}) {
+  return (
+    <Pressable style={styles.creatorCard} onPress={onPress}>
+      <View style={styles.creatorRow}>
+        <Avatar uri={avatarUrl(item.avatar)} name={item.user_name} size={48} />
+        <View style={styles.creatorInfo}>
+          <Text style={styles.creatorName} numberOfLines={1}>
+            {item.user_name}
+          </Text>
+          <Text style={styles.creatorMeta}>
+            {item.followers_count} followers · {item.character_count} characters
+          </Text>
+        </View>
+      </View>
+      {item.character_avatar_previews.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.charPreviewScroll}
+          contentContainerStyle={styles.charPreviewContent}
+        >
+          {item.character_avatar_previews.slice(0, 3).map((char) => (
+            <Pressable
+              key={char.id}
+              style={styles.charPreviewItem}
+              onPress={() => onPressCharacter(char)}
+            >
+              <Image
+                source={{ uri: botAvatarUrl(char.avatar) }}
+                style={styles.charPreviewAvatar}
+              />
+              <Text
+                style={styles.charPreviewName}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {char.name}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+    </Pressable>
+  );
+});
+
+export default function CharacterSearchScreen() {
+  const { navigate } = useNavigation<Nav>();
+  const route = useRoute<SearchRoute>();
+  const isTablet = useIsTablet();
+  const [discoveryMode, setDiscoveryMode] =
+    useState<DiscoveryMode>("characters");
+  const [allTags, setAllTags] = useState<TagEntry[]>([]);
+  const { hiddenIds, handleToggleHidden } = useHiddenCharacters();
+  const {
+    filters,
+    setFilters,
+    searchText,
+    setSearchText,
+    sortMode,
+    setSortMode,
+    selectedTagIds,
+    setSelectedTagIds,
+    toggleTag,
+  } = useDiscoverState(route.params);
+  const {
+    advancedKeywords,
+    setAdvancedKeywords,
+    advancedBlacklist,
+    setAdvancedBlacklist,
+    keywordMatchMode,
+    setKeywordMatchMode,
+    hideDarkened,
+    setHideDarkened,
+    advancedSearchVisible,
+    setAdvancedSearchVisible,
+  } = useAdvancedSearch();
+  const {
+    alertVisible,
+    alertTitle,
+    alertMessage,
+    alertButtons,
+    showBlockAlert,
+    handleAlertDismiss,
+  } = useAlert();
+  const {
+    creators,
+    creatorsTotal,
+    creatorsLoading,
+    creatorsRefreshing,
+    doFetchCreators,
+    handleLoadMoreCreators,
+  } = useCreators();
+  const {
+    longPressCharacter,
+    actionsVisible,
+    reportVisible,
+    handleLongPress,
+    handleViewCharacter,
+    handleViewCreator,
+    handleReportCharacter,
+    handleCloseReport,
+    handleActionsClose,
+  } = useLongPressActions(navigate);
+
+  const sortModalRef = useRef<SortModalHandle>(null);
+  const tagsModalRef = useRef<TagsModalHandle>(null);
+  const filterModalRef = useRef<FilterModalHandle>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openSort = useCallback(() => sortModalRef.current?.open(), []);
+  const openTags = useCallback(() => tagsModalRef.current?.open(), []);
+  const openFilters = useCallback(() => filterModalRef.current?.open(), []);
+  const closeAdvancedSearch = useCallback(
+    () => setAdvancedSearchVisible(false),
+    [setAdvancedSearchVisible],
+  );
+
+  const { state, doFetch, handleLoadMore, topCustomTags } = useCharactersList();
+
+  const currentSearchParams = useMemo(
+    () => ({
+      sort: sortMode,
+      search: searchText,
+      tags: selectedTagIds,
+      filters,
+    }),
+    [sortMode, searchText, selectedTagIds, filters],
+  );
+
+  const handleSearchChange = useCallback(
+    (text: string) => {
+      setSearchText(text);
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+
+      searchTimeoutRef.current = setTimeout(() => {
+        doFetch(1, currentSearchParams);
+      }, 500);
+    },
+    [setSearchText, doFetch, currentSearchParams],
+  );
+
+  const handleToggleMode = useCallback(() => {
+    const next = discoveryMode === "characters" ? "creators" : "characters";
+    setDiscoveryMode(next);
+    if (next === "creators" && creators.length === 0) {
+      doFetchCreators(1);
+    }
+  }, [discoveryMode, creators.length, doFetchCreators]);
+
+  const handleRefresh = useCallback(() => {
+    if (discoveryMode === "characters") {
+      doFetch(1, currentSearchParams, true);
+    } else {
+      doFetchCreators(1, true);
+    }
+  }, [doFetch, doFetchCreators, discoveryMode, currentSearchParams]);
+
+  const handleSortSelect = useCallback(
+    (value: string) => {
+      setSortMode(value);
+      doFetch(1, { ...currentSearchParams, sort: value });
+    },
+    [setSortMode, doFetch, currentSearchParams],
+  );
+
+  const handleApplyTags = useCallback(() => {
+    doFetch(1, currentSearchParams);
+  }, [currentSearchParams, doFetch]);
+
+  const handleApplyFilters = useCallback(
+    (newFilters: FilterState) => {
+      setFilters(newFilters);
+      doFetch(1, { ...currentSearchParams, filters: newFilters });
+    },
+    [setFilters, doFetch, currentSearchParams],
+  );
+
+  const handleBlockCharacter = useCallback(() => {
+    if (!longPressCharacter) return;
+    showBlockAlert(longPressCharacter);
+  }, [longPressCharacter, showBlockAlert]);
+
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const tags = await getTags();
+        setAllTags(
+          tags.map((t) => ({ id: String(t.id), name: t.name, slug: t.slug })),
+        );
+      } catch {}
+    };
+    fetchTags();
+  }, []);
+
+  const mergedTags: TagEntry[] = useMemo(
+    () => mergeTags(topCustomTags, allTags),
+    [topCustomTags, allTags],
+  );
+
+  const hasAdvancedFilters =
+    advancedKeywords.length > 0 || advancedBlacklist.length > 0;
+
+  const displayCharacters = useMemo(
+    () =>
+      filterDisplayCharacters(
+        state.characters,
+        advancedKeywords,
+        advancedBlacklist,
+        keywordMatchMode,
+        hideDarkened,
+        hiddenIds,
+      ),
+    [
+      state.characters,
+      advancedKeywords,
+      advancedBlacklist,
+      keywordMatchMode,
+      hideDarkened,
+      hiddenIds,
+    ],
+  );
+
+  const sortLabel =
+    SORT_OPTIONS.find((o) => o.value === sortMode)?.label ?? "Trending 24h";
+  const tagsLabel =
+    selectedTagIds.size > 0 ? `Tags (${selectedTagIds.size})` : "Tags";
+
+  const renderItem = useCharacterCardRenderer(
+    navigate,
+    isTablet,
+    handleLongPress,
+    hiddenIds,
+    handleToggleHidden,
+  );
+
+  const renderCreatorItem = useCreatorCardRenderer(navigate);
+
+  const handleLoadMoreWrap = useCallback(
+    () => handleLoadMore(currentSearchParams),
+    [handleLoadMore, currentSearchParams],
+  );
+
+  return (
+    <View style={styles.container}>
+      <SearchHeader
+        discoveryMode={discoveryMode}
+        hasAdvancedFilters={hasAdvancedFilters}
+        displayCount={displayCharacters.length}
+        totalCount={state.total}
+        creatorsTotal={creatorsTotal}
+        onToggleMode={handleToggleMode}
+      />
+      {discoveryMode === "characters" && (
+        <>
+          <SearchInputRow
+            searchText={searchText}
+            onSearchChange={handleSearchChange}
+            onOpenAdvanced={closeAdvancedSearch}
+          />
+          <ControlsRow
+            sortLabel={sortLabel}
+            tagsLabel={tagsLabel}
+            onOpenSort={openSort}
+            onOpenTags={openTags}
+            onOpenFilters={openFilters}
+          />
+        </>
+      )}
+      {discoveryMode === "characters" ? (
+        <CharacterList
+          data={displayCharacters}
+          renderItem={renderItem}
+          isTablet={isTablet}
+          refreshing={state.refreshing}
+          onRefresh={handleRefresh}
+          onEndReached={handleLoadMoreWrap}
+          loading={state.loading}
+          error={state.error}
+          hasMore={state.loading && state.characters.length > 0}
+        />
+      ) : (
+        <CreatorList
+          data={creators}
+          renderItem={renderCreatorItem}
+          refreshing={creatorsRefreshing}
+          onRefresh={handleRefresh}
+          onEndReached={handleLoadMoreCreators}
+          loading={creatorsLoading}
+          hasMore={creatorsLoading && creators.length > 0}
+        />
+      )}
+      <DiscoverModals
+        sortModalRef={sortModalRef}
+        currentSort={sortMode}
+        onSortSelect={handleSortSelect}
+        tagsModalRef={tagsModalRef}
+        mergedTags={mergedTags}
+        selectedTagIds={selectedTagIds}
+        onToggleTag={toggleTag}
+        onApplyTags={handleApplyTags}
+        filterModalRef={filterModalRef}
+        filters={filters}
+        onApplyFilters={handleApplyFilters}
+      />
+      <ActionOverlays
+        advancedSearchVisible={advancedSearchVisible}
+        advancedKeywords={advancedKeywords}
+        onKeywordsChange={setAdvancedKeywords}
+        advancedBlacklist={advancedBlacklist}
+        onBlacklistedChange={setAdvancedBlacklist}
+        keywordMatchMode={keywordMatchMode}
+        onMatchModeChange={setKeywordMatchMode}
+        hideDarkened={hideDarkened}
+        onHideDarkenedChange={setHideDarkened}
+        onCloseAdvancedSearch={closeAdvancedSearch}
+        actionsVisible={actionsVisible}
+        characterName={longPressCharacter?.name || ""}
+        hasCreator={!!longPressCharacter?.creator_id}
+        onActionsClose={handleActionsClose}
+        onViewCharacter={handleViewCharacter}
+        onViewCreator={handleViewCreator}
+        onBlockCharacter={handleBlockCharacter}
+        onReportCharacter={handleReportCharacter}
+        reportVisible={reportVisible}
+        characterId={longPressCharacter?.id ?? ""}
+        onCloseReport={handleCloseReport}
+        alertVisible={alertVisible}
+        alertTitle={alertTitle}
+        alertMessage={alertMessage}
+        alertButtons={alertButtons}
+        onAlertDismiss={handleAlertDismiss}
       />
     </View>
   );
@@ -1048,10 +1524,6 @@ const styles = StyleSheet.create({
   cardTablet: {
     flex: 1,
     marginHorizontal: 8,
-  },
-  columnWrapper: {
-    gap: 12,
-    paddingHorizontal: 20,
   },
   titleRow: {
     flexDirection: "row",

@@ -8,7 +8,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-  Dimensions,
+  useWindowDimensions,
   Keyboard,
 } from "react-native";
 import Animated, {
@@ -43,46 +43,31 @@ function tabIndex(tab: Tab): number {
   return TABS.findIndex((t) => t.key === tab);
 }
 
-export default function BlockedContentScreen() {
-  const { goBack } = useNavigation<Nav>();
-
-  const [activeTab, setActiveTab] = useState<Tab>("creators");
-  const [blocked, setBlocked] = useState<BlockedContent>({
-    bots: [],
-    creators: [],
-    keywords: [],
-    tags: [],
-  });
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [inputValue, setInputValue] = useState("");
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [allTags, setAllTags] = useState<CharacterTag[]>([]);
-  const [tagSearchValue, setTagSearchValue] = useState("");
-  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
-
-  const initialRef = useRef<BlockedContent | null>(null);
-  const suggestTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Reanimated shared values for swipeable tabs
+function useTabSwipe({
+  activeTab,
+  screenWidth,
+  onChangeTab,
+}: {
+  activeTab: Tab;
+  screenWidth: number;
+  onChangeTab: (tab: Tab) => void;
+}) {
   const tabIndicator = useSharedValue(0);
   const tabRowWidth = useSharedValue(1);
   const translateX = useSharedValue(0);
   const startX = useSharedValue(0);
-  const screenWidth = Dimensions.get("window").width;
 
   const snapToTab = useCallback(
     (t: Tab) => {
       const idx = tabIndex(t);
-      setActiveTab(t);
+      onChangeTab(t);
       translateX.value = withTiming(-idx * screenWidth, { duration: 250 });
       tabIndicator.value = withTiming(
         idx * (tabRowWidth.value / TAB_COUNT),
         { duration: 250 },
       );
     },
-    [translateX, tabIndicator, tabRowWidth, screenWidth],
+    [translateX, tabIndicator, tabRowWidth, screenWidth, onChangeTab],
   );
 
   const panGesture = useMemo(
@@ -121,6 +106,406 @@ export default function BlockedContentScreen() {
         }),
     [translateX, startX, tabIndicator, tabRowWidth, screenWidth, snapToTab],
   );
+
+  const indicatorStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: tabIndicator.value }],
+  }));
+
+  const contentTranslateStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  const handleTabRowLayout = useCallback(
+    (width: number) => {
+      tabRowWidth.value = width;
+      const idx = tabIndex(activeTab);
+      tabIndicator.value = idx * (width / TAB_COUNT);
+      translateX.value = -idx * screenWidth;
+    },
+    [activeTab, tabIndicator, translateX, tabRowWidth, screenWidth],
+  );
+
+  return {
+    snapToTab,
+    panGesture,
+    indicatorStyle,
+    contentTranslateStyle,
+    handleTabRowLayout,
+  };
+}
+
+const SaveButton = React.memo(function SaveButton({
+  saving,
+  hasChanges,
+  onPress,
+}: {
+  saving: boolean;
+  hasChanges: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!hasChanges || saving}
+      style={[styles.saveBtn, !hasChanges && styles.saveBtnDisabled]}
+    >
+      {saving ? (
+        <ActivityIndicator size="small" color={colors.accent} />
+      ) : (
+        <Text
+          style={[
+            styles.saveBtnText,
+            !hasChanges && styles.saveBtnTextDisabled,
+          ]}
+        >
+          Save
+        </Text>
+      )}
+    </Pressable>
+  );
+});
+
+const TabBar = React.memo(function TabBar({
+  activeTab,
+  onSelect,
+  onLayout,
+  indicatorStyle,
+}: {
+  activeTab: Tab;
+  onSelect: (tab: Tab) => void;
+  onLayout: (width: number) => void;
+  indicatorStyle: ReturnType<typeof useAnimatedStyle>;
+}) {
+  return (
+    <View
+      style={styles.tabRow}
+      onLayout={(e) => onLayout(e.nativeEvent.layout.width)}
+    >
+      {TABS.map((tab) => {
+        const active = activeTab === tab.key;
+        return (
+          <Pressable
+            key={tab.key}
+            style={styles.tab}
+            onPress={() => onSelect(tab.key)}
+          >
+            <Text style={[styles.tabText, active && styles.tabTextActive]}>
+              {tab.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+      <Animated.View style={[styles.tabIndicator, indicatorStyle]} />
+    </View>
+  );
+});
+
+const EmptyState = React.memo(function EmptyState({ text }: { text: string }) {
+  return (
+    <View style={styles.emptyState}>
+      <Text style={styles.emptyText}>{text}</Text>
+    </View>
+  );
+});
+
+function RemoveButton({
+  onPress,
+}: {
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.removeBtn,
+        pressed && { opacity: 0.7 },
+      ]}
+      onPress={onPress}
+    >
+      <Text style={styles.removeBtnText}>✕</Text>
+    </Pressable>
+  );
+}
+
+const ItemRows = React.memo(function ItemRows({
+  items,
+  emptyText,
+  onRemove,
+}: {
+  items: string[];
+  emptyText: string;
+  onRemove: (item: string) => void;
+}) {
+  if (items.length === 0) {
+    return <EmptyState text={emptyText} />;
+  }
+  return (
+    <>
+      {items.map((item) => (
+        <View key={item} style={styles.itemRow}>
+          <Text style={styles.itemText}>{item}</Text>
+          <RemoveButton onPress={() => onRemove(item)} />
+        </View>
+      ))}
+    </>
+  );
+});
+
+const ItemList = React.memo(function ItemList({
+  width,
+  items,
+  emptyText,
+  onRemove,
+}: {
+  width: number;
+  items: string[];
+  emptyText: string;
+  onRemove: (item: string) => void;
+}) {
+  return (
+    <ScrollView
+      style={{ width }}
+      contentContainerStyle={styles.contentInner}
+      keyboardShouldPersistTaps="handled"
+    >
+      <ItemRows items={items} emptyText={emptyText} onRemove={onRemove} />
+    </ScrollView>
+  );
+});
+
+const AddButton = React.memo(function AddButton({
+  onPress,
+}: {
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.addBtn,
+        pressed && { opacity: 0.7 },
+      ]}
+      onPress={onPress}
+    >
+      <Text style={styles.addBtnText}>Add</Text>
+    </Pressable>
+  );
+});
+
+const AutocompleteInput = React.memo(function AutocompleteInput({
+  value,
+  placeholder,
+  onChangeText,
+  onSubmit,
+  onFocus,
+  onBlur,
+  showDropdown,
+  suggestions,
+}: {
+  value: string;
+  placeholder: string;
+  onChangeText: (text: string) => void;
+  onSubmit?: () => void;
+  onFocus?: () => void;
+  onBlur: () => void;
+  showDropdown: boolean;
+  suggestions: { key: string; label: string; onPress: () => void }[];
+}) {
+  return (
+    <View style={styles.autocompleteContainer}>
+      <TextInput
+        style={styles.addInput}
+        placeholder={placeholder}
+        placeholderTextColor={colors.textDim}
+        value={value}
+        onChangeText={onChangeText}
+        onSubmitEditing={onSubmit}
+        returnKeyType="done"
+        autoCapitalize="none"
+        autoCorrect={false}
+        onFocus={onFocus}
+        onBlur={onBlur}
+      />
+      {showDropdown && (
+        <View style={styles.suggestionsDropdown}>
+          <ScrollView
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+            style={styles.suggestionsList}
+          >
+            {suggestions.map((s) => (
+              <Pressable
+                key={s.key}
+                style={({ pressed }) => [
+                  styles.suggestionItem,
+                  pressed && {
+                    backgroundColor: colors.accentFaded,
+                  },
+                ]}
+                onPress={s.onPress}
+              >
+                <Text style={styles.suggestionText}>{s.label}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+    </View>
+  );
+});
+
+const TagsPanel = React.memo(function TagsPanel({
+  width,
+  keywords,
+  tags,
+  allTags,
+  inputValue,
+  suggestions,
+  showSuggestions,
+  tagSearchValue,
+  showTagSuggestions,
+  filteredTagSuggestions,
+  onInputChange,
+  onSubmitKeyword,
+  onAddKeyword,
+  onKeywordFocus,
+  onKeywordBlur,
+  onTagSearchChange,
+  onTagBlur,
+  onRemoveKeyword,
+  onRemoveTag,
+  onAddTag,
+}: {
+  width: number;
+  keywords: string[];
+  tags: number[];
+  allTags: CharacterTag[];
+  inputValue: string;
+  suggestions: string[];
+  showSuggestions: boolean;
+  tagSearchValue: string;
+  showTagSuggestions: boolean;
+  filteredTagSuggestions: CharacterTag[];
+  onInputChange: (text: string) => void;
+  onSubmitKeyword: () => void;
+  onAddKeyword: (keyword: string) => void;
+  onKeywordFocus: () => void;
+  onKeywordBlur: () => void;
+  onTagSearchChange: (text: string) => void;
+  onTagBlur: () => void;
+  onRemoveKeyword: (keyword: string) => void;
+  onRemoveTag: (id: number) => void;
+  onAddTag: (tag: CharacterTag) => void;
+}) {
+  const keywordSuggestions = useMemo(
+    () =>
+      suggestions.map((s) => ({
+        key: s,
+        label: s,
+        onPress: () => onAddKeyword(s),
+      })),
+    [suggestions, onAddKeyword],
+  );
+
+  const tagSuggestions = useMemo(
+    () =>
+      filteredTagSuggestions.map((tag) => ({
+        key: String(tag.id),
+        label: tag.name,
+        onPress: () => onAddTag(tag),
+      })),
+    [filteredTagSuggestions, onAddTag],
+  );
+
+  return (
+    <ScrollView
+      style={{ width }}
+      contentContainerStyle={styles.contentInner}
+      keyboardShouldPersistTaps="handled"
+    >
+      <Text style={styles.sectionTitle}>Custom Tags</Text>
+      <View style={styles.addRow}>
+        <AutocompleteInput
+          value={inputValue}
+          placeholder="Search custom tags..."
+          onChangeText={onInputChange}
+          onSubmit={onSubmitKeyword}
+          onFocus={onKeywordFocus}
+          onBlur={onKeywordBlur}
+          showDropdown={showSuggestions}
+          suggestions={keywordSuggestions}
+        />
+        <AddButton onPress={onSubmitKeyword} />
+      </View>
+
+      <ItemRows
+        items={keywords}
+        emptyText="No blocked custom tags"
+        onRemove={onRemoveKeyword}
+      />
+
+      <View style={styles.divider} />
+
+      <Text style={styles.sectionTitle}>Tags</Text>
+      <View style={styles.addRow}>
+        <AutocompleteInput
+          value={tagSearchValue}
+          placeholder="Search tags..."
+          onChangeText={onTagSearchChange}
+          onBlur={onTagBlur}
+          showDropdown={showTagSuggestions && filteredTagSuggestions.length > 0}
+          suggestions={tagSuggestions}
+        />
+      </View>
+
+      {tags.length === 0 ? (
+        <EmptyState text="No blocked tags" />
+      ) : (
+        tags.map((id) => {
+          const tag = allTags.find((t) => t.id === id);
+          return (
+            <View key={String(id)} style={styles.itemRow}>
+              <Text style={styles.itemText}>
+                {tag ? tag.name : `#${id}`}
+              </Text>
+              <RemoveButton onPress={() => onRemoveTag(id)} />
+            </View>
+          );
+        })
+      )}
+    </ScrollView>
+  );
+});
+
+export default function BlockedContentScreen() {
+  const { goBack } = useNavigation<Nav>();
+
+  const [activeTab, setActiveTab] = useState<Tab>("creators");
+  const [blocked, setBlocked] = useState<BlockedContent>({
+    bots: [],
+    creators: [],
+    keywords: [],
+    tags: [],
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [inputValue, setInputValue] = useState("");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [allTags, setAllTags] = useState<CharacterTag[]>([]);
+  const [tagSearchValue, setTagSearchValue] = useState("");
+  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+
+  const initialRef = useRef<BlockedContent | null>(null);
+  const suggestTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { width: screenWidth } = useWindowDimensions();
+
+  const {
+    snapToTab,
+    panGesture,
+    indicatorStyle,
+    contentTranslateStyle,
+    handleTabRowLayout,
+  } = useTabSwipe({ activeTab, screenWidth, onChangeTab: setActiveTab });
 
   const loadBlockedContent = useCallback(async () => {
     try {
@@ -207,16 +592,17 @@ export default function BlockedContentScreen() {
     }));
   }, []);
 
+  const blockedTagsSet = useMemo(() => new Set(blocked.tags), [blocked.tags]);
+
   const filteredTagSuggestions = useMemo(() => {
     const q = tagSearchValue.trim().toLowerCase();
     if (q.length < 1) return [];
     return allTags
       .filter(
-        (t) =>
-          t.name.toLowerCase().includes(q) && !blocked.tags.includes(t.id),
+        (t) => t.name.toLowerCase().includes(q) && !blockedTagsSet.has(t.id),
       )
       .slice(0, 20);
-  }, [tagSearchValue, allTags, blocked.tags]);
+  }, [tagSearchValue, allTags, blockedTagsSet]);
 
   const handleAddTag = useCallback(
     (tag: CharacterTag) => {
@@ -264,23 +650,33 @@ export default function BlockedContentScreen() {
     handleAddKeyword(inputValue);
   }, [handleAddKeyword, inputValue]);
 
-  // Animated styles
-  const indicatorStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: tabIndicator.value }],
-  }));
+  const handleKeywordFocus = useCallback(() => {
+    if (suggestions.length > 0) setShowSuggestions(true);
+  }, [suggestions]);
 
-  const contentTranslateStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
+  const handleKeywordBlur = useCallback(() => {
+    setTimeout(() => setShowSuggestions(false), 200);
+  }, []);
 
-  const handleTabRowLayout = useCallback(
-    (width: number) => {
-      tabRowWidth.value = width;
-      const idx = tabIndex(activeTab);
-      tabIndicator.value = idx * (width / TAB_COUNT);
-      translateX.value = -idx * screenWidth;
+  const handleTagSearchChange = useCallback((text: string) => {
+    setTagSearchValue(text);
+    setShowTagSuggestions(text.trim().length > 0);
+  }, []);
+
+  const handleTagBlur = useCallback(() => {
+    setTimeout(() => setShowTagSuggestions(false), 200);
+  }, []);
+
+  const handleTabPress = useCallback(
+    (tab: Tab) => {
+      snapToTab(tab);
+      setInputValue("");
+      setShowSuggestions(false);
+      setTagSearchValue("");
+      setShowTagSuggestions(false);
+      Keyboard.dismiss();
     },
-    [activeTab, tabIndicator, translateX, tabRowWidth, screenWidth],
+    [snapToTab],
   );
 
   if (loading) {
@@ -300,55 +696,20 @@ export default function BlockedContentScreen() {
         title="Blocked Content"
         onBack={() => goBack()}
         rightElement={
-          <Pressable
+          <SaveButton
+            saving={saving}
+            hasChanges={hasChanges}
             onPress={handleSave}
-            disabled={!hasChanges || saving}
-            style={[styles.saveBtn, !hasChanges && styles.saveBtnDisabled]}
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color={colors.accent} />
-            ) : (
-              <Text
-                style={[
-                  styles.saveBtnText,
-                  !hasChanges && styles.saveBtnTextDisabled,
-                ]}
-              >
-                Save
-              </Text>
-            )}
-          </Pressable>
+          />
         }
       />
 
-      {/* Tab bar */}
-      <View
-        style={styles.tabRow}
-        onLayout={(e) => handleTabRowLayout(e.nativeEvent.layout.width)}
-      >
-        {TABS.map((tab) => {
-          const active = activeTab === tab.key;
-          return (
-            <Pressable
-              key={tab.key}
-              style={styles.tab}
-              onPress={() => {
-                snapToTab(tab.key);
-                setInputValue("");
-                setShowSuggestions(false);
-                setTagSearchValue("");
-                setShowTagSuggestions(false);
-                Keyboard.dismiss();
-              }}
-            >
-              <Text style={[styles.tabText, active && styles.tabTextActive]}>
-                {tab.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-        <Animated.View style={[styles.tabIndicator, indicatorStyle]} />
-      </View>
+      <TabBar
+        activeTab={activeTab}
+        onSelect={handleTabPress}
+        onLayout={handleTabRowLayout}
+        indicatorStyle={indicatorStyle}
+      />
 
       <GestureDetector gesture={panGesture}>
         <View style={styles.content}>
@@ -359,221 +720,40 @@ export default function BlockedContentScreen() {
               contentTranslateStyle,
             ]}
           >
-            {/* Creators Tab */}
-            <ScrollView
-              style={{ width: screenWidth }}
-              contentContainerStyle={styles.contentInner}
-              keyboardShouldPersistTaps="handled"
-            >
-              {blocked.creators.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyText}>No blocked creators</Text>
-                </View>
-              ) : (
-                blocked.creators.map((name) => (
-                  <View key={name} style={styles.itemRow}>
-                    <Text style={styles.itemText}>{name}</Text>
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.removeBtn,
-                        pressed && { opacity: 0.7 },
-                      ]}
-                      onPress={() => handleRemoveCreator(name)}
-                    >
-                      <Text style={styles.removeBtnText}>✕</Text>
-                    </Pressable>
-                  </View>
-                ))
-              )}
-            </ScrollView>
-
-            {/* Characters Tab */}
-            <ScrollView
-              style={{ width: screenWidth }}
-              contentContainerStyle={styles.contentInner}
-              keyboardShouldPersistTaps="handled"
-            >
-              {blocked.bots.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyText}>No blocked characters</Text>
-                </View>
-              ) : (
-                blocked.bots.map((name) => (
-                  <View key={name} style={styles.itemRow}>
-                    <Text style={styles.itemText}>{name}</Text>
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.removeBtn,
-                        pressed && { opacity: 0.7 },
-                      ]}
-                      onPress={() => handleRemoveCharacter(name)}
-                    >
-                      <Text style={styles.removeBtnText}>✕</Text>
-                    </Pressable>
-                  </View>
-                ))
-              )}
-            </ScrollView>
-
-            {/* Tags Tab */}
-            <ScrollView
-              style={{ width: screenWidth }}
-              contentContainerStyle={styles.contentInner}
-              keyboardShouldPersistTaps="handled"
-            >
-              <Text style={styles.sectionTitle}>Custom Tags</Text>
-              <View style={styles.addRow}>
-                <View style={styles.autocompleteContainer}>
-                  <TextInput
-                    style={styles.addInput}
-                    placeholder="Search custom tags..."
-                    placeholderTextColor={colors.textDim}
-                    value={inputValue}
-                    onChangeText={handleInputChange}
-                    onSubmitEditing={handleSubmitKeyword}
-                    returnKeyType="done"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    onFocus={() => {
-                      if (suggestions.length > 0) setShowSuggestions(true);
-                    }}
-                    onBlur={() => {
-                      setTimeout(() => setShowSuggestions(false), 200);
-                    }}
-                  />
-                  {showSuggestions && (
-                    <View style={styles.suggestionsDropdown}>
-                      <ScrollView
-                        nestedScrollEnabled
-                        keyboardShouldPersistTaps="handled"
-                        style={styles.suggestionsList}
-                      >
-                        {suggestions.map((s) => (
-                          <Pressable
-                            key={s}
-                            style={({ pressed }) => [
-                              styles.suggestionItem,
-                              pressed && {
-                                backgroundColor: colors.accentFaded,
-                              },
-                            ]}
-                            onPress={() => handleAddKeyword(s)}
-                          >
-                            <Text style={styles.suggestionText}>{s}</Text>
-                          </Pressable>
-                        ))}
-                      </ScrollView>
-                    </View>
-                  )}
-                </View>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.addBtn,
-                    pressed && { opacity: 0.7 },
-                  ]}
-                  onPress={handleSubmitKeyword}
-                >
-                  <Text style={styles.addBtnText}>Add</Text>
-                </Pressable>
-              </View>
-
-              {blocked.keywords.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyText}>No blocked custom tags</Text>
-                </View>
-              ) : (
-                blocked.keywords.map((kw) => (
-                  <View key={kw} style={styles.itemRow}>
-                    <Text style={styles.itemText}>{kw}</Text>
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.removeBtn,
-                        pressed && { opacity: 0.7 },
-                      ]}
-                      onPress={() => handleRemoveKeyword(kw)}
-                    >
-                      <Text style={styles.removeBtnText}>✕</Text>
-                    </Pressable>
-                  </View>
-                ))
-              )}
-
-              <View style={styles.divider} />
-
-              <Text style={styles.sectionTitle}>Tags</Text>
-              <View style={styles.addRow}>
-                <View style={styles.autocompleteContainer}>
-                  <TextInput
-                    style={styles.addInput}
-                    placeholder="Search tags..."
-                    placeholderTextColor={colors.textDim}
-                    value={tagSearchValue}
-                    onChangeText={(text) => {
-                      setTagSearchValue(text);
-                      setShowTagSuggestions(text.trim().length > 0);
-                    }}
-                    returnKeyType="done"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    onBlur={() => {
-                      setTimeout(() => setShowTagSuggestions(false), 200);
-                    }}
-                  />
-                  {showTagSuggestions && filteredTagSuggestions.length > 0 && (
-                    <View style={styles.suggestionsDropdown}>
-                      <ScrollView
-                        nestedScrollEnabled
-                        keyboardShouldPersistTaps="handled"
-                        style={styles.suggestionsList}
-                      >
-                        {filteredTagSuggestions.map((tag) => (
-                          <Pressable
-                            key={String(tag.id)}
-                            style={({ pressed }) => [
-                              styles.suggestionItem,
-                              pressed && {
-                                backgroundColor: colors.accentFaded,
-                              },
-                            ]}
-                            onPress={() => handleAddTag(tag)}
-                          >
-                            <Text style={styles.suggestionText}>
-                              {tag.name}
-                            </Text>
-                          </Pressable>
-                        ))}
-                      </ScrollView>
-                    </View>
-                  )}
-                </View>
-              </View>
-
-              {blocked.tags.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyText}>No blocked tags</Text>
-                </View>
-              ) : (
-                blocked.tags.map((id) => {
-                  const tag = allTags.find((t) => t.id === id);
-                  return (
-                    <View key={String(id)} style={styles.itemRow}>
-                      <Text style={styles.itemText}>
-                        {tag ? tag.name : `#${id}`}
-                      </Text>
-                      <Pressable
-                        style={({ pressed }) => [
-                          styles.removeBtn,
-                          pressed && { opacity: 0.7 },
-                        ]}
-                        onPress={() => handleRemoveTag(id)}
-                      >
-                        <Text style={styles.removeBtnText}>✕</Text>
-                      </Pressable>
-                    </View>
-                  );
-                })
-              )}
-            </ScrollView>
+            <ItemList
+              width={screenWidth}
+              items={blocked.creators}
+              emptyText="No blocked creators"
+              onRemove={handleRemoveCreator}
+            />
+            <ItemList
+              width={screenWidth}
+              items={blocked.bots}
+              emptyText="No blocked characters"
+              onRemove={handleRemoveCharacter}
+            />
+            <TagsPanel
+              width={screenWidth}
+              keywords={blocked.keywords}
+              tags={blocked.tags}
+              allTags={allTags}
+              inputValue={inputValue}
+              suggestions={suggestions}
+              showSuggestions={showSuggestions}
+              tagSearchValue={tagSearchValue}
+              showTagSuggestions={showTagSuggestions}
+              filteredTagSuggestions={filteredTagSuggestions}
+              onInputChange={handleInputChange}
+              onSubmitKeyword={handleSubmitKeyword}
+              onAddKeyword={handleAddKeyword}
+              onKeywordFocus={handleKeywordFocus}
+              onKeywordBlur={handleKeywordBlur}
+              onTagSearchChange={handleTagSearchChange}
+              onTagBlur={handleTagBlur}
+              onRemoveKeyword={handleRemoveKeyword}
+              onRemoveTag={handleRemoveTag}
+              onAddTag={handleAddTag}
+            />
           </Animated.View>
         </View>
       </GestureDetector>

@@ -1,4 +1,13 @@
-import { useState, useCallback, useRef, useMemo, useEffect } from "react";
+import {
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+  useEffect,
+  memo,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import {
   View,
   Text,
@@ -8,13 +17,14 @@ import {
   ActivityIndicator,
   RefreshControl,
   StyleSheet,
-  Dimensions,
+  useWindowDimensions,
   BackHandler,
 } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  type SharedValue,
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
@@ -51,6 +61,11 @@ function pronounLabel(p: Pronouns): string {
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList, "MyPersonas">;
 
+type DragState =
+  | { type: "persona"; index: number; item: Persona; startY: number }
+  | { type: "group"; index: number; item: PersonaGroup; startY: number }
+  | null;
+
 export default function MyPersonasScreen() {
   const { goBack } = useNavigation<Nav>();
   const user = useAuthStore((s) => s.user);
@@ -60,12 +75,253 @@ export default function MyPersonasScreen() {
   const [personaGroups, setPersonaGroups] = useState<PersonaGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const { width: screenWidth } = useWindowDimensions();
+
+  const {
+    tab,
+    tabIndicator,
+    snapToTab,
+    panGesture,
+    handleTabRowLayout,
+    contentTranslateStyle,
+  } = useTabSwipe(screenWidth);
+  const {
+    editModalVisible,
+    setEditModalVisible,
+    sheetMode,
+    editingPersona,
+    sheetSession,
+    deleteAlertVisible,
+    setDeleteAlertVisible,
+    openEditMain,
+    openEditPersona,
+    openCreatePersona,
+    handlePersonaSheetClose,
+    handlePersonaSaved,
+    handlePersonaDeleteRequested,
+    handleDelete,
+  } = usePersonaSheet(profile, setProfile, setPersonas);
+  const {
+    groupModalVisible,
+    setGroupModalVisible,
+    editingGroup,
+    groupSheetSession,
+    deleteGroupAlert,
+    setDeleteGroupAlert,
+    openCreateGroup,
+    openEditGroup,
+    handleGroupSheetClose,
+    handleGroupSaved,
+    handleGroupDeleteRequested,
+    handleDeleteGroup,
+  } = useGroupSheet(setPersonaGroups);
+  const {
+    drag,
+    dragDy,
+    dragStartY,
+    dragTargetIdx,
+    personaCardRefs,
+    groupCardRefs,
+    handleDragStartPersona,
+    handleDragEndPersona,
+    handleDragStartGroup,
+    handleDragEndGroup,
+  } = useDragReorder(personas, personaGroups, setPersonas, setPersonaGroups);
+
+  // Android back button dismisses sheets instead of navigating back
+  useEffect(() => {
+    const handler = () => {
+      if (deleteAlertVisible) {
+        setDeleteAlertVisible(false);
+        return true;
+      }
+      if (deleteGroupAlert) {
+        setDeleteGroupAlert(false);
+        return true;
+      }
+      if (editModalVisible) {
+        setEditModalVisible(false);
+        return true;
+      }
+      if (groupModalVisible) {
+        setGroupModalVisible(false);
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", handler);
+    return () => sub.remove();
+  }, [
+    editModalVisible,
+    groupModalVisible,
+    deleteAlertVisible,
+    deleteGroupAlert,
+    setEditModalVisible,
+    setGroupModalVisible,
+    setDeleteAlertVisible,
+    setDeleteGroupAlert,
+  ]);
+
+  const loadData = useCallback(async () => {
+    try {
+      const [p, ps, gs] = await Promise.all([
+        getMyProfile(),
+        getMyPersonas(),
+        getPersonaGroups().catch(() => [] as PersonaGroup[]),
+      ]);
+      setProfile(p);
+      setPersonas(ps);
+      setPersonaGroups(gs);
+    } catch {}
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      const load = async () => {
+        await loadData();
+        if (!cancelled) setLoading(false);
+      };
+      load();
+      return () => {
+        cancelled = true;
+      };
+    }, [loadData]),
+  );
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
+
+  const closePersonaDeleteAlert = useCallback(() => {
+    setDeleteAlertVisible(false);
+  }, [setDeleteAlertVisible]);
+
+  const closeGroupDeleteAlert = useCallback(() => {
+    setDeleteGroupAlert(false);
+  }, [setDeleteGroupAlert]);
+
+  const getGroupById = useCallback(
+    (groupId: string | null) => {
+      if (!groupId) return null;
+      return personaGroups.find((g) => g.id === groupId) || null;
+    },
+    [personaGroups],
+  );
+
+  const getPersonasInGroup = useCallback(
+    (groupId: string) => personas.filter((p) => p.groupId === groupId),
+    [personas],
+  );
+
+  const mainAvatar = profile?.avatar ? avatarUrl(profile.avatar) : undefined;
+  const mainName =
+    profile?.name || user?.user_metadata?.email || user?.email || "User";
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ScreenHeader goBack={goBack} />
+        <ActivityIndicator color={colors.accent} style={styles.loader} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <ScreenHeader goBack={goBack} />
+      <TabBar
+        tab={tab}
+        tabIndicator={tabIndicator}
+        onSelectTab={snapToTab}
+        onLayout={handleTabRowLayout}
+      />
+      <GestureDetector gesture={panGesture}>
+        <View style={styles.content}>
+          <Animated.View
+            style={[
+              styles.contentSliding,
+              { width: screenWidth * 2 },
+              contentTranslateStyle,
+            ]}
+          >
+            <PersonasPanel
+              screenWidth={screenWidth}
+              scrollEnabled={!drag}
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              mainAvatar={mainAvatar}
+              mainName={mainName}
+              profile={profile}
+              personas={personas}
+              drag={drag}
+              getGroupById={getGroupById}
+              onEditMain={openEditMain}
+              onEditPersona={openEditPersona}
+              onCreatePersona={openCreatePersona}
+              onDragStartPersona={handleDragStartPersona}
+              onDragEndPersona={handleDragEndPersona}
+              personaCardRefs={personaCardRefs}
+              dragDy={dragDy}
+              dragTargetIdx={dragTargetIdx}
+            />
+            <GroupsPanel
+              screenWidth={screenWidth}
+              scrollEnabled={!drag}
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              personaGroups={personaGroups}
+              drag={drag}
+              getMembers={getPersonasInGroup}
+              onEditGroup={openEditGroup}
+              onCreateGroup={openCreateGroup}
+              onDragStartGroup={handleDragStartGroup}
+              onDragEndGroup={handleDragEndGroup}
+              groupCardRefs={groupCardRefs}
+              dragDy={dragDy}
+              dragTargetIdx={dragTargetIdx}
+            />
+          </Animated.View>
+        </View>
+      </GestureDetector>
+      {drag && (
+        <DragOverlay drag={drag} dragStartY={dragStartY} dragDy={dragDy} />
+      )}
+      <SheetsAndAlerts
+        editModalVisible={editModalVisible}
+        sheetMode={sheetMode}
+        editingPersona={editingPersona}
+        sheetSession={sheetSession}
+        profile={profile}
+        personaGroups={personaGroups}
+        deleteAlertVisible={deleteAlertVisible}
+        onPersonaSheetClose={handlePersonaSheetClose}
+        onPersonaSaved={handlePersonaSaved}
+        onPersonaDeleteRequested={handlePersonaDeleteRequested}
+        onDeletePersona={handleDelete}
+        onCancelDeletePersona={closePersonaDeleteAlert}
+        groupModalVisible={groupModalVisible}
+        editingGroup={editingGroup}
+        groupSheetSession={groupSheetSession}
+        deleteGroupAlert={deleteGroupAlert}
+        onGroupSheetClose={handleGroupSheetClose}
+        onGroupSaved={handleGroupSaved}
+        onGroupDeleteRequested={handleGroupDeleteRequested}
+        onDeleteGroup={handleDeleteGroup}
+        onCancelDeleteGroup={closeGroupDeleteAlert}
+      />
+    </View>
+  );
+}
+
+function useTabSwipe(screenWidth: number) {
   const [tab, setTab] = useState<"personas" | "groups">("personas");
   const tabIndicator = useSharedValue(0);
   const tabRowWidth = useSharedValue(1);
   const translateX = useSharedValue(0);
   const startX = useSharedValue(0);
-  const screenWidth = Dimensions.get("window").width;
 
   const snapToTab = useCallback(
     (t: "personas" | "groups") => {
@@ -114,121 +370,67 @@ export default function MyPersonasScreen() {
     [translateX, startX, tabIndicator, tabRowWidth, snapToTab],
   );
 
-  // Persona sheet state
-  const [editModalVisible, setEditModalVisible] = useState(false);
-  const [sheetMode, setSheetMode] = useState<"create" | "edit" | "editMain">("create");
-  const [editingPersona, setEditingPersona] = useState<Persona | undefined>();
-
-  // Delete persona confirmation
-  const [deleteAlertVisible, setDeleteAlertVisible] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  // Group sheet state
-  const [groupModalVisible, setGroupModalVisible] = useState(false);
-  const [editingGroup, setEditingGroup] = useState<PersonaGroup | undefined>();
-
-  // Delete group confirmation
-  const [deleteGroupAlert, setDeleteGroupAlert] = useState(false);
-  const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
-
-  // Drag state
-  const [drag, setDrag] = useState<
-    | {
-        type: "persona";
-        index: number;
-        item: Persona;
-        startY: number;
-      }
-    | {
-        type: "group";
-        index: number;
-        item: PersonaGroup;
-        startY: number;
-      }
-    | null
-  >(null);
-  const dragDy = useSharedValue(0);
-  const dragStartY = useSharedValue(0);
-  const dragTargetIdx = useSharedValue(-1);
-  const personaCardRefs = useRef<Array<View | null>>([]);
-  const groupCardRefs = useRef<Array<View | null>>([]);
-
-  // Android back button dismisses sheets instead of navigating back
-  useEffect(() => {
-    const handler = () => {
-      if (deleteAlertVisible) {
-        setDeleteAlertVisible(false);
-        return true;
-      }
-      if (deleteGroupAlert) {
-        setDeleteGroupAlert(false);
-        return true;
-      }
-      if (editModalVisible) {
-        setEditModalVisible(false);
-        return true;
-      }
-      if (groupModalVisible) {
-        setGroupModalVisible(false);
-        return true;
-      }
-      return false;
-    };
-    const sub = BackHandler.addEventListener("hardwareBackPress", handler);
-    return () => sub.remove();
-  }, [editModalVisible, groupModalVisible, deleteAlertVisible, deleteGroupAlert]);
-
-  const loadData = useCallback(async () => {
-    try {
-      const [p, ps, gs] = await Promise.all([
-        getMyProfile(),
-        getMyPersonas(),
-        getPersonaGroups().catch(() => [] as PersonaGroup[]),
-      ]);
-      setProfile(p);
-      setPersonas(ps);
-      setPersonaGroups(gs);
-    } catch {}
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-      const load = async () => {
-        await loadData();
-        if (!cancelled) setLoading(false);
-      };
-      load();
-      return () => {
-        cancelled = true;
-      };
-    }, [loadData]),
+  const handleTabRowLayout = useCallback(
+    (width: number) => {
+      tabRowWidth.value = width;
+      tabIndicator.value = tab === "personas" ? 0 : width / 2;
+      translateX.value = tab === "personas" ? 0 : -width;
+    },
+    [tab, tabIndicator, translateX, tabRowWidth],
   );
 
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  }, [loadData]);
+  const contentTranslateStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        translateX:
+          (translateX.value / Math.max(tabRowWidth.value, 1)) * screenWidth,
+      },
+    ],
+  }));
 
-  // --- Persona sheet openers ---
+  return {
+    tab,
+    tabIndicator,
+    snapToTab,
+    panGesture,
+    handleTabRowLayout,
+    contentTranslateStyle,
+  };
+}
+
+function usePersonaSheet(
+  profile: UserProfile | null,
+  setProfile: Dispatch<SetStateAction<UserProfile | null>>,
+  setPersonas: Dispatch<SetStateAction<Persona[]>>,
+) {
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [sheetMode, setSheetMode] = useState<"create" | "edit" | "editMain">(
+    "create",
+  );
+  const [editingPersona, setEditingPersona] = useState<Persona | undefined>();
+  const [sheetSession, setSheetSession] = useState(0);
+  const [deleteAlertVisible, setDeleteAlertVisible] = useState(false);
+  const deletingIdRef = useRef<string | null>(null);
 
   const openEditMain = useCallback(() => {
     if (!profile) return;
     setSheetMode("editMain");
     setEditingPersona(undefined);
+    setSheetSession((s) => s + 1);
     setEditModalVisible(true);
   }, [profile]);
 
   const openEditPersona = useCallback((p: Persona) => {
     setSheetMode("edit");
     setEditingPersona(p);
+    setSheetSession((s) => s + 1);
     setEditModalVisible(true);
   }, []);
 
   const openCreatePersona = useCallback(() => {
     setSheetMode("create");
     setEditingPersona(undefined);
+    setSheetSession((s) => s + 1);
     setEditModalVisible(true);
   }, []);
 
@@ -243,16 +445,15 @@ export default function MyPersonasScreen() {
       setProfile(p);
       setPersonas(ps);
     } catch {}
-  }, []);
+  }, [setProfile, setPersonas]);
 
   const handlePersonaDeleteRequested = useCallback((personaId: string) => {
-    setDeletingId(personaId);
+    deletingIdRef.current = personaId;
     setDeleteAlertVisible(true);
   }, []);
 
-  // --- Persona delete ---
-
   const handleDelete = useCallback(async () => {
+    const deletingId = deletingIdRef.current;
     if (!deletingId) return;
     try {
       await deletePersona(deletingId);
@@ -262,11 +463,109 @@ export default function MyPersonasScreen() {
       Alert.alert("Error", "Failed to delete persona");
     } finally {
       setDeleteAlertVisible(false);
-      setDeletingId(null);
+      deletingIdRef.current = null;
     }
-  }, [deletingId]);
+  }, [setPersonas]);
 
-  // --- Drag handlers ---
+  return {
+    editModalVisible,
+    setEditModalVisible,
+    sheetMode,
+    editingPersona,
+    sheetSession,
+    deleteAlertVisible,
+    setDeleteAlertVisible,
+    openEditMain,
+    openEditPersona,
+    openCreatePersona,
+    handlePersonaSheetClose,
+    handlePersonaSaved,
+    handlePersonaDeleteRequested,
+    handleDelete,
+  };
+}
+
+function useGroupSheet(
+  setPersonaGroups: Dispatch<SetStateAction<PersonaGroup[]>>,
+) {
+  const [groupModalVisible, setGroupModalVisible] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<PersonaGroup | undefined>();
+  const [groupSheetSession, setGroupSheetSession] = useState(0);
+  const [deleteGroupAlert, setDeleteGroupAlert] = useState(false);
+  const deletingGroupIdRef = useRef<string | null>(null);
+
+  const openCreateGroup = useCallback(() => {
+    setEditingGroup(undefined);
+    setGroupSheetSession((s) => s + 1);
+    setGroupModalVisible(true);
+  }, []);
+
+  const openEditGroup = useCallback((g: PersonaGroup) => {
+    setEditingGroup(g);
+    setGroupSheetSession((s) => s + 1);
+    setGroupModalVisible(true);
+  }, []);
+
+  const handleGroupSheetClose = useCallback(() => {
+    setGroupModalVisible(false);
+  }, []);
+
+  const handleGroupSaved = useCallback(async () => {
+    setGroupModalVisible(false);
+    try {
+      const gs = await getPersonaGroups();
+      setPersonaGroups(gs);
+    } catch {}
+  }, [setPersonaGroups]);
+
+  const handleGroupDeleteRequested = useCallback((groupId: string) => {
+    deletingGroupIdRef.current = groupId;
+    setDeleteGroupAlert(true);
+  }, []);
+
+  const handleDeleteGroup = useCallback(async () => {
+    const deletingGroupId = deletingGroupIdRef.current;
+    if (!deletingGroupId) return;
+    try {
+      await deletePersonaGroup(deletingGroupId);
+      setPersonaGroups((prev) => prev.filter((g) => g.id !== deletingGroupId));
+      setGroupModalVisible(false);
+    } catch {
+      Alert.alert("Error", "Failed to delete group");
+    } finally {
+      setDeleteGroupAlert(false);
+      deletingGroupIdRef.current = null;
+    }
+  }, [setPersonaGroups]);
+
+  return {
+    groupModalVisible,
+    setGroupModalVisible,
+    editingGroup,
+    groupSheetSession,
+    deleteGroupAlert,
+    setDeleteGroupAlert,
+    openCreateGroup,
+    openEditGroup,
+    handleGroupSheetClose,
+    handleGroupSaved,
+    handleGroupDeleteRequested,
+    handleDeleteGroup,
+  };
+}
+
+function useDragReorder(
+  personas: Persona[],
+  personaGroups: PersonaGroup[],
+  setPersonas: Dispatch<SetStateAction<Persona[]>>,
+  setPersonaGroups: Dispatch<SetStateAction<PersonaGroup[]>>,
+) {
+  const [drag, setDrag] = useState<DragState>(null);
+  const dragDy = useSharedValue(0);
+  const dragStartY = useSharedValue(0);
+  const dragTargetIdx = useSharedValue(-1);
+  const personaCardRefs = useRef<Array<View | null>>([]);
+  const groupCardRefs = useRef<Array<View | null>>([]);
 
   const handleDragStartPersona = useCallback(
     (index: number, p: Persona) => {
@@ -304,7 +603,7 @@ export default function MyPersonasScreen() {
         setPersonas(ps);
       }
     },
-    [personas, dragTargetIdx, dragDy, dragStartY],
+    [personas, dragTargetIdx, dragDy, dragStartY, setPersonas],
   );
 
   const handleDragStartGroup = useCallback(
@@ -344,84 +643,430 @@ export default function MyPersonasScreen() {
         setPersonaGroups(gs);
       }
     },
-    [personaGroups, dragTargetIdx, dragDy, dragStartY],
+    [personaGroups, dragTargetIdx, dragDy, dragStartY, setPersonaGroups],
   );
 
-  // --- Group sheet openers ---
+  return {
+    drag,
+    dragDy,
+    dragStartY,
+    dragTargetIdx,
+    personaCardRefs,
+    groupCardRefs,
+    handleDragStartPersona,
+    handleDragEndPersona,
+    handleDragStartGroup,
+    handleDragEndGroup,
+  };
+}
 
-  const openCreateGroup = useCallback(() => {
-    setEditingGroup(undefined);
-    setGroupModalVisible(true);
-  }, []);
-
-  const openEditGroup = useCallback((g: PersonaGroup) => {
-    setEditingGroup(g);
-    setGroupModalVisible(true);
-  }, []);
-
-  const handleGroupSheetClose = useCallback(() => {
-    setGroupModalVisible(false);
-  }, []);
-
-  const handleGroupSaved = useCallback(async () => {
-    setGroupModalVisible(false);
-    try {
-      const gs = await getPersonaGroups();
-      setPersonaGroups(gs);
-    } catch {}
-  }, []);
-
-  const handleGroupDeleteRequested = useCallback((groupId: string) => {
-    setDeletingGroupId(groupId);
-    setDeleteGroupAlert(true);
-  }, []);
-
-  // --- Group delete ---
-
-  const handleDeleteGroup = useCallback(async () => {
-    if (!deletingGroupId) return;
-    try {
-      await deletePersonaGroup(deletingGroupId);
-      setPersonaGroups((prev) => prev.filter((g) => g.id !== deletingGroupId));
-      setGroupModalVisible(false);
-    } catch {
-      Alert.alert("Error", "Failed to delete group");
-    } finally {
-      setDeleteGroupAlert(false);
-      setDeletingGroupId(null);
-    }
-  }, [deletingGroupId]);
-
-  // --- Group helpers ---
-
-  const getGroupById = useCallback(
-    (groupId: string | null) => {
-      if (!groupId) return null;
-      return personaGroups.find((g) => g.id === groupId) || null;
-    },
-    [personaGroups],
+const ScreenHeader = memo(function ScreenHeader({
+  goBack,
+}: {
+  goBack: () => void;
+}) {
+  return (
+    <View style={styles.header}>
+      <Pressable onPress={() => goBack()} style={styles.backBtn}>
+        <Text style={styles.backText}>{"←"}</Text>
+      </Pressable>
+      <Text style={styles.headerTitle}>My Personas</Text>
+      <View style={styles.backBtn} />
+    </View>
   );
+});
 
-  const getPersonasInGroup = useCallback(
-    (groupId: string) => personas.filter((p) => p.groupId === groupId),
-    [personas],
-  );
-
-  // --- Animated styles ---
-
+const TabBar = memo(function TabBar({
+  tab,
+  tabIndicator,
+  onSelectTab,
+  onLayout,
+}: {
+  tab: "personas" | "groups";
+  tabIndicator: SharedValue<number>;
+  onSelectTab: (t: "personas" | "groups") => void;
+  onLayout: (width: number) => void;
+}) {
   const indicatorStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: tabIndicator.value }],
   }));
 
-  const contentTranslateStyle = useAnimatedStyle(() => ({
-    transform: [
-      {
-        translateX:
-          (translateX.value / Math.max(tabRowWidth.value, 1)) * screenWidth,
-      },
-    ],
-  }));
+  return (
+    <View
+      style={styles.tabRow}
+      onLayout={(e) => onLayout(e.nativeEvent.layout.width)}
+    >
+      <Pressable onPress={() => onSelectTab("personas")} style={styles.tab}>
+        <Text
+          style={[styles.tabText, tab === "personas" && styles.tabTextActive]}
+        >
+          Personas
+        </Text>
+      </Pressable>
+      <Pressable onPress={() => onSelectTab("groups")} style={styles.tab}>
+        <Text style={[styles.tabText, tab === "groups" && styles.tabTextActive]}>
+          Persona Groups
+        </Text>
+      </Pressable>
+      <Animated.View style={[styles.tabIndicator, indicatorStyle]} />
+    </View>
+  );
+});
 
+const MainPersonaCard = memo(function MainPersonaCard({
+  mainAvatar,
+  mainName,
+  appearance,
+  onEdit,
+}: {
+  mainAvatar?: string;
+  mainName: string;
+  appearance: string | undefined;
+  onEdit: () => void;
+}) {
+  return (
+    <View style={styles.mainPersonaCard}>
+      <Avatar uri={mainAvatar} name={mainName} size={56} />
+      <View style={styles.mainPersonaInfo}>
+        <Text style={styles.mainPersonaName}>{mainName}</Text>
+        <Text style={styles.mainPersonaAppearance} numberOfLines={2}>
+          {appearance || "No appearance set"}
+        </Text>
+      </View>
+      <Pressable
+        onPress={onEdit}
+        style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.7 }]}
+      >
+        <Text style={styles.editBtnText}>Edit</Text>
+      </Pressable>
+    </View>
+  );
+});
+
+const PersonasPanel = memo(function PersonasPanel({
+  screenWidth,
+  scrollEnabled,
+  refreshing,
+  onRefresh,
+  mainAvatar,
+  mainName,
+  profile,
+  personas,
+  drag,
+  getGroupById,
+  onEditMain,
+  onEditPersona,
+  onCreatePersona,
+  onDragStartPersona,
+  onDragEndPersona,
+  personaCardRefs,
+  dragDy,
+  dragTargetIdx,
+}: {
+  screenWidth: number;
+  scrollEnabled: boolean;
+  refreshing: boolean;
+  onRefresh: () => void;
+  mainAvatar?: string;
+  mainName: string;
+  profile: UserProfile | null;
+  personas: Persona[];
+  drag: DragState;
+  getGroupById: (groupId: string | null) => PersonaGroup | null;
+  onEditMain: () => void;
+  onEditPersona: (p: Persona) => void;
+  onCreatePersona: () => void;
+  onDragStartPersona: (index: number, p: Persona) => void;
+  onDragEndPersona: (index: number) => void;
+  personaCardRefs: { current: Array<View | null> };
+  dragDy: SharedValue<number>;
+  dragTargetIdx: SharedValue<number>;
+}) {
+  return (
+    <ScrollView
+      style={{ width: screenWidth }}
+      contentContainerStyle={styles.contentInner}
+      scrollEnabled={scrollEnabled}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.accent}
+        />
+      }
+    >
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Main Persona</Text>
+        <MainPersonaCard
+          mainAvatar={mainAvatar}
+          mainName={mainName}
+          appearance={profile?.profile}
+          onEdit={onEditMain}
+        />
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Personas</Text>
+        {personas.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyText}>No personas yet</Text>
+            <Text style={styles.emptySubtext}>
+              Create additional personas to use in chats
+            </Text>
+          </View>
+        ) : (
+          personas.map((p, i) => {
+            const group = getGroupById(p.groupId);
+            return (
+              <GestureDetector
+                key={p.id}
+                gesture={Gesture.Exclusive(
+                  Gesture.Pan()
+                    .activateAfterLongPress(400)
+                    .onStart(() => {
+                      scheduleOnRN(onDragStartPersona, i, p);
+                    })
+                    .onUpdate((e) => {
+                      dragDy.value = e.translationY;
+                      const cardH = 88;
+                      dragTargetIdx.value = Math.max(
+                        0,
+                        Math.min(
+                          personas.length - 1,
+                          Math.round(i + e.translationY / cardH),
+                        ),
+                      );
+                    })
+                    .onEnd(() => {
+                      scheduleOnRN(onDragEndPersona, i);
+                    }),
+                  Gesture.Tap().onEnd(() => {
+                    scheduleOnRN(onEditPersona, p);
+                  }),
+                )}
+              >
+                <Animated.View
+                  ref={(ref: View | null) => {
+                    personaCardRefs.current[i] = ref;
+                  }}
+                  style={[
+                    styles.personaCard,
+                    drag?.index === i && { opacity: 0.3 },
+                  ]}
+                >
+                  <Avatar
+                    uri={p.avatar ? avatarUrl(p.avatar) : undefined}
+                    name={p.name}
+                    size={48}
+                  />
+                  <View style={styles.personaCardInfo}>
+                    <View style={styles.personaCardNameRow}>
+                      <Text style={styles.personaCardName}>{p.name}</Text>
+                      {p.pronouns && (
+                        <View style={styles.pronounTag}>
+                          <Text style={styles.pronounTagText}>
+                            {pronounLabel(p.pronouns)}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.personaCardAppearance} numberOfLines={1}>
+                      {p.appearance || "No appearance"}
+                    </Text>
+                    {group && (
+                      <View
+                        style={[
+                          styles.groupChip,
+                          { backgroundColor: `${group.color}33` },
+                        ]}
+                      >
+                        <Text
+                          style={[styles.groupChipText, { color: group.color }]}
+                        >
+                          {group.name}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.dragHandle}>
+                    <Text style={styles.dragHandleText}>{"☰"}</Text>
+                  </View>
+                </Animated.View>
+              </GestureDetector>
+            );
+          })
+        )}
+        <Button
+          title="Add Persona"
+          onPress={onCreatePersona}
+          style={styles.addBtn}
+        />
+      </View>
+    </ScrollView>
+  );
+});
+
+const GroupsPanel = memo(function GroupsPanel({
+  screenWidth,
+  scrollEnabled,
+  refreshing,
+  onRefresh,
+  personaGroups,
+  drag,
+  getMembers,
+  onEditGroup,
+  onCreateGroup,
+  onDragStartGroup,
+  onDragEndGroup,
+  groupCardRefs,
+  dragDy,
+  dragTargetIdx,
+}: {
+  screenWidth: number;
+  scrollEnabled: boolean;
+  refreshing: boolean;
+  onRefresh: () => void;
+  personaGroups: PersonaGroup[];
+  drag: DragState;
+  getMembers: (groupId: string) => Persona[];
+  onEditGroup: (g: PersonaGroup) => void;
+  onCreateGroup: () => void;
+  onDragStartGroup: (index: number, g: PersonaGroup) => void;
+  onDragEndGroup: (index: number) => void;
+  groupCardRefs: { current: Array<View | null> };
+  dragDy: SharedValue<number>;
+  dragTargetIdx: SharedValue<number>;
+}) {
+  return (
+    <ScrollView
+      style={{ width: screenWidth }}
+      contentContainerStyle={styles.contentInner}
+      scrollEnabled={scrollEnabled}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.accent}
+        />
+      }
+    >
+      <View style={styles.section}>
+        {personaGroups.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyText}>No groups</Text>
+            <Text style={styles.emptySubtext}>
+              Create groups to organize your personas
+            </Text>
+          </View>
+        ) : (
+          personaGroups.map((g, i) => {
+            const members = getMembers(g.id);
+            return (
+              <GestureDetector
+                key={g.id}
+                gesture={Gesture.Exclusive(
+                  Gesture.Pan()
+                    .activateAfterLongPress(400)
+                    .onStart(() => {
+                      scheduleOnRN(onDragStartGroup, i, g);
+                    })
+                    .onUpdate((e) => {
+                      dragDy.value = e.translationY;
+                      const rowH = 100;
+                      dragTargetIdx.value = Math.max(
+                        0,
+                        Math.min(
+                          personaGroups.length - 1,
+                          Math.round(i + e.translationY / rowH),
+                        ),
+                      );
+                    })
+                    .onEnd(() => {
+                      scheduleOnRN(onDragEndGroup, i);
+                    }),
+                  Gesture.Tap().onEnd(() => {
+                    scheduleOnRN(onEditGroup, g);
+                  }),
+                )}
+              >
+                <Animated.View
+                  ref={(ref: View | null) => {
+                    groupCardRefs.current[i] = ref;
+                  }}
+                  style={[
+                    styles.groupCard,
+                    drag?.index === i &&
+                      drag?.type === "group" && { opacity: 0.3 },
+                  ]}
+                >
+                  <View style={styles.groupCardHeader}>
+                    <View
+                      style={[styles.groupDot, { backgroundColor: g.color }]}
+                    />
+                    <Text style={styles.groupCardName}>{g.name}</Text>
+                    <Text style={styles.groupCardCount}>
+                      {members.length} persona
+                      {members.length !== 1 ? "s" : ""}
+                    </Text>
+                    <View style={styles.dragHandle}>
+                      <Text style={styles.dragHandleText}>{"☰"}</Text>
+                    </View>
+                  </View>
+                  {g.description ? (
+                    <Text style={styles.groupDesc}>{g.description}</Text>
+                  ) : null}
+                  {members.length > 0 && (
+                    <View style={styles.groupMembers}>
+                      {members.map((p) => (
+                        <View key={p.id} style={styles.groupMemberRow}>
+                          <Avatar
+                            uri={
+                              p.avatar ? avatarUrl(p.avatar) : undefined
+                            }
+                            name={p.name}
+                            size={28}
+                          />
+                          <Text style={styles.groupMemberName}>{p.name}</Text>
+                          {p.pronouns && (
+                            <View style={styles.pronounTagSmall}>
+                              <Text style={styles.pronounTagTextSmall}>
+                                {pronounLabel(p.pronouns)}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  {members.length === 0 && (
+                    <Text style={styles.groupEmptyMembers}>
+                      No personas in this group
+                    </Text>
+                  )}
+                </Animated.View>
+              </GestureDetector>
+            );
+          })
+        )}
+        <Button
+          title="Create Group"
+          onPress={onCreateGroup}
+          style={styles.createGroupBtn}
+        />
+      </View>
+    </ScrollView>
+  );
+});
+
+const DragOverlay = memo(function DragOverlay({
+  drag,
+  dragStartY,
+  dragDy,
+}: {
+  drag: Exclude<DragState, null>;
+  dragStartY: SharedValue<number>;
+  dragDy: SharedValue<number>;
+}) {
   const dragOverlayStyle = useAnimatedStyle(() => ({
     position: "absolute" as const,
     transform: [{ translateY: dragStartY.value + dragDy.value }],
@@ -433,422 +1078,111 @@ export default function MyPersonasScreen() {
     shadowRadius: 12,
   }));
 
-  const handleTabRowLayout = useCallback(
-    (width: number) => {
-      tabRowWidth.value = width;
-      tabIndicator.value = tab === "personas" ? 0 : width / 2;
-      translateX.value = tab === "personas" ? 0 : -width;
-    },
-    [tab, tabIndicator, translateX, tabRowWidth],
-  );
-
-  // --- Loading state ---
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Pressable onPress={() => goBack()} style={styles.backBtn}>
-            <Text style={styles.backText}>{"←"}</Text>
-          </Pressable>
-          <Text style={styles.headerTitle}>My Personas</Text>
-          <View style={styles.backBtn} />
-        </View>
-        <ActivityIndicator color={colors.accent} style={styles.loader} />
-      </View>
-    );
-  }
-
-  const mainAvatar = profile?.avatar ? avatarUrl(profile.avatar) : undefined;
-  const mainName =
-    profile?.name || user?.user_metadata?.email || user?.email || "User";
-
-  // --- Main render ---
-
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Pressable onPress={() => goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>{"←"}</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>My Personas</Text>
-        <View style={styles.backBtn} />
-      </View>
-
-      <View
-        style={styles.tabRow}
-        onLayout={(e) => handleTabRowLayout(e.nativeEvent.layout.width)}
-      >
-        <Pressable onPress={() => snapToTab("personas")} style={styles.tab}>
-          <Text
-            style={[styles.tabText, tab === "personas" && styles.tabTextActive]}
-          >
-            Personas
-          </Text>
-        </Pressable>
-        <Pressable onPress={() => snapToTab("groups")} style={styles.tab}>
-          <Text
-            style={[styles.tabText, tab === "groups" && styles.tabTextActive]}
-          >
-            Persona Groups
-          </Text>
-        </Pressable>
-        <Animated.View style={[styles.tabIndicator, indicatorStyle]} />
-      </View>
-
-      <GestureDetector gesture={panGesture}>
-        <View style={styles.content}>
-          <Animated.View
-            style={[
-              styles.contentSliding,
-              { width: screenWidth * 2 },
-              contentTranslateStyle,
-            ]}
-          >
-            <ScrollView
-              style={{ width: screenWidth }}
-              contentContainerStyle={styles.contentInner}
-              scrollEnabled={!drag}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={handleRefresh}
-                  tintColor={colors.accent}
-                />
-              }
-            >
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Main Persona</Text>
-                <View style={styles.mainPersonaCard}>
-                  <Avatar uri={mainAvatar} name={mainName} size={56} />
-                  <View style={styles.mainPersonaInfo}>
-                    <Text style={styles.mainPersonaName}>{mainName}</Text>
-                    <Text
-                      style={styles.mainPersonaAppearance}
-                      numberOfLines={2}
-                    >
-                      {profile?.profile || "No appearance set"}
-                    </Text>
-                  </View>
-                  <Pressable
-                    onPress={openEditMain}
-                    style={({ pressed }) => [
-                      styles.editBtn,
-                      pressed && { opacity: 0.7 },
-                    ]}
-                  >
-                    <Text style={styles.editBtnText}>Edit</Text>
-                  </Pressable>
-                </View>
-              </View>
-
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Personas</Text>
-                {personas.length === 0 ? (
-                  <View style={styles.emptyCard}>
-                    <Text style={styles.emptyText}>No personas yet</Text>
-                    <Text style={styles.emptySubtext}>
-                      Create additional personas to use in chats
-                    </Text>
-                  </View>
-                ) : (
-                  personas.map((p, i) => {
-                    const group = getGroupById(p.groupId);
-                    return (
-                      <GestureDetector
-                        key={p.id}
-                        gesture={Gesture.Exclusive(
-                          Gesture.Pan()
-                            .activateAfterLongPress(400)
-                            .onStart(() => {
-                              scheduleOnRN(handleDragStartPersona, i, p);
-                            })
-                            .onUpdate((e) => {
-                              dragDy.value = e.translationY;
-                              const cardH = 88;
-                              dragTargetIdx.value = Math.max(
-                                0,
-                                Math.min(
-                                  personas.length - 1,
-                                  Math.round(i + e.translationY / cardH),
-                                ),
-                              );
-                            })
-                            .onEnd(() => {
-                              scheduleOnRN(handleDragEndPersona, i);
-                            }),
-                          Gesture.Tap().onEnd(() => {
-                            scheduleOnRN(openEditPersona, p);
-                          }),
-                        )}
-                      >
-                        <Animated.View
-                          ref={(ref: View | null) => {
-                            personaCardRefs.current[i] = ref;
-                          }}
-                          style={[
-                            styles.personaCard,
-                            drag?.index === i && {
-                              opacity: 0.3,
-                            },
-                          ]}
-                        >
-                          <Avatar
-                            uri={p.avatar ? avatarUrl(p.avatar) : undefined}
-                            name={p.name}
-                            size={48}
-                          />
-                          <View style={styles.personaCardInfo}>
-                            <View style={styles.personaCardNameRow}>
-                              <Text style={styles.personaCardName}>
-                                {p.name}
-                              </Text>
-                              {p.pronouns && (
-                                <View style={styles.pronounTag}>
-                                  <Text style={styles.pronounTagText}>
-                                    {pronounLabel(p.pronouns)}
-                                  </Text>
-                                </View>
-                              )}
-                            </View>
-                            <Text
-                              style={styles.personaCardAppearance}
-                              numberOfLines={1}
-                            >
-                              {p.appearance || "No appearance"}
-                            </Text>
-                            {group && (
-                              <View
-                                style={[
-                                  styles.groupChip,
-                                  {
-                                    backgroundColor: `${group.color}33`,
-                                  },
-                                ]}
-                              >
-                                <Text
-                                  style={[
-                                    styles.groupChipText,
-                                    {
-                                      color: group.color,
-                                    },
-                                  ]}
-                                >
-                                  {group.name}
-                                </Text>
-                              </View>
-                            )}
-                          </View>
-                          <View style={styles.dragHandle}>
-                            <Text style={styles.dragHandleText}>
-                              {"☰"}
-                            </Text>
-                          </View>
-                        </Animated.View>
-                      </GestureDetector>
-                    );
-                  })
-                )}
-                <Button
-                  title="Add Persona"
-                  onPress={openCreatePersona}
-                  style={styles.addBtn}
-                />
-              </View>
-            </ScrollView>
-
-            <ScrollView
-              style={{ width: screenWidth }}
-              contentContainerStyle={styles.contentInner}
-              scrollEnabled={!drag}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={handleRefresh}
-                  tintColor={colors.accent}
-                />
-              }
-            >
-              <View style={styles.section}>
-                {personaGroups.length === 0 ? (
-                  <View style={styles.emptyCard}>
-                    <Text style={styles.emptyText}>No groups</Text>
-                    <Text style={styles.emptySubtext}>
-                      Create groups to organize your personas
-                    </Text>
-                  </View>
-                ) : (
-                  personaGroups.map((g, i) => {
-                    const members = getPersonasInGroup(g.id);
-                    return (
-                      <GestureDetector
-                        key={g.id}
-                        gesture={Gesture.Exclusive(
-                          Gesture.Pan()
-                            .activateAfterLongPress(400)
-                            .onStart(() => {
-                              scheduleOnRN(handleDragStartGroup, i, g);
-                            })
-                            .onUpdate((e) => {
-                              dragDy.value = e.translationY;
-                              const rowH = 100;
-                              dragTargetIdx.value = Math.max(
-                                0,
-                                Math.min(
-                                  personaGroups.length - 1,
-                                  Math.round(i + e.translationY / rowH),
-                                ),
-                              );
-                            })
-                            .onEnd(() => {
-                              scheduleOnRN(handleDragEndGroup, i);
-                            }),
-                          Gesture.Tap().onEnd(() => {
-                            scheduleOnRN(openEditGroup, g);
-                          }),
-                        )}
-                      >
-                        <Animated.View
-                          ref={(ref: View | null) => {
-                            groupCardRefs.current[i] = ref;
-                          }}
-                          style={[
-                            styles.groupCard,
-                            drag?.index === i &&
-                              drag?.type === "group" && {
-                                opacity: 0.3,
-                              },
-                          ]}
-                        >
-                          <View style={styles.groupCardHeader}>
-                            <View
-                              style={[
-                                styles.groupDot,
-                                {
-                                  backgroundColor: g.color,
-                                },
-                              ]}
-                            />
-                            <Text style={styles.groupCardName}>{g.name}</Text>
-                            <Text style={styles.groupCardCount}>
-                              {members.length} persona
-                              {members.length !== 1 ? "s" : ""}
-                            </Text>
-                            <View style={styles.dragHandle}>
-                              <Text style={styles.dragHandleText}>
-                                {"☰"}
-                              </Text>
-                            </View>
-                          </View>
-                          {g.description ? (
-                            <Text style={styles.groupDesc}>
-                              {g.description}
-                            </Text>
-                          ) : null}
-                          {members.length > 0 && (
-                            <View style={styles.groupMembers}>
-                              {members.map((p) => (
-                                <View key={p.id} style={styles.groupMemberRow}>
-                                  <Avatar
-                                    uri={
-                                      p.avatar ? avatarUrl(p.avatar) : undefined
-                                    }
-                                    name={p.name}
-                                    size={28}
-                                  />
-                                  <Text style={styles.groupMemberName}>
-                                    {p.name}
-                                  </Text>
-                                  {p.pronouns && (
-                                    <View style={styles.pronounTagSmall}>
-                                      <Text style={styles.pronounTagTextSmall}>
-                                        {pronounLabel(p.pronouns)}
-                                      </Text>
-                                    </View>
-                                  )}
-                                </View>
-                              ))}
-                            </View>
-                          )}
-                          {members.length === 0 && (
-                            <Text style={styles.groupEmptyMembers}>
-                              No personas in this group
-                            </Text>
-                          )}
-                        </Animated.View>
-                      </GestureDetector>
-                    );
-                  })
-                )}
-                <Button
-                  title="Create Group"
-                  onPress={openCreateGroup}
-                  style={styles.createGroupBtn}
-                />
-              </View>
-            </ScrollView>
-          </Animated.View>
-        </View>
-      </GestureDetector>
-
-      {drag && (
-        <Animated.View style={dragOverlayStyle}>
-          {drag.type === "persona" ? (
-            <View style={[styles.personaCard, styles.dragCard]}>
-              <Avatar
-                uri={
-                  (drag.item as Persona).avatar
-                    ? avatarUrl((drag.item as Persona).avatar)
-                    : undefined
-                }
-                name={(drag.item as Persona).name}
-                size={48}
-              />
-              <View style={styles.personaCardInfo}>
-                <View style={styles.personaCardNameRow}>
-                  <Text style={styles.personaCardName}>
-                    {(drag.item as Persona).name}
-                  </Text>
-                  {(drag.item as Persona).pronouns && (
-                    <View style={styles.pronounTag}>
-                      <Text style={styles.pronounTagText}>
-                        {pronounLabel((drag.item as Persona).pronouns!)}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.personaCardAppearance} numberOfLines={1}>
-                  {(drag.item as Persona).appearance || "No appearance"}
-                </Text>
-              </View>
-            </View>
-          ) : (
-            <View style={[styles.groupCard, styles.dragCard]}>
-              <View
-                style={[
-                  styles.groupDot,
-                  {
-                    backgroundColor: (drag.item as PersonaGroup).color,
-                  },
-                ]}
-              />
-              <Text style={styles.groupCardName}>
-                {(drag.item as PersonaGroup).name}
+    <Animated.View style={dragOverlayStyle}>
+      {drag.type === "persona" ? (
+        <View style={[styles.personaCard, styles.dragCard]}>
+          <Avatar
+            uri={
+              (drag.item as Persona).avatar
+                ? avatarUrl((drag.item as Persona).avatar)
+                : undefined
+            }
+            name={(drag.item as Persona).name}
+            size={48}
+          />
+          <View style={styles.personaCardInfo}>
+            <View style={styles.personaCardNameRow}>
+              <Text style={styles.personaCardName}>
+                {(drag.item as Persona).name}
               </Text>
+              {(drag.item as Persona).pronouns && (
+                <View style={styles.pronounTag}>
+                  <Text style={styles.pronounTagText}>
+                    {pronounLabel((drag.item as Persona).pronouns!)}
+                  </Text>
+                </View>
+              )}
             </View>
-          )}
-        </Animated.View>
+            <Text style={styles.personaCardAppearance} numberOfLines={1}>
+              {(drag.item as Persona).appearance || "No appearance"}
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <View style={[styles.groupCard, styles.dragCard]}>
+          <View
+            style={[
+              styles.groupDot,
+              { backgroundColor: (drag.item as PersonaGroup).color },
+            ]}
+          />
+          <Text style={styles.groupCardName}>
+            {(drag.item as PersonaGroup).name}
+          </Text>
+        </View>
       )}
+    </Animated.View>
+  );
+});
 
+const SheetsAndAlerts = memo(function SheetsAndAlerts({
+  editModalVisible,
+  sheetMode,
+  editingPersona,
+  sheetSession,
+  profile,
+  personaGroups,
+  deleteAlertVisible,
+  onPersonaSheetClose,
+  onPersonaSaved,
+  onPersonaDeleteRequested,
+  onDeletePersona,
+  onCancelDeletePersona,
+  groupModalVisible,
+  editingGroup,
+  groupSheetSession,
+  deleteGroupAlert,
+  onGroupSheetClose,
+  onGroupSaved,
+  onGroupDeleteRequested,
+  onDeleteGroup,
+  onCancelDeleteGroup,
+}: {
+  editModalVisible: boolean;
+  sheetMode: "create" | "edit" | "editMain";
+  editingPersona: Persona | undefined;
+  sheetSession: number;
+  profile: UserProfile | null;
+  personaGroups: PersonaGroup[];
+  deleteAlertVisible: boolean;
+  onPersonaSheetClose: () => void;
+  onPersonaSaved: () => void;
+  onPersonaDeleteRequested: (personaId: string) => void;
+  onDeletePersona: () => void;
+  onCancelDeletePersona: () => void;
+  groupModalVisible: boolean;
+  editingGroup: PersonaGroup | undefined;
+  groupSheetSession: number;
+  deleteGroupAlert: boolean;
+  onGroupSheetClose: () => void;
+  onGroupSaved: () => void;
+  onGroupDeleteRequested: (groupId: string) => void;
+  onDeleteGroup: () => void;
+  onCancelDeleteGroup: () => void;
+}) {
+  return (
+    <>
       <PersonaSheet
+        key={`${sheetSession}-${sheetMode}-${editingPersona?.id ?? ""}`}
         visible={editModalVisible}
         mode={sheetMode}
         persona={editingPersona}
         profile={profile}
         personaGroups={personaGroups}
-        onClose={handlePersonaSheetClose}
-        onSaved={handlePersonaSaved}
-        onDeleteRequested={handlePersonaDeleteRequested}
+        onClose={onPersonaSheetClose}
+        onSaved={onPersonaSaved}
+        onDeleteRequested={onPersonaDeleteRequested}
       />
 
       <CustomAlert
@@ -859,23 +1193,24 @@ export default function MyPersonasScreen() {
           {
             text: "Delete",
             style: "destructive",
-            onPress: handleDelete,
+            onPress: onDeletePersona,
           },
           {
             text: "Cancel",
             style: "cancel",
-            onPress: () => setDeleteAlertVisible(false),
+            onPress: onCancelDeletePersona,
           },
         ]}
-        onDismiss={() => setDeleteAlertVisible(false)}
+        onDismiss={onCancelDeletePersona}
       />
 
       <PersonaGroupSheet
+        key={`${groupSheetSession}-${editingGroup?.id ?? ""}`}
         visible={groupModalVisible}
         group={editingGroup}
-        onClose={handleGroupSheetClose}
-        onSaved={handleGroupSaved}
-        onDeleteRequested={handleGroupDeleteRequested}
+        onClose={onGroupSheetClose}
+        onSaved={onGroupSaved}
+        onDeleteRequested={onGroupDeleteRequested}
       />
 
       <CustomAlert
@@ -886,19 +1221,19 @@ export default function MyPersonasScreen() {
           {
             text: "Delete",
             style: "destructive",
-            onPress: handleDeleteGroup,
+            onPress: onDeleteGroup,
           },
           {
             text: "Cancel",
             style: "cancel",
-            onPress: () => setDeleteGroupAlert(false),
+            onPress: onCancelDeleteGroup,
           },
         ]}
-        onDismiss={() => setDeleteGroupAlert(false)}
+        onDismiss={onCancelDeleteGroup}
       />
-    </View>
+    </>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },

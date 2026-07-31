@@ -10,12 +10,14 @@ import {
   ScrollView,
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
+import type { ListRenderItem } from "@shopify/flash-list";
 import { Search } from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useShallow } from "zustand/react/shallow";
 import Avatar from "../../components/common/Avatar";
 import { useChatStore } from "../../stores/chatStore";
+import { useAlert } from "../../hooks/useAlert";
 import { withChallengeRetry } from "../../hooks/useChat";
 import { useTurnstile } from "../../components/turnstile/TurnstileProvider";
 import { botAvatarUrl } from "../../utils/assets";
@@ -24,9 +26,7 @@ import type { ChatListItem } from "../../types/api";
 import type { ChatsStackParamList } from "../../navigation/types";
 import ChatEntryActions from "../../components/chat/ChatEntryActions";
 import PersonaPicker from "../../components/chat/PersonaPicker";
-import CustomAlert, {
-  type AlertButton,
-} from "../../components/common/CustomAlert";
+import CustomAlert from "../../components/common/CustomAlert";
 import CustomBottomSheet from "../../components/common/CustomBottomSheet";
 import {
   getCharacterChats,
@@ -40,7 +40,6 @@ type Nav = NativeStackNavigationProp<ChatsStackParamList, "ChatList">;
 
 export default function ChatListScreen() {
   const { navigate } = useNavigation<Nav>();
-
   const { chats, isLoadingChats, error, hasMoreChats, chatsPage } =
     useChatStore(
       useShallow((s) => ({
@@ -51,12 +50,9 @@ export default function ChatListScreen() {
         chatsPage: s.chatsPage,
       })),
     );
-
   const storeCreateChat = useChatStore((s) => s.createChat);
   const storeRemoveChat = useChatStore((s) => s.removeChat);
-
   const { showChallenge, showTurnstile } = useTurnstile();
-
   const loadChatsStore = useChatStore((s) => s.loadChats);
 
   const loadChats = useCallback(
@@ -69,7 +65,6 @@ export default function ChatListScreen() {
     },
     [loadChatsStore, showChallenge, showTurnstile],
   );
-
   const startNewChat = useCallback(
     async (characterId: string, personaId?: string) => {
       return await withChallengeRetry(
@@ -80,7 +75,6 @@ export default function ChatListScreen() {
     },
     [storeCreateChat, showChallenge, showTurnstile],
   );
-
   const deleteChat = useCallback(
     async (chatId: number) => {
       await withChallengeRetry(
@@ -99,26 +93,18 @@ export default function ChatListScreen() {
     loadedRef.current = true;
     loadChats(1);
   }, [loadChats]);
-
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-
   const [targetChat, setTargetChat] = useState<ChatListItem | null>(null);
   const [actionsVisible, setActionsVisible] = useState(false);
   const [personaPickerVisible, setPersonaPickerVisible] = useState(false);
-
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [alertTitle, setAlertTitle] = useState("");
-  const [alertMessage, setAlertMessage] = useState("");
-  const [alertButtons, setAlertButtons] = useState<AlertButton[]>([]);
-
+  const { alert, showAlert, dismissAlert } = useAlert();
   const [characterChats, setCharacterChats] = useState<ChatListItem[]>([]);
   const [characterChatsVisible, setCharacterChatsVisible] = useState(false);
   const [characterChatsLoading, setCharacterChatsLoading] = useState(false);
   const [characterChatsName, setCharacterChatsName] = useState("");
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewUri, setPreviewUri] = useState("");
-  const [previewName, setPreviewName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredChats = useMemo(
@@ -135,22 +121,25 @@ export default function ChatListScreen() {
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    await loadChats(1);
-    setIsRefreshing(false);
+    try {
+      await loadChats(1);
+    } finally {
+      setIsRefreshing(false);
+    }
   }, [loadChats]);
-
   const handleLoadMore = useCallback(async () => {
     if (!hasMoreChats || isLoadingMore || isLoadingChats) return;
     setIsLoadingMore(true);
-    await loadChats(chatsPage + 1);
-    setIsLoadingMore(false);
+    try {
+      await loadChats(chatsPage + 1);
+    } finally {
+      setIsLoadingMore(false);
+    }
   }, [hasMoreChats, isLoadingMore, isLoadingChats, chatsPage, loadChats]);
-
   const handleLongPress = useCallback((item: ChatListItem) => {
     setTargetChat(item);
     setActionsVisible(true);
   }, []);
-
   const handleViewCharacter = useCallback(() => {
     if (!targetChat) return;
     navigate("ChatCharacter", {
@@ -158,7 +147,6 @@ export default function ChatListScreen() {
       characterName: targetChat.character.name || "Character",
     });
   }, [targetChat, navigate]);
-
   const handleViewCreator = useCallback(() => {
     if (!targetChat?.character.creator_id) return;
     navigate("CreatorScreen", {
@@ -166,13 +154,11 @@ export default function ChatListScreen() {
       userName: targetChat.character.creator_name || "Creator",
     });
   }, [targetChat, navigate]);
-
   const handleNewChat = useCallback(() => {
     if (!targetChat) return;
     setActionsVisible(false);
     setPersonaPickerVisible(true);
   }, [targetChat]);
-
   const handlePersonaSelect = useCallback(
     async (persona: { id: string; name: string; avatar: string } | null) => {
       if (!targetChat) return;
@@ -187,7 +173,6 @@ export default function ChatListScreen() {
     },
     [targetChat, startNewChat, navigate],
   );
-
   const handleAllChats = useCallback(async () => {
     if (!targetChat) return;
     setCharacterChatsName(targetChat.character.name || "Character");
@@ -201,83 +186,52 @@ export default function ChatListScreen() {
       setCharacterChatsLoading(false);
     }
   }, [targetChat]);
-
   const handleDelete = useCallback(() => {
     if (!targetChat) return;
     setActionsVisible(false);
-    setAlertTitle("Delete Chat");
-    setAlertMessage(
+    showAlert(
+      "Delete Chat",
       `Delete "${targetChat.character.name}"? This cannot be undone.`,
-    );
-    setAlertButtons([
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          setAlertVisible(false);
-          try {
-            await deleteChat(targetChat.id);
-          } catch {}
+      [
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            dismissAlert();
+            try {
+              await deleteChat(targetChat.id);
+            } catch {}
+          },
         },
-      },
-      {
-        text: "Cancel",
-        style: "cancel",
-        onPress: () => setAlertVisible(false),
-      },
-    ]);
-    setAlertVisible(true);
-  }, [targetChat, deleteChat]);
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: dismissAlert,
+        },
+      ],
+    );
+  }, [targetChat, deleteChat, showAlert, dismissAlert]);
 
-  const renderItem = useCallback(
-    ({ item }: { item: ChatListItem }) => (
-      <Pressable
-        style={({ pressed }) => [styles.chatItem, pressed && { opacity: 0.7 }]}
-        onPress={() =>
-          navigate("ChatScreen", {
-            chatId: item.id,
-            characterName: item.character.name || "Chat",
-            characterId: item.character_id,
-          })
-        }
-        onLongPress={() => handleLongPress(item)}
-      >
-        <Avatar
-          uri={botAvatarUrl(item.character.avatar)}
-          name={item.character.name}
-          size={52}
-          onPress={() => {
-            setPreviewUri(botAvatarUrl(item.character.avatar));
-            setPreviewName(item.character.name);
-            setPreviewVisible(true);
-          }}
-        />
-        <View style={styles.chatInfo}>
-          <View style={styles.chatTopRow}>
-            <Text style={styles.chatName} numberOfLines={1}>
-              {item.character.name || "Unnamed"}
-            </Text>
-            <Text style={styles.chatTime}>
-              {formatRelativeTime(item.updated_at)}
-            </Text>
-          </View>
-          <Text style={styles.chatSummary} numberOfLines={2}>
-            {item.summary && item.summary.length > 0
-              ? item.summary
-              : item.character.description
-                ? stripHtml(item.character.description)
-                : "No messages yet"}
-          </Text>
-          <Text style={styles.chatCount}>{item.chat_count} messages</Text>
-        </View>
-      </Pressable>
-    ),
-    [navigate, handleLongPress],
+  const openChat = useCallback(
+    (item: ChatListItem) => {
+      navigate("ChatScreen", {
+        chatId: item.id,
+        characterName: item.character.name || "Chat",
+        characterId: item.character_id,
+      });
+    },
+    [navigate],
   );
-
-  const keyExtractor = useCallback(
-    (item: ChatListItem) => item.id.toString(),
-    [],
+  const openAvatarPreview = useCallback((item: ChatListItem) => {
+    setPreviewUri(botAvatarUrl(item.character.avatar));
+    setPreviewVisible(true);
+  }, []);
+  const openCharChat = useCallback(
+    (item: ChatListItem) => {
+      setCharacterChatsVisible(false);
+      openChat(item);
+    },
+    [openChat],
   );
 
   const handleActionsClose = useCallback(() => setActionsVisible(false), []);
@@ -289,108 +243,38 @@ export default function ChatListScreen() {
     () => setCharacterChatsVisible(false),
     [],
   );
-  const handleAlertDismiss = useCallback(() => setAlertVisible(false), []);
   const handleCharChatsBack = useCallback(() => {
     setCharacterChatsVisible(false);
     setActionsVisible(true);
   }, []);
+  const handlePreviewClose = useCallback(() => setPreviewVisible(false), []);
 
-  if (isLoadingChats && chats.length === 0) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Chats</Text>
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.accent} />
-        </View>
-      </View>
-    );
-  }
+  const retryLoad = useCallback(() => loadChats(1), [loadChats]);
 
-  if (error && chats.length === 0) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Chats</Text>
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>{error}</Text>
-          <Pressable
-            onPress={() => loadChats(1)}
-            style={({ pressed }) => [
-              styles.retryBtn,
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <Text style={styles.retryText}>Retry</Text>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
+  if (isLoadingChats && chats.length === 0) return <ChatListLoading />;
+  if (error && chats.length === 0) return <ChatListError message={error} onRetry={retryLoad} />;
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Chats</Text>
+      <ChatListHeader />
       {chats.length > 0 && (
-        <View style={styles.searchRow}>
-          <Search size={16} color={colors.textDim} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search conversations..."
-            placeholderTextColor={colors.textDim}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
-          {searchQuery.length > 0 && (
-            <Pressable onPress={() => setSearchQuery("")}>
-              <Text style={styles.clearBtn}>Clear</Text>
-            </Pressable>
-          )}
-        </View>
+        <SearchBar query={searchQuery} onQueryChange={setSearchQuery} />
       )}
       {chats.length === 0 ? (
-        <ScrollView
-          contentContainerStyle={[styles.centered, { flexGrow: 1 }]}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={handleRefresh}
-              tintColor={colors.accent}
-            />
-          }
-        >
-          <Text style={styles.emptyText}>No chats yet</Text>
-          <Text style={styles.emptySubtext}>
-            Start a chat from the Discover tab
-          </Text>
-        </ScrollView>
+        <ChatListEmptyState
+          isRefreshing={isRefreshing}
+          onRefresh={handleRefresh}
+        />
       ) : (
-        <FlashList
+        <ChatsList
           data={filteredChats}
-          renderItem={renderItem}
-          keyExtractor={keyExtractor}
+          onOpenItem={openChat}
+          onLongPressItem={handleLongPress}
+          onAvatarPressItem={openAvatarPreview}
           onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.2}
-          style={styles.flashlist}
-          drawDistance={2000}
-          overrideProps={{ initialDrawBatchSize: 50 }}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={handleRefresh}
-              tintColor={colors.accent}
-            />
-          }
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          ListFooterComponent={
-            isLoadingMore ? (
-              <ActivityIndicator
-                style={styles.footerLoader}
-                color={colors.accent}
-              />
-            ) : null
-          }
+          isRefreshing={isRefreshing}
+          onRefresh={handleRefresh}
+          isLoadingMore={isLoadingMore}
         />
       )}
 
@@ -415,83 +299,327 @@ export default function ChatListScreen() {
       />
 
       <CustomAlert
-        visible={alertVisible}
-        title={alertTitle}
-        message={alertMessage}
-        buttons={alertButtons}
-        onDismiss={handleAlertDismiss}
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        buttons={alert.buttons}
+        onDismiss={dismissAlert}
       />
 
       <CustomBottomSheet
         visible={characterChatsVisible}
         onClose={handleAllChatsClose}
       >
-        <View style={styles.charChatsContent}>
-          <View style={styles.charChatsTitleRow}>
-            <Pressable
-              onPress={handleCharChatsBack}
-              style={styles.charChatsBackBtn}
-            >
-              <Text style={styles.charChatsBackText}>{"\u2190"}</Text>
-            </Pressable>
-            <Text style={styles.charChatsTitle}>{characterChatsName}</Text>
-            <View style={styles.charChatsBackBtn} />
-          </View>
-          {characterChatsLoading ? (
-            <ActivityIndicator
-              color={colors.accent}
-              style={{ paddingVertical: 24 }}
-            />
-          ) : characterChats.length === 0 ? (
-            <Text style={styles.charChatsEmpty}>
-              No other chats with this character
-            </Text>
-          ) : (
-            <ScrollView style={styles.charChatsList}>
-              {characterChats.map((chat) => (
-                <Pressable
-                  key={chat.id}
-                  style={({ pressed }) => [
-                    styles.charChatRow,
-                    pressed && { opacity: 0.7 },
-                  ]}
-                  onPress={() => {
-                    setCharacterChatsVisible(false);
-                    navigate("ChatScreen", {
-                      chatId: chat.id,
-                      characterName: chat.character.name || "Chat",
-                      characterId: chat.character_id,
-                    });
-                  }}
-                >
-                  <Avatar
-                    uri={botAvatarUrl(chat.character.avatar)}
-                    name={chat.character.name}
-                    size={36}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.charChatRowName} numberOfLines={1}>
-                      {chat.character.name}
-                    </Text>
-                    <Text style={styles.charChatRowMeta}>
-                      {chat.chat_count} messages
-                    </Text>
-                  </View>
-                </Pressable>
-              ))}
-            </ScrollView>
-          )}
-        </View>
+        <CharacterChatsSheet
+          name={characterChatsName}
+          loading={characterChatsLoading}
+          chats={characterChats}
+          onOpenItem={openCharChat}
+          onBack={handleCharChatsBack}
+        />
       </CustomBottomSheet>
 
       <AvatarPreview
         visible={previewVisible}
         uri={previewUri}
-        onClose={() => setPreviewVisible(false)}
+        onClose={handlePreviewClose}
       />
     </View>
   );
 }
+
+const ChatListHeader = React.memo(function ChatListHeader() {
+  return <Text style={styles.title}>Chats</Text>;
+});
+
+const ChatListLoading = React.memo(function ChatListLoading() {
+  return (
+    <View style={styles.container}>
+      <ChatListHeader />
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={colors.accent} />
+      </View>
+    </View>
+  );
+});
+
+const ChatListError = React.memo(function ChatListError({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <View style={styles.container}>
+      <ChatListHeader />
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>{message}</Text>
+        <Pressable
+          onPress={onRetry}
+          style={({ pressed }) => [
+            styles.retryBtn,
+            pressed && { opacity: 0.7 },
+          ]}
+        >
+          <Text style={styles.retryText}>Retry</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+});
+
+const SearchBar = React.memo(function SearchBar({
+  query,
+  onQueryChange,
+}: {
+  query: string;
+  onQueryChange: (text: string) => void;
+}) {
+  return (
+    <View style={styles.searchRow}>
+      <Search size={16} color={colors.textDim} />
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Search conversations..."
+        placeholderTextColor={colors.textDim}
+        value={query}
+        onChangeText={onQueryChange}
+        autoCorrect={false}
+        autoCapitalize="none"
+      />
+      {query.length > 0 && (
+        <Pressable onPress={() => onQueryChange("")}>
+          <Text style={styles.clearBtn}>Clear</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+});
+
+const ChatListEmptyState = React.memo(function ChatListEmptyState({
+  isRefreshing,
+  onRefresh,
+}: {
+  isRefreshing: boolean;
+  onRefresh: () => void;
+}) {
+  return (
+    <ScrollView
+      contentContainerStyle={[styles.centered, { flexGrow: 1 }]}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.accent}
+        />
+      }
+    >
+      <Text style={styles.emptyText}>No chats yet</Text>
+      <Text style={styles.emptySubtext}>
+        Start a chat from the Discover tab
+      </Text>
+    </ScrollView>
+  );
+});
+
+const ChatListItemRow = React.memo(function ChatListItemRow({
+  item,
+  onPress,
+  onLongPress,
+  onAvatarPress,
+}: {
+  item: ChatListItem;
+  onPress: (item: ChatListItem) => void;
+  onLongPress: (item: ChatListItem) => void;
+  onAvatarPress: (item: ChatListItem) => void;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.chatItem, pressed && { opacity: 0.7 }]}
+      onPress={() => onPress(item)}
+      onLongPress={() => onLongPress(item)}
+    >
+      <Avatar
+        uri={botAvatarUrl(item.character.avatar)}
+        name={item.character.name}
+        size={52}
+        onPress={() => onAvatarPress(item)}
+      />
+      <View style={styles.chatInfo}>
+        <View style={styles.chatTopRow}>
+          <Text style={styles.chatName} numberOfLines={1}>
+            {item.character.name || "Unnamed"}
+          </Text>
+          <Text style={styles.chatTime}>
+            {formatRelativeTime(item.updated_at)}
+          </Text>
+        </View>
+        <Text style={styles.chatSummary} numberOfLines={2}>
+          {item.summary && item.summary.length > 0
+            ? item.summary
+            : item.character.description
+              ? stripHtml(item.character.description)
+              : "No messages yet"}
+        </Text>
+        <Text style={styles.chatCount}>{item.chat_count} messages</Text>
+      </View>
+    </Pressable>
+  );
+});
+
+const CharChatRow = React.memo(function CharChatRow({
+  item,
+  onOpen,
+}: {
+  item: ChatListItem;
+  onOpen: (item: ChatListItem) => void;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.charChatRow,
+        pressed && { opacity: 0.7 },
+      ]}
+      onPress={() => onOpen(item)}
+    >
+      <Avatar
+        uri={botAvatarUrl(item.character.avatar)}
+        name={item.character.name}
+        size={36}
+      />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.charChatRowName} numberOfLines={1}>
+          {item.character.name}
+        </Text>
+        <Text style={styles.charChatRowMeta}>{item.chat_count} messages</Text>
+      </View>
+    </Pressable>
+  );
+});
+
+const ChatsList = React.memo(function ChatsList({
+  data,
+  onOpenItem,
+  onLongPressItem,
+  onAvatarPressItem,
+  onEndReached,
+  isRefreshing,
+  onRefresh,
+  isLoadingMore,
+}: {
+  data: ChatListItem[];
+  onOpenItem: (item: ChatListItem) => void;
+  onLongPressItem: (item: ChatListItem) => void;
+  onAvatarPressItem: (item: ChatListItem) => void;
+  onEndReached: () => void;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+  isLoadingMore: boolean;
+}) {
+  const renderItem = useCallback(
+    ({ item }: { item: ChatListItem }) => (
+      <ChatListItemRow
+        item={item}
+        onPress={onOpenItem}
+        onLongPress={onLongPressItem}
+        onAvatarPress={onAvatarPressItem}
+      />
+    ),
+    [onOpenItem, onLongPressItem, onAvatarPressItem],
+  );
+
+  const keyExtractor = useCallback(
+    (item: ChatListItem) => item.id.toString(),
+    [],
+  );
+
+  return (
+    <FlashList
+      data={data}
+      renderItem={renderItem}
+      keyExtractor={keyExtractor}
+      onEndReached={onEndReached}
+      onEndReachedThreshold={0.2}
+      style={styles.flashlist}
+      drawDistance={2000}
+      overrideProps={{ initialDrawBatchSize: 50 }}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.accent}
+        />
+      }
+      contentContainerStyle={styles.list}
+      showsVerticalScrollIndicator={false}
+      ListFooterComponent={
+        isLoadingMore ? (
+          <ActivityIndicator
+            style={styles.footerLoader}
+            color={colors.accent}
+          />
+        ) : null
+      }
+    />
+  );
+});
+
+const CharacterChatsSheet = React.memo(function CharacterChatsSheet({
+  name,
+  loading,
+  chats,
+  onOpenItem,
+  onBack,
+}: {
+  name: string;
+  loading: boolean;
+  chats: ChatListItem[];
+  onOpenItem: (item: ChatListItem) => void;
+  onBack: () => void;
+}) {
+  const renderItem = useCallback(
+    ({ item }: { item: ChatListItem }) => (
+      <CharChatRow item={item} onOpen={onOpenItem} />
+    ),
+    [onOpenItem],
+  );
+
+  const keyExtractor = useCallback(
+    (item: ChatListItem) => item.id.toString(),
+    [],
+  );
+
+  return (
+    <View style={styles.charChatsContent}>
+      <View style={styles.charChatsTitleRow}>
+        <Pressable onPress={onBack} style={styles.charChatsBackBtn}>
+          <Text style={styles.charChatsBackText}>{"\u2190"}</Text>
+        </Pressable>
+        <Text style={styles.charChatsTitle}>{name}</Text>
+        <View style={styles.charChatsBackBtn} />
+      </View>
+      {loading ? (
+        <ActivityIndicator
+          color={colors.accent}
+          style={{ paddingVertical: 24 }}
+        />
+      ) : chats.length === 0 ? (
+        <Text style={styles.charChatsEmpty}>
+          No other chats with this character
+        </Text>
+      ) : (
+        <FlashList
+          data={chats}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          style={styles.charChatsList}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+    </View>
+  );
+});
 
 const styles = StyleSheet.create({
   container: {

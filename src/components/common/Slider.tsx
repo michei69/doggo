@@ -1,11 +1,11 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  PanResponder,
   type LayoutChangeEvent,
 } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { colors } from "../../utils/colors";
 
 export default function Slider({
@@ -41,16 +41,21 @@ export default function Slider({
     return Math.max(0, Math.min(1, dx / trackLayout.current.width));
   }, []);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e) =>
-        onValueChange(snap(getRatio(e.nativeEvent.pageX))),
-      onPanResponderMove: (e) =>
-        onValueChange(snap(getRatio(e.nativeEvent.pageX))),
-    }),
-  ).current;
+  const setFromPageX = useCallback(
+    (pageX: number) => {
+      onValueChange(snap(getRatio(pageX)));
+    },
+    [onValueChange, snap, getRatio],
+  );
+
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .minDistance(0)
+        .onBegin((e) => setFromPageX(e.absoluteX))
+        .onUpdate((e) => setFromPageX(e.absoluteX)),
+    [setFromPageX],
+  );
 
   const handleLayout = useCallback((e: LayoutChangeEvent) => {
     e.target.measure((_x, _y, width, _h, pageX) => {
@@ -70,20 +75,18 @@ export default function Slider({
         </View>
       </View>
       <View style={styles.trackOuter}>
-        <View
-          style={styles.track}
-          onLayout={handleLayout}
-          {...panResponder.panHandlers}
-        >
-          <View
-            style={[styles.trackFill, { width: `${percent}%` }]}
-            pointerEvents="none"
-          />
-          <View
-            style={[styles.thumb, { left: `${percent}%` }]}
-            pointerEvents="none"
-          />
-        </View>
+        <GestureDetector gesture={panGesture}>
+          <View style={styles.track} onLayout={handleLayout}>
+            <View
+              style={[styles.trackFill, { width: `${percent}%` }]}
+              pointerEvents="none"
+            />
+            <View
+              style={[styles.thumb, { left: `${percent}%` }]}
+              pointerEvents="none"
+            />
+          </View>
+        </GestureDetector>
       </View>
     </View>
   );
@@ -139,10 +142,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     marginLeft: -11,
     top: -8,
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 4,
+    boxShadow: "0 2px 3px rgba(0, 0, 0, 0.3)",
   },
 });

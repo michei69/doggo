@@ -22,40 +22,7 @@ import { useChatStore } from "../../stores/chatStore";
 import { scheduleOnRN } from "react-native-worklets";
 import { setMessageMainState } from "../../api/chats";
 
-export interface MessageGroup {
-  messages: ChatMessage[];
-  isBot: boolean;
-  key: string;
-}
-
-export function groupMessages(messages: ChatMessage[]): MessageGroup[] {
-  const groups: MessageGroup[] = [];
-  let i = 0;
-  while (i < messages.length) {
-    const current = messages[i];
-    if (current.is_bot) {
-      const variants: ChatMessage[] = [current];
-      i++;
-      while (i < messages.length && messages[i].is_bot) {
-        variants.push(messages[i]);
-        i++;
-      }
-      groups.push({
-        messages: variants,
-        isBot: true,
-        key: variants.map((m) => String(m.id ?? "")).join("-"),
-      });
-    } else {
-      groups.push({
-        messages: [current],
-        isBot: false,
-        key: String(current.id ?? `msg-${i}`),
-      });
-      i++;
-    }
-  }
-  return groups;
-}
+import { groupMessages, type MessageGroup } from "../../utils/messages";
 
 const MessageGroupRenderer = React.memo(
   function MessageGroupRenderer({
@@ -117,15 +84,18 @@ const MessageGroupRenderer = React.memo(
       group.messages[safeIdx] ?? group.messages[variantCount - 1];
 
     const onRerollRef = useRef(onReroll);
-    onRerollRef.current = onReroll;
     const safeIdxRef = useRef(safeIdx);
-    safeIdxRef.current = safeIdx;
     const variantCountRef = useRef(variantCount);
-    variantCountRef.current = variantCount;
     const groupRef = useRef(group);
-    groupRef.current = group;
     const chatIdRef = useRef(chatId);
-    chatIdRef.current = chatId;
+
+    useEffect(() => {
+      onRerollRef.current = onReroll;
+      safeIdxRef.current = safeIdx;
+      variantCountRef.current = variantCount;
+      groupRef.current = group;
+      chatIdRef.current = chatId;
+    });
 
     const syncVariantToServer = useCallback((newIdx: number) => {
       const g = groupRef.current;
@@ -259,7 +229,7 @@ const MessageGroupRenderer = React.memo(
                     onPress={isLastVariant ? () => onReroll?.() : goNext}
                     style={styles.variantBtn}
                   >
-                    <Text style={[styles.variantBtnText]}>{"\u2192"}</Text>
+                    <Text style={styles.variantBtnText}>{"\u2192"}</Text>
                   </Pressable>
                 </>
               )}

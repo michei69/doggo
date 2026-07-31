@@ -46,9 +46,8 @@ import type {
 import type { CharactersStackParamList } from "../../navigation/types";
 import FilterModal, {
   type FilterModalHandle,
-  type FilterState,
-  INITIAL_FILTERS,
 } from "../../components/discover/FilterModal";
+import { type FilterState, INITIAL_FILTERS } from "../../utils/discover";
 import AdvancedSearchModal from "../../components/discover/AdvancedSearchModal";
 import { BadgeCheck, CirclePlus, Search, SlidersHorizontal } from "lucide-react-native";
 
@@ -102,6 +101,416 @@ function listReducer(state: ListState, action: ListAction): ListState {
   }
 }
 
+const ProfileSection = React.memo(function ProfileSection({
+  profile,
+  isTablet,
+  aboutExpanded,
+  onToggleAbout,
+  onAvatarPress,
+  followerCount,
+  characterCount,
+  isOwnProfile,
+  isFollowing,
+  followingLoading,
+  userId,
+  setIsFollowing,
+  setFollowerCount,
+  setFollowingLoading,
+}: {
+  profile: UserProfile;
+  isTablet: boolean;
+  aboutExpanded: boolean;
+  onToggleAbout: () => void;
+  onAvatarPress: () => void;
+  followerCount: number;
+  characterCount: number;
+  isOwnProfile: boolean;
+  isFollowing: boolean;
+  followingLoading: boolean;
+  userId: string;
+  setIsFollowing: React.Dispatch<React.SetStateAction<boolean>>;
+  setFollowerCount: React.Dispatch<React.SetStateAction<number>>;
+  setFollowingLoading: React.Dispatch<React.SetStateAction<boolean>>;
+}) {
+  const handleToggleFollow = useCallback(async () => {
+    if (followingLoading) return;
+    setFollowingLoading(true);
+    try {
+      if (isFollowing) {
+        await unfollowUser(userId);
+        setIsFollowing(false);
+        setFollowerCount((c) => Math.max(0, c - 1));
+      } else {
+        await followUser(userId);
+        setIsFollowing(true);
+        setFollowerCount((c) => c + 1);
+      }
+    } catch {
+      Alert.alert("Error", "Failed to update follow status");
+    } finally {
+      setFollowingLoading(false);
+    }
+  }, [userId, isFollowing, followingLoading, setIsFollowing, setFollowerCount, setFollowingLoading]);
+
+  return (
+    <View style={[styles.profileSection, isTablet && { paddingTop: 0 }]}>
+      <Pressable onPress={onAvatarPress}>
+        <Avatar
+          uri={profile.avatar ? avatarUrl(profile.avatar) : undefined}
+          name={profile.name}
+          size={80}
+        />
+      </Pressable>
+      <Text style={styles.profileName}>{profile.name || `@${profile.user_name}`}</Text>
+      {profile.user_name ? (
+        <Text style={styles.profileUsername}>@{profile.user_name}</Text>
+      ) : null}
+      {profile.is_verified && (
+        <View style={styles.verifiedRow}>
+          <BadgeCheck size={14} color={colors.accent} />
+          <Text style={styles.profileVerified}> Verified</Text>
+        </View>
+      )}
+      {profile.subscriber_badge && (
+        <View style={styles.subBadge}>
+          <CirclePlus size={14} color={colors.accent} />
+          <Text style={styles.subBadgeText}> Subscriber</Text>
+        </View>
+      )}
+      {profile.about_me ? (
+        <View style={styles.aboutSection}>
+          <View style={!aboutExpanded && styles.aboutCollapsed}>
+            <Text style={styles.profileAbout}>
+              {stripHtml(profile.about_me)}
+            </Text>
+          </View>
+          <Pressable style={styles.showMoreBtn} onPress={onToggleAbout}>
+            <Text style={styles.showMoreText}>
+              {aboutExpanded ? "Show less" : "Show more"}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {profile.badges && profile.badges.length > 0 && (
+        <View style={styles.badgesRow}>
+          {profile.badges.map((b) => (
+            <View key={b.id} style={styles.badge}>
+              <Avatar uri={assetUrl(b.img)} size={24} />
+              <Text style={styles.badgeTitle}>{b.title}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      <View style={styles.statsRow}>
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{followerCount}</Text>
+          <Text style={styles.statLabel}>Followers</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{characterCount}</Text>
+          <Text style={styles.statLabel}>Characters</Text>
+        </View>
+      </View>
+
+      {!isOwnProfile && (
+        <Pressable
+          onPress={handleToggleFollow}
+          disabled={followingLoading}
+          style={({ pressed }) => [
+            styles.followBtn,
+            isFollowing && styles.followingBtn,
+            pressed && { opacity: 0.7 },
+          ]}
+        >
+          <Text
+            style={[
+              styles.followBtnText,
+              isFollowing && styles.followingBtnText,
+            ]}
+          >
+            {followingLoading
+              ? "..."
+              : isFollowing
+                ? "Following"
+                : "Follow"}
+          </Text>
+        </Pressable>
+      )}
+    </View>
+  );
+});
+
+const FilterRow = React.memo(function FilterRow({
+  onOpenFilters,
+  onOpenAdvanced,
+}: {
+  onOpenFilters: () => void;
+  onOpenAdvanced: () => void;
+}) {
+  return (
+    <View style={styles.filterRow}>
+      <Pressable
+        onPress={onOpenFilters}
+        style={({ pressed }) => [
+          styles.filterBtn,
+          pressed && { opacity: 0.7 },
+        ]}
+      >
+        <SlidersHorizontal size={16} color={colors.accent} />
+        <Text style={styles.filterBtnText}>Filters</Text>
+      </Pressable>
+      <Pressable
+        onPress={onOpenAdvanced}
+        style={({ pressed }) => [
+          styles.filterBtn,
+          pressed && { opacity: 0.7 },
+        ]}
+      >
+        <Search size={16} color={colors.accent} />
+        <Text style={styles.filterBtnText}>Advanced</Text>
+      </Pressable>
+    </View>
+  );
+});
+
+function CharacterList({
+  characters,
+  loading,
+  refreshing,
+  onRefresh,
+  onEndReached,
+  isTablet,
+  profileSection,
+  filterRow,
+  navigate,
+  characterScreenName,
+  onLongPress,
+}: {
+  characters: TrendingCharacter[];
+  loading: boolean;
+  refreshing: boolean;
+  onRefresh: () => void;
+  onEndReached: () => void;
+  isTablet: boolean;
+  profileSection: React.ReactElement;
+  filterRow: React.ReactElement;
+  navigate: (name: string, params?: any) => void;
+  characterScreenName: string;
+  onLongPress: (item: TrendingCharacter) => void;
+}) {
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+
+  const handleToggleHidden = useCallback((characterId: string) => {
+    setHiddenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(characterId)) {
+        next.delete(characterId);
+      } else {
+        next.add(characterId);
+      }
+      return next;
+    });
+  }, []);
+
+  const renderItem = useCallback(
+    ({ item }: { item: TrendingCharacter }) => (
+      <CharacterCard
+        character={item}
+        onPress={() =>
+          navigate(characterScreenName, {
+            characterId: item.id,
+            characterName: item.name,
+          })
+        }
+        onLongPress={() => onLongPress(item)}
+        hidden={hiddenIds.has(item.id)}
+        onToggleHidden={() => handleToggleHidden(item.id)}
+      />
+    ),
+    [navigate, characterScreenName, onLongPress, hiddenIds, handleToggleHidden],
+  );
+
+  return (
+    <FlashList
+      data={characters}
+      renderItem={renderItem}
+      keyExtractor={(item) => item.id}
+      onEndReached={onEndReached}
+      onEndReachedThreshold={0.5}
+      style={styles.flashlist}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.accent}
+        />
+      }
+      contentContainerStyle={styles.listContent}
+      showsVerticalScrollIndicator={false}
+      ListHeaderComponent={
+        isTablet ? filterRow : (
+          <>
+            {profileSection}
+            {filterRow}
+          </>
+        )
+      }
+      ListFooterComponent={
+        loading && characters.length > 0 ? (
+          <ActivityIndicator
+            style={styles.footerLoader}
+            color={colors.accent}
+          />
+        ) : null
+      }
+    />
+  );
+}
+
+const ScreenModals = React.memo(function ScreenModals({
+  navigate,
+  characterScreenName,
+  longPressCharacter,
+  actionsVisible,
+  reportVisible,
+  alertVisible,
+  alertTitle,
+  alertMessage,
+  alertButtons,
+  preview,
+  setPreview,
+  setActionsVisible,
+  setReportVisible,
+  setAlertVisible,
+  setAlertTitle,
+  setAlertMessage,
+  setAlertButtons,
+}: {
+  navigate: (name: string, params?: any) => void;
+  characterScreenName: string;
+  longPressCharacter: TrendingCharacter | null;
+  actionsVisible: boolean;
+  reportVisible: boolean;
+  alertVisible: boolean;
+  alertTitle: string;
+  alertMessage: string;
+  alertButtons: AlertButton[];
+  preview: { uri: string; name: string } | null;
+  setPreview: React.Dispatch<React.SetStateAction<{ uri: string; name: string } | null>>;
+  setActionsVisible: React.Dispatch<React.SetStateAction<boolean>>;
+  setReportVisible: React.Dispatch<React.SetStateAction<boolean>>;
+  setAlertVisible: React.Dispatch<React.SetStateAction<boolean>>;
+  setAlertTitle: React.Dispatch<React.SetStateAction<string>>;
+  setAlertMessage: React.Dispatch<React.SetStateAction<string>>;
+  setAlertButtons: React.Dispatch<React.SetStateAction<AlertButton[]>>;
+}) {
+  const handleViewCharacter = useCallback(() => {
+    if (!longPressCharacter) return;
+    navigate(characterScreenName, {
+      characterId: longPressCharacter.id,
+      characterName: longPressCharacter.name,
+    });
+  }, [longPressCharacter, navigate, characterScreenName]);
+
+  const handleViewCreator = useCallback(() => {
+    if (!longPressCharacter?.creator_id) return;
+    navigate("CreatorScreen", {
+      userId: longPressCharacter.creator_id,
+      userName: longPressCharacter.creator_name || "Creator",
+    });
+  }, [longPressCharacter, navigate]);
+
+  const handleBlockCharacter = useCallback(() => {
+    if (!longPressCharacter) return;
+    setAlertTitle("Block Character");
+    setAlertMessage(
+      `Block "${longPressCharacter.name}"? Hidden characters won't appear in your discover feed.`,
+    );
+    setAlertButtons([
+      {
+        text: "Block",
+        style: "destructive",
+        onPress: async () => {
+          setAlertVisible(false);
+          try {
+            const blocked = await getBlockedContent();
+            if (!blocked.bots.includes(longPressCharacter.id)) {
+              blocked.bots.push(longPressCharacter.id);
+            }
+            await updateBlockedContent(blocked);
+          } catch {}
+        },
+      },
+      { text: "Cancel", style: "cancel", onPress: () => setAlertVisible(false) },
+    ]);
+    setAlertVisible(true);
+  }, [longPressCharacter, setAlertTitle, setAlertMessage, setAlertButtons, setAlertVisible]);
+
+  const handleReportCharacter = useCallback(() => {
+    setActionsVisible(false);
+    setReportVisible(true);
+  }, [setActionsVisible, setReportVisible]);
+
+  const handleActionsClose = useCallback(() => {
+    setActionsVisible(false);
+  }, [setActionsVisible]);
+
+  const handleAlertDismiss = useCallback(() => setAlertVisible(false), [setAlertVisible]);
+
+  const handleCloseReport = useCallback(() => {
+    setReportVisible(false);
+  }, [setReportVisible]);
+
+  return (
+    <>
+      <AvatarPreview
+        visible={preview !== null}
+        uri={preview?.uri ?? ""}
+        onClose={() => setPreview(null)}
+      />
+      <CharacterDiscoverActionsSheet
+        visible={actionsVisible}
+        characterName={longPressCharacter?.name || ""}
+        hasCreator={!!longPressCharacter?.creator_id}
+        onClose={handleActionsClose}
+        onViewCharacter={handleViewCharacter}
+        onViewCreator={handleViewCreator}
+        onBlockCharacter={handleBlockCharacter}
+        onReportCharacter={handleReportCharacter}
+      />
+      <CharacterReportModal
+        visible={reportVisible}
+        characterId={longPressCharacter?.id ?? ""}
+        onClose={handleCloseReport}
+      />
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        buttons={alertButtons}
+        onDismiss={handleAlertDismiss}
+      />
+    </>
+  );
+});
+
+function ProfileState({ loading, error }: { loading: boolean; error: string | null }) {
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={colors.accent} />
+      </View>
+    );
+  }
+  return (
+    <View style={styles.centered}>
+      <Text style={styles.errorText}>{error || "Profile not found"}</Text>
+    </View>
+  );
+}
+
 export default function CreatorScreen() {
   const route = useRoute<Route>();
   const navigation = useNavigation<any>();
@@ -147,7 +556,6 @@ export default function CreatorScreen() {
   const [advancedSearchVisible, setAdvancedSearchVisible] = useState(false);
   const [hideDarkened, setHideDarkened] = useState(false);
 
-  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [longPressCharacter, setLongPressCharacter] = useState<TrendingCharacter | null>(null);
   const [actionsVisible, setActionsVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
@@ -155,26 +563,6 @@ export default function CreatorScreen() {
   const [alertTitle, setAlertTitle] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
   const [alertButtons, setAlertButtons] = useState<AlertButton[]>([]);
-
-  const handleToggleFollow = useCallback(async () => {
-    if (followingLoading) return;
-    setFollowingLoading(true);
-    try {
-      if (isFollowing) {
-        await unfollowUser(userId);
-        setIsFollowing(false);
-        setFollowerCount((c) => Math.max(0, c - 1));
-      } else {
-        await followUser(userId);
-        setIsFollowing(true);
-        setFollowerCount((c) => c + 1);
-      }
-    } catch {
-      Alert.alert("Error", "Failed to update follow status");
-    } finally {
-      setFollowingLoading(false);
-    }
-  }, [userId, isFollowing, followingLoading]);
 
   const [list, dispatch] = useReducer(listReducer, {
     characters: [],
@@ -187,22 +575,27 @@ export default function CreatorScreen() {
   const pageRef = useRef(1);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchProfile = async () => {
       try {
         const [profile, following] = await Promise.all([
           getProfile(userId),
           isOwnProfile ? Promise.resolve([]) : getMyFollowing().catch(() => []),
         ]);
+        if (cancelled) return;
         setProfile(profile);
         setFollowerCount(parseInt(profile.followers_count ?? "0", 10) || 0);
         setIsFollowing(following.some((f) => f.user_id === userId));
       } catch (err: any) {
-        setProfileError(err.message || "Failed to load profile");
+        if (!cancelled) setProfileError(err.message || "Failed to load profile");
       } finally {
-        setProfileLoading(false);
+        if (!cancelled) setProfileLoading(false);
       }
     };
     fetchProfile();
+    return () => {
+      cancelled = true;
+    };
   }, [userId, isOwnProfile]);
 
   const doFetch = useCallback(
@@ -262,18 +655,6 @@ export default function CreatorScreen() {
     doFetch(1, true);
   }, [doFetch]);
 
-  const handleToggleHidden = useCallback((characterId: string) => {
-    setHiddenIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(characterId)) {
-        next.delete(characterId);
-      } else {
-        next.add(characterId);
-      }
-      return next;
-    });
-  }, []);
-
   const handleApplyFilters = useCallback(
     (newFilters: FilterState) => {
       setFilters(newFilters);
@@ -288,258 +669,69 @@ export default function CreatorScreen() {
     setActionsVisible(true);
   }, []);
 
-  const handleViewCharacter = useCallback(() => {
-    if (!longPressCharacter) return;
-    navigate(characterScreenName, {
-      characterId: longPressCharacter.id,
-      characterName: longPressCharacter.name,
+  const handleToggleAbout = useCallback(() => {
+    setAboutExpanded((e) => !e);
+  }, []);
+
+  const handleAvatarPress = useCallback(() => {
+    if (!profile) return;
+    setPreview({
+      uri: avatarUrl(profile.avatar),
+      name: profile.name,
     });
-  }, [longPressCharacter, navigate, characterScreenName]);
+  }, [profile]);
 
-  const handleViewCreator = useCallback(() => {
-    if (!longPressCharacter?.creator_id) return;
-    navigate("CreatorScreen", {
-      userId: longPressCharacter.creator_id,
-      userName: longPressCharacter.creator_name || "Creator",
-    });
-  }, [longPressCharacter, navigate]);
-
-  const handleBlockCharacter = useCallback(() => {
-    if (!longPressCharacter) return;
-    setAlertTitle("Block Character");
-    setAlertMessage(
-      `Block "${longPressCharacter.name}"? Hidden characters won't appear in your discover feed.`,
-    );
-    setAlertButtons([
-      {
-        text: "Block",
-        style: "destructive",
-        onPress: async () => {
-          setAlertVisible(false);
-          try {
-            const blocked = await getBlockedContent();
-            if (!blocked.bots.includes(longPressCharacter.id)) {
-              blocked.bots.push(longPressCharacter.id);
-            }
-            await updateBlockedContent(blocked);
-          } catch {}
-        },
-      },
-      { text: "Cancel", style: "cancel", onPress: () => setAlertVisible(false) },
-    ]);
-    setAlertVisible(true);
-  }, [longPressCharacter]);
-
-  const handleReportCharacter = useCallback(() => {
-    setActionsVisible(false);
-    setReportVisible(true);
+  const handleOpenFilters = useCallback(() => {
+    filterModalRef.current?.open();
   }, []);
 
-  const handleActionsClose = useCallback(() => {
-    setActionsVisible(false);
+  const handleOpenAdvanced = useCallback(() => {
+    setAdvancedSearchVisible(true);
   }, []);
 
-  const handleAlertDismiss = useCallback(() => setAlertVisible(false), []);
-
-  const handleCloseReport = useCallback(() => {
-    setReportVisible(false);
-  }, []);
-
-  const renderItem = useCallback(
-    ({ item }: { item: TrendingCharacter }) => (
-      <CharacterCard
-        character={item}
-        onPress={() =>
-          navigate(characterScreenName, {
-            characterId: item.id,
-            characterName: item.name,
-          })
-        }
-        onLongPress={() => handleLongPress(item)}
-        hidden={hiddenIds.has(item.id)}
-        onToggleHidden={() => handleToggleHidden(item.id)}
-      />
-    ),
-    [navigate, characterScreenName, handleLongPress, hiddenIds, handleToggleHidden],
-  );
-
-  if (profileLoading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.accent} />
-      </View>
-    );
-  }
-
-  if (profileError || !profile) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>
-          {profileError || "Profile not found"}
-        </Text>
-      </View>
-    );
+  if (profileLoading || profileError || !profile) {
+    return <ProfileState loading={profileLoading} error={profileError} />;
   }
 
   const profileSection = (
-    <View style={[styles.profileSection, isTablet && { paddingTop: 0 }]}>
-      <Pressable
-        onPress={() =>
-          setPreview({
-            uri: avatarUrl(profile.avatar),
-            name: profile.name,
-          })
-        }
-      >
-        <Avatar
-          uri={profile.avatar ? avatarUrl(profile.avatar) : undefined}
-          name={profile.name}
-          size={80}
-        />
-      </Pressable>
-      <Text style={styles.profileName}>{profile.name || `@${profile.user_name}`}</Text>
-      {profile.user_name ? (
-        <Text style={styles.profileUsername}>@{profile.user_name}</Text>
-      ) : null}
-      {profile.is_verified && (
-        <View style={styles.verifiedRow}>
-          <BadgeCheck size={14} color={colors.accent} />
-          <Text style={styles.profileVerified}> Verified</Text>
-        </View>
-      )}
-      {profile.subscriber_badge && (
-        <View style={styles.subBadge}>
-          <CirclePlus size={14} color={colors.accent} />
-          <Text style={styles.subBadgeText}> Subscriber</Text>
-        </View>
-      )}
-      {profile.about_me ? (
-        <View style={styles.aboutSection}>
-          <View style={!aboutExpanded && styles.aboutCollapsed}>
-            <Text style={styles.profileAbout}>
-              {stripHtml(profile.about_me)}
-            </Text>
-          </View>
-          <Pressable
-            style={styles.showMoreBtn}
-            onPress={() => setAboutExpanded((e) => !e)}
-          >
-            <Text style={styles.showMoreText}>
-              {aboutExpanded ? "Show less" : "Show more"}
-            </Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {profile.badges && profile.badges.length > 0 && (
-        <View style={styles.badgesRow}>
-          {profile.badges.map((b) => (
-            <View key={b.id} style={styles.badge}>
-              <Avatar uri={assetUrl(b.img)} size={24} />
-              <Text style={styles.badgeTitle}>{b.title}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-
-      <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{followerCount}</Text>
-          <Text style={styles.statLabel}>Followers</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{list.total}</Text>
-          <Text style={styles.statLabel}>Characters</Text>
-        </View>
-      </View>
-
-      {!isOwnProfile && (
-        <Pressable
-          onPress={handleToggleFollow}
-          disabled={followingLoading}
-          style={({ pressed }) => [
-            styles.followBtn,
-            isFollowing && styles.followingBtn,
-            pressed && { opacity: 0.7 },
-          ]}
-        >
-          <Text
-            style={[
-              styles.followBtnText,
-              isFollowing && styles.followingBtnText,
-            ]}
-          >
-            {followingLoading
-              ? "..."
-              : isFollowing
-                ? "Following"
-                : "Follow"}
-          </Text>
-        </Pressable>
-      )}
-    </View>
+    <ProfileSection
+      profile={profile}
+      isTablet={isTablet}
+      aboutExpanded={aboutExpanded}
+      onToggleAbout={handleToggleAbout}
+      onAvatarPress={handleAvatarPress}
+      followerCount={followerCount}
+      characterCount={list.total}
+      isOwnProfile={isOwnProfile}
+      isFollowing={isFollowing}
+      followingLoading={followingLoading}
+      userId={userId}
+      setIsFollowing={setIsFollowing}
+      setFollowerCount={setFollowerCount}
+      setFollowingLoading={setFollowingLoading}
+    />
   );
 
   const filterRow = (
-    <View style={styles.filterRow}>
-      <Pressable
-        onPress={() => filterModalRef.current?.open()}
-        style={({ pressed }) => [
-          styles.filterBtn,
-          pressed && { opacity: 0.7 },
-        ]}
-      >
-        <SlidersHorizontal size={16} color={colors.accent} />
-        <Text style={styles.filterBtnText}>Filters</Text>
-      </Pressable>
-      <Pressable
-        onPress={() => setAdvancedSearchVisible(true)}
-        style={({ pressed }) => [
-          styles.filterBtn,
-          pressed && { opacity: 0.7 },
-        ]}
-      >
-        <Search size={16} color={colors.accent} />
-        <Text style={styles.filterBtnText}>Advanced</Text>
-      </Pressable>
-    </View>
+    <FilterRow
+      onOpenFilters={handleOpenFilters}
+      onOpenAdvanced={handleOpenAdvanced}
+    />
   );
 
   const characterList = (
-    <FlashList
-      data={list.characters}
-      renderItem={renderItem}
-      keyExtractor={(item) => item.id}
+    <CharacterList
+      characters={list.characters}
+      loading={list.loading}
+      refreshing={list.refreshing}
+      onRefresh={handleRefresh}
       onEndReached={handleLoadMore}
-      onEndReachedThreshold={0.5}
-      style={styles.flashlist}
-      refreshControl={
-        <RefreshControl
-          refreshing={list.refreshing}
-          onRefresh={handleRefresh}
-          tintColor={colors.accent}
-        />
-      }
-      contentContainerStyle={styles.listContent}
-      showsVerticalScrollIndicator={false}
-      ListHeaderComponent={
-        isTablet
-          ? filterRow
-          : (
-            <>
-              {profileSection}
-              {filterRow}
-            </>
-          )
-      }
-      ListFooterComponent={
-        list.loading && list.characters.length > 0 ? (
-          <ActivityIndicator
-            style={styles.footerLoader}
-            color={colors.accent}
-          />
-        ) : null
-      }
+      isTablet={isTablet}
+      profileSection={profileSection}
+      filterRow={filterRow}
+      navigate={navigate}
+      characterScreenName={characterScreenName}
+      onLongPress={handleLongPress}
     />
   );
 
@@ -562,36 +754,13 @@ export default function CreatorScreen() {
       ) : (
         characterList
       )}
-      <AvatarPreview
-        visible={preview !== null}
-        uri={preview?.uri ?? ""}
-        onClose={() => setPreview(null)}
-      />
-
-      <CharacterDiscoverActionsSheet
-        visible={actionsVisible}
-        characterName={longPressCharacter?.name || ""}
-        hasCreator={!!longPressCharacter?.creator_id}
-        onClose={handleActionsClose}
-        onViewCharacter={handleViewCharacter}
-        onViewCreator={handleViewCreator}
-        onBlockCharacter={handleBlockCharacter}
-        onReportCharacter={handleReportCharacter}
-      />
-
-      <CharacterReportModal
-        visible={reportVisible}
-        characterId={longPressCharacter?.id ?? ""}
-        onClose={handleCloseReport}
-      />
-
       <FilterModal
         ref={filterModalRef}
         filters={filters}
         onApply={handleApplyFilters}
       />
-
       <AdvancedSearchModal
+        key={advancedSearchVisible ? "open" : "closed"}
         visible={advancedSearchVisible}
         keywords={advancedKeywords}
         blacklisted={advancedBlacklist}
@@ -603,13 +772,24 @@ export default function CreatorScreen() {
         onHideDarkenedChange={setHideDarkened}
         onClose={() => setAdvancedSearchVisible(false)}
       />
-
-      <CustomAlert
-        visible={alertVisible}
-        title={alertTitle}
-        message={alertMessage}
-        buttons={alertButtons}
-        onDismiss={handleAlertDismiss}
+      <ScreenModals
+        navigate={navigate}
+        characterScreenName={characterScreenName}
+        longPressCharacter={longPressCharacter}
+        actionsVisible={actionsVisible}
+        reportVisible={reportVisible}
+        alertVisible={alertVisible}
+        alertTitle={alertTitle}
+        alertMessage={alertMessage}
+        alertButtons={alertButtons}
+        preview={preview}
+        setPreview={setPreview}
+        setActionsVisible={setActionsVisible}
+        setReportVisible={setReportVisible}
+        setAlertVisible={setAlertVisible}
+        setAlertTitle={setAlertTitle}
+        setAlertMessage={setAlertMessage}
+        setAlertButtons={setAlertButtons}
       />
     </View>
   );
