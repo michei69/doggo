@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -42,11 +42,8 @@ export default function PersonaPicker({
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [loading, setLoading] = useState(false);
-  const fetchedRef = useRef(false);
 
   const handleShow = useCallback(async () => {
-    if (fetchedRef.current) return;
-    fetchedRef.current = true;
     setLoading(true);
     try {
       let ps: Persona[] = [];
