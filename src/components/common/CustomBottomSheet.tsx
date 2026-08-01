@@ -37,8 +37,9 @@ function Proxy({
   });
 
   useEffect(() => {
+    const key = keyRef.current;
     return () => {
-      if (keyRef.current >= 0) unregisterSheet(keyRef.current);
+      if (key >= 0) unregisterSheet(key);
     };
   }, []);
 
@@ -193,7 +194,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 1000,
+    zIndex: 50,
   },
   backdropTouchable: {
     position: "absolute",

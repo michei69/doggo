@@ -8,8 +8,7 @@ import type {
     CreateChatRequest,
     CreateChatResponse,
 } from "../types/api";
-import { storage } from "../utils/storage";
-import { getUserAgent } from "../utils/userAgent";
+import { buildAuthHeaders } from "../utils/authHeaders";
 import { readSSEStream, type SSECallbacks } from "./sse";
 
 export async function getChats(page: number = 1): Promise<ChatListItem[]> {
@@ -174,26 +173,13 @@ export async function generateAlpha(
     apiKey?: string,
     realModel?: string,
 ): Promise<void> {
-    const [token, cfClearance, cfBm] = await Promise.all([
-        storage.getAccessToken(),
-        storage.getCfClearance(),
-        storage.getCfBm(),
-    ]);
-    const cookies: string[] = [];
-    if (cfClearance) cookies.push(`cf_clearance=${cfClearance}`);
-    if (cfBm) cookies.push(`__cf_bm=${cfBm}`);
-    const ua = getUserAgent();
+    const headers = await buildAuthHeaders({ contentType: "application/json" });
 
     let response: Response;
     try {
         response = await fetch("https://janitorai.com/generateAlpha", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                ...(cookies.length > 0 ? { Cookie: cookies.join("; ") } : {}),
-                ...(ua ? { "User-Agent": ua } : {}),
-            },
+            headers,
             body: JSON.stringify(body),
             signal,
         });
@@ -277,15 +263,7 @@ export async function cancelGeneration(): Promise<void> {
 }
 
 export async function fetchSystemPrompt(detail: ChatDetail): Promise<string> {
-    const [token, cfClearance, cfBm] = await Promise.all([
-        storage.getAccessToken(),
-        storage.getCfClearance(),
-        storage.getCfBm(),
-    ]);
-    const cookies: string[] = [];
-    if (cfClearance) cookies.push(`cf_clearance=${cfClearance}`);
-    if (cfBm) cookies.push(`__cf_bm=${cfBm}`);
-    const ua = getUserAgent();
+    const headers = await buildAuthHeaders({ contentType: "application/json" });
 
     const body = {
         chat: {
@@ -311,12 +289,7 @@ export async function fetchSystemPrompt(detail: ChatDetail): Promise<string> {
 
     const response = await fetch("https://janitorai.com/generateAlpha", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            ...(cookies.length > 0 ? { Cookie: cookies.join("; ") } : {}),
-            ...(ua ? { "User-Agent": ua } : {}),
-        },
+        headers,
         body: JSON.stringify(body),
     });
 

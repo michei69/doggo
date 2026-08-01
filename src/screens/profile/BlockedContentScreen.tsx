@@ -6,7 +6,6 @@ import {
   Pressable,
   TextInput,
   ScrollView,
-  Alert,
   ActivityIndicator,
   useWindowDimensions,
   Keyboard,
@@ -20,6 +19,8 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import ScreenHeader from "../../components/common/ScreenHeader";
+import CustomAlert from "../../components/common/CustomAlert";
+import { useAlert } from "../../hooks/useAlert";
 import { colors } from "../../utils/colors";
 import { getBlockedContent, updateBlockedContent } from "../../api/profile";
 import { getTagSuggestions, getTags } from "../../api/characters";
@@ -477,6 +478,7 @@ const TagsPanel = React.memo(function TagsPanel({
 
 export default function BlockedContentScreen() {
   const { goBack } = useNavigation<Nav>();
+  const { alert, showAlert, dismissAlert } = useAlert();
 
   const [activeTab, setActiveTab] = useState<Tab>("creators");
   const [blocked, setBlocked] = useState<BlockedContent>({
@@ -517,11 +519,11 @@ export default function BlockedContentScreen() {
       setAllTags(tags);
       initialRef.current = JSON.parse(JSON.stringify(data));
     } catch {
-      Alert.alert("Error", "Failed to load blocked content");
+      showAlert("Error", "Failed to load blocked content", [{ text: "OK" }]);
     } finally {
       setLoading(false);
     }
-  }, [])
+  }, [showAlert]);
 
   useEffect(() => {
     loadBlockedContent();
@@ -537,13 +539,13 @@ export default function BlockedContentScreen() {
     try {
       await updateBlockedContent(blocked);
       initialRef.current = JSON.parse(JSON.stringify(blocked));
-      Alert.alert("Saved", "Blocked content updated");
+      showAlert("Saved", "Blocked content updated", [{ text: "OK" }]);
     } catch {
-      Alert.alert("Error", "Failed to save blocked content");
+      showAlert("Error", "Failed to save blocked content", [{ text: "OK" }]);
     } finally {
       setSaving(false);
     }
-  }, [blocked, hasChanges]);
+  }, [blocked, hasChanges, showAlert]);
 
   const handleAddKeyword = useCallback(
     (keyword: string) => {
@@ -757,6 +759,14 @@ export default function BlockedContentScreen() {
           </Animated.View>
         </View>
       </GestureDetector>
+
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        buttons={alert.buttons}
+        onDismiss={dismissAlert}
+      />
     </View>
   );
 }

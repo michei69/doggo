@@ -1,0 +1,285 @@
+import React, { useMemo } from "react";
+import {
+    ActivityIndicator,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+} from "react-native";
+import { Image } from "expo-image";
+import { FlashList } from "@shopify/flash-list";
+import type { CharacterAvatarPreview, ProfileSearchResult } from "../../../api/characters";
+import Avatar from "../../../components/common/Avatar";
+import type { TrendingCharacter } from "../../../types/api";
+import { avatarUrl, botAvatarUrl } from "../../../utils/assets";
+import { colors } from "../../../utils/colors";
+
+export const CharacterList = React.memo(function CharacterList({
+    data,
+    renderItem,
+    isTablet,
+    refreshing,
+    onRefresh,
+    onEndReached,
+    loading,
+    error,
+    hasMore,
+}: {
+    data: TrendingCharacter[];
+    renderItem: ({
+        item,
+    }: {
+        item: TrendingCharacter;
+    }) => React.ReactElement;
+    isTablet: boolean;
+    refreshing: boolean;
+    onRefresh: () => void;
+    onEndReached: () => void;
+    loading: boolean;
+    error: string | null;
+    hasMore: boolean;
+}) {
+    const refreshControl = useMemo(
+        () => (
+            <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={colors.accent}
+            />
+        ),
+        [refreshing, onRefresh],
+    );
+    if (loading && data.length === 0) {
+        return (
+            <View style={styles.listLoader}>
+                <ActivityIndicator size="large" color={colors.accent} />
+            </View>
+        );
+    }
+    if (error && data.length === 0) {
+        return (
+            <View style={styles.listLoader}>
+                <Text style={styles.errorText}>{error}</Text>
+            </View>
+        );
+    }
+    return (
+        <FlashList
+            data={data}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id}
+            numColumns={isTablet ? 2 : 1}
+            key={isTablet ? "tablet-2col" : "phone-1col"}
+            onEndReached={onEndReached}
+            onEndReachedThreshold={0.5}
+            drawDistance={800}
+            refreshControl={refreshControl}
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+                !loading && !error ? (
+                    <View style={styles.listLoader}>
+                        <Text style={styles.emptyText}>No characters found</Text>
+                    </View>
+                ) : null
+            }
+            ListFooterComponent={
+                hasMore ? (
+                    <ActivityIndicator style={styles.footerLoader} color={colors.accent} />
+                ) : null
+            }
+        />
+    );
+});
+
+export const CreatorList = React.memo(function CreatorList({
+    data,
+    renderItem,
+    refreshing,
+    onRefresh,
+    onEndReached,
+    loading,
+    hasMore,
+}: {
+    data: ProfileSearchResult[];
+    renderItem: ({
+        item,
+    }: {
+        item: ProfileSearchResult;
+    }) => React.ReactElement;
+    refreshing: boolean;
+    onRefresh: () => void;
+    onEndReached: () => void;
+    loading: boolean;
+    hasMore: boolean;
+}) {
+    const refreshControl = useMemo(
+        () => (
+            <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={colors.accent}
+            />
+        ),
+        [refreshing, onRefresh],
+    );
+    if (loading && data.length === 0) {
+        return (
+            <View style={styles.listLoader}>
+                <ActivityIndicator size="large" color={colors.accent} />
+            </View>
+        );
+    }
+    return (
+        <FlashList
+            data={data}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id}
+            onEndReached={onEndReached}
+            onEndReachedThreshold={0.5}
+            drawDistance={800}
+            refreshControl={refreshControl}
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+                !loading ? (
+                    <View style={styles.listLoader}>
+                        <Text style={styles.emptyText}>No creators found</Text>
+                    </View>
+                ) : null
+            }
+            ListFooterComponent={
+                hasMore ? (
+                    <ActivityIndicator style={styles.footerLoader} color={colors.accent} />
+                ) : null
+            }
+        />
+    );
+});
+
+export const CreatorCard = React.memo(function CreatorCard({
+    item,
+    onPress,
+    onPressCharacter,
+}: {
+    item: ProfileSearchResult;
+    onPress: () => void;
+    onPressCharacter: (char: CharacterAvatarPreview) => void;
+}) {
+    return (
+        <Pressable style={styles.creatorCard} onPress={onPress}>
+            <View style={styles.creatorRow}>
+                <Avatar uri={avatarUrl(item.avatar)} name={item.user_name} size={48} />
+                <View style={styles.creatorInfo}>
+                    <Text style={styles.creatorName} numberOfLines={1}>
+                        {item.user_name}
+                    </Text>
+                    <Text style={styles.creatorMeta}>
+                        {item.followers_count} followers · {item.character_count} characters
+                    </Text>
+                </View>
+            </View>
+            {item.character_avatar_previews.length > 0 && (
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.charPreviewScroll}
+                    contentContainerStyle={styles.charPreviewContent}
+                >
+                    {item.character_avatar_previews.slice(0, 3).map((char) => (
+                        <Pressable
+                            key={char.id}
+                            style={styles.charPreviewItem}
+                            onPress={() => onPressCharacter(char)}
+                        >
+                            <Image
+                                source={{ uri: botAvatarUrl(char.avatar) }}
+                                style={styles.charPreviewAvatar}
+                            />
+                            <Text
+                                style={styles.charPreviewName}
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                            >
+                                {char.name}
+                            </Text>
+                        </Pressable>
+                    ))}
+                </ScrollView>
+            )}
+        </Pressable>
+    );
+});
+
+const styles = StyleSheet.create({
+    list: {
+        paddingBottom: 80,
+    },
+    listLoader: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        paddingVertical: 60,
+    },
+    footerLoader: {
+        paddingVertical: 20,
+    },
+    errorText: {
+        color: colors.danger,
+        fontSize: 16,
+    },
+    emptyText: {
+        color: colors.textDim,
+        fontSize: 14,
+    },
+    creatorCard: {
+        backgroundColor: colors.card,
+        borderRadius: 12,
+        marginHorizontal: 20,
+        marginBottom: 12,
+        padding: 16,
+    },
+    creatorRow: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
+    creatorInfo: {
+        marginLeft: 12,
+        flex: 1,
+    },
+    creatorName: {
+        color: colors.text,
+        fontSize: 16,
+        fontWeight: "700",
+    },
+    creatorMeta: {
+        color: colors.textDim,
+        fontSize: 13,
+        marginTop: 2,
+    },
+    charPreviewScroll: {
+        marginTop: 12,
+    },
+    charPreviewContent: {
+        gap: 12,
+    },
+    charPreviewItem: {
+        alignItems: "center",
+        width: 64,
+    },
+    charPreviewAvatar: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: colors.border,
+    },
+    charPreviewName: {
+        color: colors.textDim,
+        fontSize: 11,
+        marginTop: 4,
+        textAlign: "center",
+        width: 64,
+    },
+});

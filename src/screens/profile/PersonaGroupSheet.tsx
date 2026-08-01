@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   Pressable,
-  Alert,
   ActivityIndicator,
   StyleSheet,
   TextInput as RNTextInput,
@@ -20,6 +19,7 @@ import Animated, {
   cancelAnimation,
 } from "react-native-reanimated";
 import { colors } from "../../utils/colors";
+import CustomAlert from "../../components/common/CustomAlert";
 import {
   createPersonaGroup,
   updatePersonaGroup,
@@ -32,6 +32,7 @@ import {
   unregisterSheet,
 } from "../../stores/sheetStore";
 import { useKeyboardHeight } from "../../hooks/useKeyboardHeight";
+import { useAlert } from "../../hooks/useAlert";
 
 const GROUP_COLORS = [
   "#7c5ce7",
@@ -87,6 +88,7 @@ function PersonaGroupContent({
   animateOut: (onFinish: () => void) => void;
 }) {
   const editingId = group?.id ?? null;
+  const { alert, showAlert, dismissAlert } = useAlert();
 
   const [form, setForm] = useState<GroupForm>(() => initialGroupForm(group));
   const [saving, setSaving] = useState(false);
@@ -116,11 +118,11 @@ function PersonaGroupContent({
         onSaved();
       });
     } catch {
-      Alert.alert("Error", "Failed to save group");
+      showAlert("Error", "Failed to save group", [{ text: "OK" }]);
     } finally {
       setSaving(false);
     }
-  }, [form, editingId, onSaved, animateOut]);
+  }, [form, editingId, onSaved, animateOut, showAlert]);
 
   const handleDelete = useCallback(() => {
     if (!editingId) return;
@@ -138,12 +140,15 @@ function PersonaGroupContent({
 
   const rSheetStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
+  }));
+
+  const sheetStaticStyle = {
     maxHeight: windowHeight * 0.9,
     ...(isTablet && {
       marginLeft: sheetInset,
       marginRight: sheetInset,
     }),
-  }));
+  };
 
   return (
     <Animated.View style={[styles.container, rContainerStyle]}>
@@ -153,7 +158,7 @@ function PersonaGroupContent({
         style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <Animated.View style={[styles.sheet, rSheetStyle]}>
+        <Animated.View style={[styles.sheet, rSheetStyle, sheetStaticStyle]}>
           <ScrollView
             contentContainerStyle={
               Platform.OS === "android"
@@ -262,6 +267,13 @@ function PersonaGroupContent({
           </ScrollView>
         </Animated.View>
       </KeyboardAvoidingView>
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        buttons={alert.buttons}
+        onDismiss={dismissAlert}
+      />
     </Animated.View>
   );
 }
@@ -365,8 +377,9 @@ export default function PersonaGroupSheet({
   });
 
   useEffect(() => {
+    const key = portalKeyRef.current;
     return () => {
-      if (portalKeyRef.current >= 0) unregisterSheet(portalKeyRef.current);
+      if (key >= 0) unregisterSheet(key);
     };
   }, []);
 
@@ -380,7 +393,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 1000,
+    zIndex: 50,
     justifyContent: "flex-end",
   },
   backdrop: {

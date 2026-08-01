@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import type { ListRenderItem } from "@shopify/flash-list";
+import { Skeleton } from "boneyard-js/native";
 import { Search } from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -334,12 +335,32 @@ const ChatListHeader = React.memo(function ChatListHeader() {
 
 const ChatListLoading = React.memo(function ChatListLoading() {
   return (
-    <View style={styles.container}>
-      <ChatListHeader />
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.accent} />
+    <Skeleton
+      name="chat-list"
+      loading
+      animate="shimmer"
+      fallback={
+        <View style={styles.container}>
+          <ChatListHeader />
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color={colors.accent} />
+          </View>
+        </View>
+      }
+    >
+      <View style={styles.container}>
+        <ChatListHeader />
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <View key={i} style={styles.skeletonRow}>
+            <View style={styles.skeletonAvatar} />
+            <View style={styles.skeletonInfo}>
+              <View style={styles.skeletonName} />
+              <View style={styles.skeletonSummary} />
+            </View>
+          </View>
+        ))}
       </View>
-    </View>
+    </Skeleton>
   );
 });
 
@@ -404,16 +425,20 @@ const ChatListEmptyState = React.memo(function ChatListEmptyState({
   isRefreshing: boolean;
   onRefresh: () => void;
 }) {
+  const refreshControl = useMemo(
+    () => (
+      <RefreshControl
+        refreshing={isRefreshing}
+        onRefresh={onRefresh}
+        tintColor={colors.accent}
+      />
+    ),
+    [isRefreshing, onRefresh],
+  );
   return (
     <ScrollView
       contentContainerStyle={[styles.centered, { flexGrow: 1 }]}
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefreshing}
-          onRefresh={onRefresh}
-          tintColor={colors.accent}
-        />
-      }
+      refreshControl={refreshControl}
     >
       <Text style={styles.emptyText}>No chats yet</Text>
       <Text style={styles.emptySubtext}>
@@ -534,6 +559,17 @@ const ChatsList = React.memo(function ChatsList({
     [],
   );
 
+  const refreshControl = useMemo(
+    () => (
+      <RefreshControl
+        refreshing={isRefreshing}
+        onRefresh={onRefresh}
+        tintColor={colors.accent}
+      />
+    ),
+    [isRefreshing, onRefresh],
+  );
+
   return (
     <FlashList
       data={data}
@@ -544,13 +580,7 @@ const ChatsList = React.memo(function ChatsList({
       style={styles.flashlist}
       drawDistance={2000}
       overrideProps={{ initialDrawBatchSize: 50 }}
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefreshing}
-          onRefresh={onRefresh}
-          tintColor={colors.accent}
-        />
-      }
+      refreshControl={refreshControl}
       contentContainerStyle={styles.list}
       showsVerticalScrollIndicator={false}
       ListFooterComponent={
@@ -631,6 +661,35 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: colors.background,
+  },
+  skeletonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 12,
+  },
+  skeletonAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.border,
+  },
+  skeletonInfo: {
+    flex: 1,
+    gap: 8,
+  },
+  skeletonName: {
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.border,
+    width: "55%",
+  },
+  skeletonSummary: {
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.border,
+    width: "85%",
   },
   title: {
     color: colors.text,

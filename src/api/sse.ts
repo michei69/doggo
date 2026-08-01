@@ -88,7 +88,7 @@ export async function readSSEStream(
     }
 }
 
-export class SSEClient {
+class SSEClient {
     private abortController: AbortController | null = null;
 
     async streamChat(
@@ -119,8 +119,21 @@ export class SSEClient {
             });
 
             if (!response.ok) {
+                const bodyText = await response.text().catch(() => "");
+                let errorDetail = response.statusText || "";
+                if (bodyText) {
+                    try {
+                        const json = JSON.parse(bodyText);
+                        errorDetail =
+                            (typeof json.error === "string" ? json.error : json.error?.message) ||
+                            json.message ||
+                            bodyText;
+                    } catch {
+                        errorDetail = bodyText;
+                    }
+                }
                 throw new Error(
-                    `HTTP ${response.status}: ${response.statusText}`,
+                    `HTTP ${response.status}: ${errorDetail || "Unknown error"}`,
                 );
             }
 

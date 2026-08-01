@@ -14,7 +14,6 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
-  Alert,
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import {
@@ -116,6 +115,7 @@ const ProfileSection = React.memo(function ProfileSection({
   setIsFollowing,
   setFollowerCount,
   setFollowingLoading,
+  onFollowError,
 }: {
   profile: UserProfile;
   isTablet: boolean;
@@ -131,6 +131,7 @@ const ProfileSection = React.memo(function ProfileSection({
   setIsFollowing: React.Dispatch<React.SetStateAction<boolean>>;
   setFollowerCount: React.Dispatch<React.SetStateAction<number>>;
   setFollowingLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  onFollowError: () => void;
 }) {
   const handleToggleFollow = useCallback(async () => {
     if (followingLoading) return;
@@ -146,11 +147,11 @@ const ProfileSection = React.memo(function ProfileSection({
         setFollowerCount((c) => c + 1);
       }
     } catch {
-      Alert.alert("Error", "Failed to update follow status");
+      onFollowError();
     } finally {
       setFollowingLoading(false);
     }
-  }, [userId, isFollowing, followingLoading, setIsFollowing, setFollowerCount, setFollowingLoading]);
+  }, [userId, isFollowing, followingLoading, setIsFollowing, setFollowerCount, setFollowingLoading, onFollowError]);
 
   return (
     <View style={[styles.profileSection, isTablet && { paddingTop: 0 }]}>
@@ -332,6 +333,17 @@ function CharacterList({
     [navigate, characterScreenName, onLongPress, hiddenIds, handleToggleHidden],
   );
 
+  const refreshControl = useMemo(
+    () => (
+      <RefreshControl
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        tintColor={colors.accent}
+      />
+    ),
+    [refreshing, onRefresh],
+  );
+
   return (
     <FlashList
       data={characters}
@@ -340,13 +352,7 @@ function CharacterList({
       onEndReached={onEndReached}
       onEndReachedThreshold={0.5}
       style={styles.flashlist}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={colors.accent}
-        />
-      }
+      refreshControl={refreshControl}
       contentContainerStyle={styles.listContent}
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={
@@ -564,6 +570,20 @@ export default function CreatorScreen() {
   const [alertMessage, setAlertMessage] = useState("");
   const [alertButtons, setAlertButtons] = useState<AlertButton[]>([]);
 
+  const showAlert = useCallback(
+    (title: string, message: string, buttons: AlertButton[]) => {
+      setAlertTitle(title);
+      setAlertMessage(message);
+      setAlertButtons(buttons);
+      setAlertVisible(true);
+    },
+    [setAlertTitle, setAlertMessage, setAlertButtons, setAlertVisible],
+  );
+
+  const handleFollowError = useCallback(() => {
+    showAlert("Error", "Failed to update follow status", [{ text: "OK" }]);
+  }, [showAlert]);
+
   const [list, dispatch] = useReducer(listReducer, {
     characters: [],
     page: 1,
@@ -709,6 +729,7 @@ export default function CreatorScreen() {
       setIsFollowing={setIsFollowing}
       setFollowerCount={setFollowerCount}
       setFollowingLoading={setFollowingLoading}
+      onFollowError={handleFollowError}
     />
   );
 

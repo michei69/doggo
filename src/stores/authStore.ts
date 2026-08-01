@@ -37,14 +37,14 @@ const REFRESH_MARGIN_MS = 5 * 60 * 1000;
 
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
-export function clearRefreshTimer() {
+function clearRefreshTimer() {
     if (refreshTimer) {
         clearTimeout(refreshTimer);
         refreshTimer = null;
     }
 }
 
-export async function scheduleRefresh(
+async function scheduleRefresh(
     expiresAt: number,
     refreshFn: () => Promise<void>,
 ) {
@@ -79,7 +79,7 @@ export async function scheduleRefresh(
     }, delay);
 }
 
-export async function performRefresh(
+async function performRefresh(
     get: () => AuthState,
     set: (partial: Partial<AuthState>) => void,
 ) {

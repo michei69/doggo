@@ -1,7 +1,6 @@
 import axios from "axios";
 import { API_BASE_URL } from "../utils/constants";
-import { storage } from "../utils/storage";
-import { getUserAgent } from "../utils/userAgent";
+import { buildAuthHeaders } from "../utils/authHeaders";
 
 export const apiClient = axios.create({
     baseURL: API_BASE_URL,
@@ -10,32 +9,16 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use(async (config) => {
-    const [token, cfClearance, cfBm] = await Promise.all([
-        storage.getAccessToken(),
-        storage.getCfClearance(),
-        storage.getCfBm(),
-    ]);
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
-    const cookies: string[] = [];
-    if (cfClearance) cookies.push(`cf_clearance=${cfClearance}`);
-    if (cfBm) cookies.push(`__cf_bm=${cfBm}`);
-    if (cookies.length > 0) {
-        config.headers.Cookie = cookies.join("; ");
-    }
-    const ua = getUserAgent();
-    if (ua) {
-        config.headers["User-Agent"] = ua;
-    }
+    const authHeaders = await buildAuthHeaders();
+    Object.assign(config.headers, authHeaders);
     console.log(
         "[API] REQ",
         config.method?.toUpperCase(),
         config.url?.replace(API_BASE_URL, ""),
         config.params,
         {
-            hasAuth: !!token,
-            hasCfClearance: !!cfClearance,
+            hasAuth: !!authHeaders.Authorization,
+            hasCfClearance: authHeaders.Cookie?.includes("cf_clearance") ?? false,
         },
     );
     return config;

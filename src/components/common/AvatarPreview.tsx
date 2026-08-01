@@ -5,7 +5,7 @@ import {
   Text,
   View,
   StyleSheet,
-  Dimensions,
+  useWindowDimensions,
 } from "react-native";
 import {
   Gesture,
@@ -22,9 +22,6 @@ import { scheduleOnRN } from "react-native-worklets";
 
 const MAX_SCALE = 5;
 const MIN_SCALE = 1;
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
-const CX = SCREEN_W / 2;
-const CY = SCREEN_H / 2;
 
 export default function AvatarPreview({
   visible,
@@ -35,6 +32,9 @@ export default function AvatarPreview({
   uri: string;
   onClose: () => void;
 }) {
+  const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
+  const CX = SCREEN_W / 2;
+  const CY = SCREEN_H / 2;
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);

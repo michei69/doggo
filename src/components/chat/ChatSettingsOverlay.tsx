@@ -1,8 +1,6 @@
-import React, { useCallback } from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import { useCallback } from "react";
 import { useNavigation } from "@react-navigation/native";
-import CustomBottomSheet from "../common/CustomBottomSheet";
-import { colors } from "../../utils/colors";
+import OptionSheet, { type OptionSheetAction } from "../common/OptionSheet";
 
 export default function ChatSettingsOverlay({
   visible,
@@ -83,101 +81,34 @@ export default function ChatSettingsOverlay({
     onAttemptViewSystemPrompt?.();
   }, [onClose, onAttemptViewSystemPrompt]);
 
-  const optionStyle = useCallback(
-    ({ pressed }: { pressed: boolean }) => [
-      styles.option,
-      pressed && { opacity: 0.7 },
-    ],
-    [],
-  );
+  const actions: OptionSheetAction[] = [
+    { label: "View Character", onPress: handleViewCharacter },
+    {
+      label: allowProxy ? "View System Prompt" : "Fetch System Prompt",
+      onPress: allowProxy
+        ? handleViewSystemPrompt
+        : handleAttemptViewSystemPrompt,
+    },
+    ...(creatorId
+      ? [{ label: "View Creator", onPress: handleViewCreator }]
+      : []),
+    { label: "Generation Settings", onPress: handleGenerationSettings },
+    { label: "New Chat", onPress: handleNewChat },
+    { label: "All Chats", onPress: handleAllChats },
+    {
+      label: "Messages Actions",
+      onPress: handleMessagesActions,
+      accent: true,
+    },
+    { label: "Delete Chat", onPress: handleDeleteChat, destructive: true },
+  ];
 
   return (
-    <CustomBottomSheet visible={visible} onClose={onClose}>
-      <View style={styles.content}>
-        <Text style={styles.title}>{characterName}</Text>
-
-        <Pressable style={optionStyle} onPress={handleViewCharacter}>
-          <Text style={styles.optionText}>View Character</Text>
-        </Pressable>
-
-        {allowProxy ? (
-          <Pressable style={optionStyle} onPress={handleViewSystemPrompt}>
-            <Text style={styles.optionText}>View System Prompt</Text>
-          </Pressable>
-        ) : (
-          <Pressable
-            style={optionStyle}
-            onPress={handleAttemptViewSystemPrompt}
-          >
-            <Text style={styles.optionText}>Fetch System Prompt</Text>
-          </Pressable>
-        )}
-
-        {creatorId ? (
-          <Pressable style={optionStyle} onPress={handleViewCreator}>
-            <Text style={styles.optionText}>View Creator</Text>
-          </Pressable>
-        ) : null}
-
-        <Pressable style={optionStyle} onPress={handleGenerationSettings}>
-          <Text style={styles.optionText}>Generation Settings</Text>
-        </Pressable>
-
-        <Pressable style={optionStyle} onPress={handleNewChat}>
-          <Text style={styles.optionText}>New Chat</Text>
-        </Pressable>
-
-        <Pressable style={optionStyle} onPress={handleAllChats}>
-          <Text style={styles.optionText}>All Chats</Text>
-        </Pressable>
-
-        <Pressable style={optionStyle} onPress={handleMessagesActions}>
-          <Text style={[styles.optionText, styles.actionText]}>
-            Messages Actions
-          </Text>
-        </Pressable>
-
-        <Pressable style={optionStyle} onPress={handleDeleteChat}>
-          <Text style={[styles.optionText, styles.deleteText]}>
-            Delete Chat
-          </Text>
-        </Pressable>
-      </View>
-    </CustomBottomSheet>
+    <OptionSheet
+      visible={visible}
+      onClose={onClose}
+      title={characterName}
+      actions={actions}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 4,
-    paddingBottom: 8,
-  },
-  title: {
-    color: colors.textSecondary,
-    fontSize: 18,
-    fontWeight: "700",
-    textAlign: "center",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    marginBottom: 4,
-  },
-  option: {
-    paddingVertical: 16,
-    alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  optionText: {
-    color: colors.textSecondary,
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  deleteText: {
-    color: colors.danger,
-  },
-  actionText: {
-    color: colors.accent,
-  },
-});

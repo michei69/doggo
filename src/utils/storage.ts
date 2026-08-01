@@ -215,6 +215,14 @@ export const storage = {
         return v === "true";
     },
 
+    async setPrivacyMode(enabled: boolean): Promise<void> {
+        await AsyncStorage.setItem(STORAGE_KEYS.PRIVACY_MODE, String(enabled));
+    },
+    async getPrivacyMode(): Promise<boolean> {
+        const v = await AsyncStorage.getItem(STORAGE_KEYS.PRIVACY_MODE);
+        return v === "true";
+    },
+
     async clearAll(): Promise<void> {
         await Promise.all([
             SecureStore.deleteItemAsync(STORAGE_KEYS.ACCESS_TOKEN),

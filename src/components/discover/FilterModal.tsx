@@ -1,7 +1,6 @@
 import React, {
   useState,
   useCallback,
-  forwardRef,
   useImperativeHandle,
 } from "react";
 import {
@@ -72,10 +71,13 @@ function OperatorToggle({
   );
 }
 
-export default forwardRef<
-  FilterModalHandle,
-  { filters: FilterState; onApply: (filters: FilterState) => void }
->(({ filters, onApply }, ref) => {
+export default function FilterModal({
+  filters,
+  onApply,
+  ref,
+}: { filters: FilterState; onApply: (filters: FilterState) => void } & {
+  ref?: React.Ref<FilterModalHandle>;
+}) {
   const [visible, setVisible] = useState(false);
   const [pending, setPending] = useState<FilterState>(INITIAL_FILTERS);
 
@@ -211,7 +213,7 @@ export default forwardRef<
       </Pressable>
     </Modal>
   );
-});
+}
 
 const styles = StyleSheet.create({
   overlay: {

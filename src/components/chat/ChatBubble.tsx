@@ -67,8 +67,11 @@ export default React.memo(function ChatBubble({
   const isEdgeToEdge = chatLayout === "edgeToEdge";
   const showTimestamps = useChatStore((s) => s.showTimestamps);
 
-  const [editing, setEditing] = useState(false);
+  const editing = editingMessageId === message.id;
   const [editContent, setEditContent] = useState("");
+  const [editTargetId, setEditTargetId] = useState<number | null | undefined>(
+    null,
+  );
   const [thinkingExpanded, setThinkingExpanded] = useState(false);
   const [preview, setPreview] = useState<{ uri: string; name: string } | null>(
     null,
@@ -76,14 +79,12 @@ export default React.memo(function ChatBubble({
   const inputRef = useRef<TextInput>(null);
   const onLinkPress = useNavigateToJanitorLink();
 
-  useEffect(() => {
-    if (editingMessageId === message.id) {
+  if (editTargetId !== editingMessageId) {
+    setEditTargetId(editingMessageId);
+    if (editing) {
       setEditContent(message.message);
-      setEditing(true);
-    } else if (editing) {
-      setEditing(false);
     }
-  }, [editingMessageId, editing, message]);
+  }
 
   useEffect(() => {
     if (editing) {
@@ -96,12 +97,10 @@ export default React.memo(function ChatBubble({
     if (editContent.trim() && editContent !== message.message) {
       onEdit(message.id, editContent.trim());
     }
-    setEditing(false);
     onEditingDone?.();
   }, [editContent, message.message, message.id, onEdit, onEditingDone]);
 
   const handleCancelEdit = useCallback(() => {
-    setEditing(false);
     onEditingDone?.();
   }, [onEditingDone]);
 

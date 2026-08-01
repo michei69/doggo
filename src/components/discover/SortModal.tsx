@@ -1,6 +1,5 @@
 import React, {
   useState,
-  forwardRef,
   useImperativeHandle,
   useCallback,
 } from "react";
@@ -12,10 +11,13 @@ export interface SortModalHandle {
   open: () => void;
 }
 
-export default forwardRef<
-  SortModalHandle,
-  { currentSort: string; onSelect: (value: string) => void }
->(({ currentSort, onSelect }, ref) => {
+export default function SortModal({
+  currentSort,
+  onSelect,
+  ref,
+}: { currentSort: string; onSelect: (value: string) => void } & {
+  ref?: React.Ref<SortModalHandle>;
+}) {
   const [visible, setVisible] = useState(false);
 
   useImperativeHandle(ref, () => ({
@@ -65,7 +67,7 @@ export default forwardRef<
       </Pressable>
     </Modal>
   );
-});
+}
 
 const styles = StyleSheet.create({
   overlay: {

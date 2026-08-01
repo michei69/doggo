@@ -121,7 +121,7 @@ export default function CharacterCard({
                   </View>
                 </View>
               </View>
-              <View style={styles.info}>
+              <View style={[styles.info, { alignSelf: "stretch" }]}>
                 {(character.tags.length > 0 ||
                   character.custom_tags.length > 0) && (
                   <View style={styles.tagsRow}>

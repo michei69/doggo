@@ -113,5 +113,10 @@ Before committing any code, run these checks:
 
 1. **TypeScript type-checking**: `bunx tsc --noEmit`
 2. **Biome lint/format**: `bunx biome check`
-3. **React Doctor**: `bun run doctor`
+3. **React Doctor**: `bunx react-doctor@latest` — must be ≥80. Never install react-doctor as a project dependency; always run it via `bunx`.
 4. **stop-slop skill**: Use the stop-slop skill to check for AI-generated slop patterns
+
+## Alerts
+
+- **Never use React Native's built-in `Alert.alert`.** Always use the custom alert system: `useAlert()` from `src/hooks/useAlert.ts` + `<CustomAlert>` from `src/components/common/CustomAlert.tsx`. Screens own their `CustomAlert` instance and render it in their root JSX.
+- `AlertButton` type is exported from `src/components/common/CustomAlert.tsx`.

@@ -349,13 +349,13 @@ const ScriptsList = memo(function ScriptsList({
             <View style={styles.scriptFooterRow}>
               <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
                 <Clock size={12} color={theme.light} />
-                <Text style={{ color: theme.light, fontSize: 11 }}>
+                <Text style={{ color: theme.light, fontSize: 12 }}>
                   {formatDate(script.updated_at, dateFormat)}
                 </Text>
               </View>
               <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
                 <MessageCircle size={12} color={theme.light} />
-                <Text style={{ color: theme.light, fontSize: 11 }}>
+                <Text style={{ color: theme.light, fontSize: 12 }}>
                   {script.message_count}
                 </Text>
               </View>

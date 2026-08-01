@@ -2,7 +2,6 @@ import React, {
   useState,
   useMemo,
   useCallback,
-  forwardRef,
   useImperativeHandle,
 } from "react";
 import {
@@ -53,15 +52,18 @@ function tagTextColor(label: string, selected: boolean): string {
   return selected ? `hsl(${h}, 65%, 78%)` : `hsl(${h}, 55%, 68%)`;
 }
 
-export default forwardRef<
-  TagsModalHandle,
-  {
-    mergedTags: TagEntry[];
-    selectedTagIds: Set<string>;
-    onToggleTag: (tagId: string) => void;
-    onApply: () => void;
-  }
->(({ mergedTags, selectedTagIds, onToggleTag, onApply }, ref) => {
+export default function TagsModal({
+  mergedTags,
+  selectedTagIds,
+  onToggleTag,
+  onApply,
+  ref,
+}: {
+  mergedTags: TagEntry[];
+  selectedTagIds: Set<string>;
+  onToggleTag: (tagId: string) => void;
+  onApply: () => void;
+} & { ref?: React.Ref<TagsModalHandle> }) {
   const [visible, setVisible] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
   const [customTags, setCustomTags] = useState<TagEntry[]>([]);
@@ -186,7 +188,7 @@ export default forwardRef<
       </Pressable>
     </Modal>
   );
-});
+}
 
 const styles = StyleSheet.create({
   overlay: {

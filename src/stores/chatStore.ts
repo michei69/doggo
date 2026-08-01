@@ -8,7 +8,7 @@ import type {
 import * as chatsApi from "../api/chats";
 import { storage } from "../utils/storage";
 
-export function formatError(err: any): string {
+function formatError(err: any): string {
     if (err.message?.includes("Request failed")) {
         return "Connection error. Please check your internet and try again.";
     }

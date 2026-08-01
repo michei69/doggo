@@ -84,7 +84,7 @@ export function replaceTags(
 }
 
 const anonRegex = /(?<!\\w)Anon(?=(?:[^\\w']|$)|'s)/g
-export const escapeRegex = (thing: string) => thing.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const escapeRegex = (thing: string) => thing.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 export const generify = (thing: string, charName: string) =>
     thing?.replaceAll(anonRegex, "{{user}}").replaceAll(new RegExp(`(?<!\\w)${escapeRegex(charName)}(?=(?:[^\\w']|$)|'s)`, 'g'), "{{char}}");
 export const cleanTags = (thing: string, personaTag: string) =>

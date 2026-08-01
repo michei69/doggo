@@ -305,6 +305,79 @@ export interface ProxyConfiguration {
     name: string;
 }
 
+export interface PromptLibraryItem {
+    content: string;
+    created_at: string;
+    id: string;
+    kind: "system";
+    name: string;
+    updated_at: string;
+}
+
+export interface ApiProxyConfig {
+    api_key: string;
+    api_url: string;
+    client_id: string;
+    created_at: string;
+    id: string;
+    model: string;
+    name: string;
+    position: number;
+    prompt: {
+        id: string;
+        user_id: string;
+        kind: "system";
+        name: string;
+        content: string;
+        created_at: string;
+        updated_at: string;
+        deleted_at: string | null;
+        materialization_attempt_id: null;
+    } | null;
+    updated_at: string;
+}
+
+export interface ApiSettingsGeneration {
+    top_k: number;
+    top_p: number;
+    temperature: number;
+    prefill_text: string;
+    max_new_token: number;
+    context_length: number;
+    enable_thinking: boolean;
+    prefill_enabled: boolean;
+    enable_reasoning: boolean;
+    frequency_penalty: number;
+    repetition_penalty: number;
+    enable_reasoning_chat: boolean;
+    enable_short_responses: boolean;
+    enable_router_temperature: boolean;
+}
+
+export interface ApiSettingsSettings {
+    bad_words: string[];
+    claude_model: string | null;
+    claude_prompt: string | null;
+    generation_settings: ApiSettingsGeneration;
+    janitor_prompt: string | null;
+    migrated_from_legacy_at: string;
+    openai_model: string;
+    openai_prompt: { id: string; [key: string]: unknown };
+    proxy_global_prompt: string | null;
+    router_enabled: boolean;
+    selected_proxy_config_id: string;
+    source: "proxy" | "janitor" | "openai" | "claude";
+    updated_at: string;
+}
+
+export interface ApiSettingsResponse {
+    legacy_config: unknown;
+    materialized: boolean;
+    prompts: PromptLibraryItem[];
+    proxy_configs: ApiProxyConfig[];
+    settings: ApiSettingsSettings;
+}
+
 export interface GenerationSettings {
     context_length: number;
     max_new_token: number;

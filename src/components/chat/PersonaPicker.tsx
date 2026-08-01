@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -42,32 +42,25 @@ export default function PersonaPicker({
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [loading, setLoading] = useState(false);
+  const fetchedRef = useRef(false);
 
-  useEffect(() => {
-    if (visible && !profile) {
-      setLoading(true);
-      let cancelled = false;
-      const fetchData = async () => {
-        try {
-          let ps: Persona[] = [];
-          try {
-            ps = await getMyPersonas();
-          } catch {}
-          const p = await getMyProfile();
-          if (cancelled) return;
-          setProfile(p);
-          setPersonas(ps);
-        } catch {
-        } finally {
-          if (!cancelled) setLoading(false);
-        }
-      };
-      fetchData();
-      return () => {
-        cancelled = true;
-      };
+  const handleShow = useCallback(async () => {
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+    setLoading(true);
+    try {
+      let ps: Persona[] = [];
+      try {
+        ps = await getMyPersonas();
+      } catch {}
+      const p = await getMyProfile();
+      setProfile(p);
+      setPersonas(ps);
+    } catch {
+    } finally {
+      setLoading(false);
     }
-  }, [visible, profile]);
+  }, []);
 
   const entries = useMemo((): PersonaEntry[] => {
     if (!profile) return [];
@@ -127,6 +120,7 @@ export default function PersonaPicker({
       visible={visible}
       transparent
       animationType="fade"
+      onShow={handleShow}
       onRequestClose={onClose}
     >
       <Pressable style={styles.overlay} onPress={onClose}>

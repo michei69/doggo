@@ -103,6 +103,18 @@ export default function MyCharactersScreen() {
     fetchCharacters(1, filter, false).finally(() => setRefreshing(false));
   }, [filter, fetchCharacters]);
 
+  const refreshControl = useMemo(
+    () => (
+      <RefreshControl
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+        tintColor={colors.accent}
+        colors={[colors.accent]}
+      />
+    ),
+    [refreshing, handleRefresh],
+  );
+
   const handleFilterSelect = useCallback((key: PrivacyFilter) => {
     setFilter(key);
     setFilterModalVisible(false);
@@ -246,14 +258,7 @@ export default function MyCharactersScreen() {
           onEndReachedThreshold={0.5}
           drawDistance={2000}
           overrideProps={{ initialDrawBatchSize: 50 }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={colors.accent}
-              colors={[colors.accent]}
-            />
-          }
+          refreshControl={refreshControl}
           ListFooterComponent={renderFooter}
           ListEmptyComponent={renderEmpty}
           contentContainerStyle={styles.listContent}

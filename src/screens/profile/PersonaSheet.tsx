@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   Pressable,
-  Alert,
   ActivityIndicator,
   StyleSheet,
   TextInput as RNTextInput,
@@ -22,6 +21,7 @@ import Animated, {
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import Avatar from "../../components/common/Avatar";
+import CustomAlert from "../../components/common/CustomAlert";
 import { avatarUrl } from "../../utils/assets";
 import { colors } from "../../utils/colors";
 import {
@@ -45,6 +45,7 @@ import {
   unregisterSheet,
 } from "../../stores/sheetStore";
 import { useKeyboardHeight } from "../../hooks/useKeyboardHeight";
+import { useAlert } from "../../hooks/useAlert";
 
 const EMPTY_PRONOUNS: Pronouns = {
   subjective: "",
@@ -230,7 +231,7 @@ function GroupField({
       <Text style={styles.formLabel}>Group</Text>
       {personaGroups.length === 0 ? (
         <Text style={styles.dropdownEmpty}>
-          No groups — create one in the Groups tab
+          No groups: create one in the Groups tab
         </Text>
       ) : (
         <View>
@@ -426,6 +427,7 @@ function PersonaSheetContent({
 }) {
   const isMainPersona = mode === "editMain";
   const editingId = mode === "edit" ? persona?.id ?? null : null;
+  const { alert, showAlert, dismissAlert } = useAlert();
 
   const [form, setForm] = useState<PersonaForm>(() =>
     initialFormValue(mode, persona, profile),
@@ -444,10 +446,9 @@ function PersonaSheetContent({
   const handlePickAndUploadAvatar = useCallback(async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert(
-        "Permission needed",
-        "Allow access to photos to change your avatar.",
-      );
+      showAlert("Permission needed", "Allow access to photos to change your avatar.", [
+        { text: "OK" },
+      ]);
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -489,15 +490,15 @@ function PersonaSheetContent({
       });
       setForm((f) => ({ ...f, avatar: upload.filename }));
     } catch {
-      Alert.alert("Error", "Failed to upload avatar");
+      showAlert("Error", "Failed to upload avatar", [{ text: "OK" }]);
     } finally {
       setUploading(false);
     }
-  }, [animateIn]);
+  }, [animateIn, showAlert]);
 
   const handleSave = useCallback(async () => {
     if (!form.name.trim()) {
-      Alert.alert("Error", "Name is required");
+      showAlert("Error", "Name is required", [{ text: "OK" }]);
       return;
     }
     setSaving(true);
@@ -535,11 +536,11 @@ function PersonaSheetContent({
         onSaved();
       });
     } catch {
-      Alert.alert("Error", "Failed to save persona");
+      showAlert("Error", "Failed to save persona", [{ text: "OK" }]);
     } finally {
       setSaving(false);
     }
-  }, [form, isMainPersona, editingId, onSaved, animateOut]);
+  }, [form, isMainPersona, editingId, onSaved, animateOut, showAlert]);
 
   const handleDelete = useCallback(() => {
     if (!editingId) return;
@@ -557,12 +558,15 @@ function PersonaSheetContent({
 
   const rSheetStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
+  }));
+
+  const sheetStaticStyle = {
     maxHeight: windowHeight * 0.9,
     ...(isTablet && {
       marginLeft: sheetInset,
       marginRight: sheetInset,
     }),
-  }));
+  };
 
   return (
     <Animated.View style={[styles.container, rContainerStyle]}>
@@ -571,7 +575,7 @@ function PersonaSheetContent({
         style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <Animated.View style={[styles.sheet, rSheetStyle]}>
+        <Animated.View style={[styles.sheet, rSheetStyle, sheetStaticStyle]}>
           <Text style={styles.modalTitle}>
             {isMainPersona
               ? "Edit Main Persona"
@@ -675,6 +679,13 @@ function PersonaSheetContent({
           )}
         </Animated.View>
       </KeyboardAvoidingView>
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        buttons={alert.buttons}
+        onDismiss={dismissAlert}
+      />
     </Animated.View>
   );
 }
@@ -790,8 +801,9 @@ export default function PersonaSheet({
   });
 
   useEffect(() => {
+    const key = portalKeyRef.current;
     return () => {
-      if (portalKeyRef.current >= 0) unregisterSheet(portalKeyRef.current);
+      if (key >= 0) unregisterSheet(key);
     };
   }, []);
 
@@ -805,7 +817,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 1000,
+    zIndex: 50,
     justifyContent: "flex-end",
   },
   backdrop: {

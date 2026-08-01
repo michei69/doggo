@@ -182,7 +182,7 @@ export default function CommentItem({
         {translating && (
           <View style={styles.translatingRow}>
             <ActivityIndicator size="small" color={colors.accent} />
-            <Text style={styles.translatingText}>Translating...</Text>
+            <Text style={styles.translatingText}>Translating…</Text>
           </View>
         )}
         <View style={styles.actions}>

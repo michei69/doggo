@@ -22,6 +22,7 @@ export const STORAGE_KEYS = {
     HIDDEN_CHARACTERS: "hidden_characters",
     REVIEW_REACTIONS_ENABLED: "review_reactions_enabled",
     FULL_RES_IMAGES: "full_res_images",
+    PRIVACY_MODE: "privacy_mode",
 } as const;
 
 export const SUPABASE_ANON_KEY =

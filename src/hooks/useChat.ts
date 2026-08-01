@@ -2,9 +2,9 @@ import { useCallback, useRef } from "react";
 import { useChatStore } from "../stores/chatStore";
 import { useAuthStore } from "../stores/authStore";
 import * as chatsApi from "../api/chats";
-import { sseClient, type SSECallbacks } from "../api/sse";
+import { sseClient } from "../api/sse";
 import { getMyProfile } from "../api/profile";
-import type { CreateMessageRequest } from "../types/api";
+import type { CreateMessageRequest, ChatMessage } from "../types/api";
 import { useTurnstile } from "../components/turnstile/TurnstileProvider";
 import { groupMessages } from "../utils/messages";
 import { processText } from "../utils/processText";
@@ -14,7 +14,7 @@ import { TURNSTILE_LOGIN_SITE_KEY } from "../utils/turnstile";
 
 const TOKEN_BUFFER_MS = 150;
 
-export function createTokenBuffer(onFlush: (accumulated: string) => void) {
+function createTokenBuffer(onFlush: (accumulated: string) => void) {
     let buffer = "";
     let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -64,6 +64,122 @@ export async function withChallengeRetry<T>(
         }
         throw err;
     }
+}
+
+interface StreamCallbacksDeps {
+    tempMessage: ChatMessage;
+    msgBuffer: ReturnType<typeof createTokenBuffer>;
+    flushThinking: () => void;
+    addThinking: (t: string) => void;
+    enableThinking: boolean;
+    characterId: string;
+    chatId: number;
+    storeSetGenerating: (generating: boolean) => void;
+    storeSetActiveThinking: (thinking: string) => void;
+    storeUpdateOptimistically: (
+        tempId: number,
+        changes: Partial<ChatMessage>,
+    ) => void;
+    genAbortRef: React.MutableRefObject<AbortController | null>;
+    showChallenge: (html: string) => Promise<string>;
+    showTurnstile: (siteKey: string) => Promise<string>;
+}
+
+function makeStreamCallbacks({
+    tempMessage,
+    msgBuffer,
+    flushThinking,
+    addThinking,
+    enableThinking,
+    characterId,
+    chatId,
+    storeSetGenerating,
+    storeSetActiveThinking,
+    storeUpdateOptimistically,
+    genAbortRef,
+    showChallenge,
+    showTurnstile,
+}: StreamCallbacksDeps) {
+    return {
+        onToken: (token: string) => {
+            const msgs = useChatStore.getState().messages;
+            const last = msgs[msgs.length - 1];
+            if (last && last.id === tempMessage.id) {
+                msgBuffer.add(token);
+            }
+        },
+        onThinking: (thinking: string) => {
+            if (enableThinking) {
+                addThinking(thinking);
+            }
+        },
+        onComplete: async (fullMessage: string) => {
+            msgBuffer.flush();
+            flushThinking();
+            storeSetGenerating(false);
+            genAbortRef.current = null;
+            if (fullMessage) {
+                const state = useChatStore.getState();
+                const message = state.autoFormatEnabled
+                    ? processText(fullMessage, {
+                          wrapper: state.narrationWrapper,
+                          removeTags: true,
+                      })
+                    : fullMessage;
+                try {
+                    const rawResponse: any = await withChallengeRetry(
+                        () =>
+                            chatsApi.createMessage({
+                                is_bot: true,
+                                is_main: false,
+                                message,
+                                character_id: characterId,
+                                chat_id: chatId,
+                                created_at: new Date(),
+                                rating: null,
+                            }),
+                        showChallenge,
+                        showTurnstile,
+                    );
+                    const savedMsg = rawResponse?.data ?? rawResponse;
+                    if (Array.isArray(savedMsg)) {
+                        useChatStore.setState((s) => {
+                            const msgs = s.messages.filter(
+                                (m) => m.id !== tempMessage.id,
+                            );
+                            // Only reset is_main on messages in the last bot group (variants being replaced)
+                            const lastBotGroupIds = new Set<number>();
+                            for (let i = msgs.length - 1; i >= 0; i--) {
+                                if (msgs[i].is_bot && msgs[i].id > 0) {
+                                    lastBotGroupIds.add(msgs[i].id);
+                                } else {
+                                    break;
+                                }
+                            }
+                            return {
+                                messages: msgs
+                                    .map((m) =>
+                                        m.is_bot && lastBotGroupIds.has(m.id)
+                                            ? { ...m, is_main: false }
+                                            : m,
+                                    )
+                                    .concat({ ...savedMsg[0], is_main: true }),
+                            };
+                        });
+                    }
+                } catch {}
+            }
+        },
+        onError: (err: Error) => {
+            flushThinking();
+            storeSetGenerating(false);
+            storeSetActiveThinking("");
+            genAbortRef.current = null;
+            storeUpdateOptimistically(tempMessage.id, {
+                message: `Error: ${err.message}`,
+            });
+        },
+    };
 }
 
 export function useChat() {
@@ -325,8 +441,7 @@ export function useChat() {
                     profile.config.generation_settings.enable_thinking ?? false;
                 storeSetEnableThinking(enableThinking);
 
-                const privacyMode =
-                    profile.config.generation_settings.privacy_mode ?? false;
+                const privacyMode = await storage.getPrivacyMode();
 
                 const userConfig = {
                     ...profile.config,
@@ -428,84 +543,30 @@ export function useChat() {
                         }
                     });
 
-                    sseClient.streamChat(apiUrl, apiKey, model, msgArr, {
-                        onToken: (token: string) => {
-                            const msgs = useChatStore.getState().messages;
-                            const last = msgs[msgs.length - 1];
-                            if (last && last.id === tempMessage.id) {
-                                msgBuffer.add(token);
-                            }
-                        },
-                        onThinking: (thinking: string) => {
-                            if (enableThinking) {
-                                addThinking(thinking);
-                            }
-                        },
-                        onComplete: async (fullMessage: string) => {
-                            msgBuffer.flush();
-                            flushThinking();
-                            storeSetGenerating(false);
-                            genAbortRef.current = null;
-                            if (fullMessage) {
-                                const state = useChatStore.getState();
-                                const message = state.autoFormatEnabled
-                                    ? processText(fullMessage, {
-                                          wrapper: state.narrationWrapper,
-                                          removeTags: true,
-                                      })
-                                    : fullMessage;
-                                try {
-                                    const rawResponse: any = await withChallengeRetry(
-                                        () =>
-                                            chatsApi.createMessage({
-                                                is_bot: true,
-                                                is_main: false,
-                                                message,
-                                                character_id: characterId,
-                                                chat_id: chatId,
-                                                created_at: new Date(),
-                                                rating: null,
-                                            }),
-                                        showChallenge,
-                                        showTurnstile,
-                                    );
-                                    const savedMsg = rawResponse?.data ?? rawResponse;
-                                    if (Array.isArray(savedMsg)) {
-                                        useChatStore.setState((s) => {
-                                            const msgs = s.messages.filter((m) => m.id !== tempMessage.id);
-                                            // Only reset is_main on messages in the last bot group (variants being replaced)
-                                            const lastBotGroupIds = new Set<number>();
-                                            for (let i = msgs.length - 1; i >= 0; i--) {
-                                                if (msgs[i].is_bot && msgs[i].id > 0) {
-                                                    lastBotGroupIds.add(msgs[i].id);
-                                                } else {
-                                                    break;
-                                                }
-                                            }
-                                            return {
-                                                messages: msgs
-                                                    .map((m) =>
-                                                        m.is_bot && lastBotGroupIds.has(m.id)
-                                                            ? { ...m, is_main: false }
-                                                            : m,
-                                                    )
-                                                    .concat({ ...savedMsg[0], is_main: true }),
-                                            };
-                                        });
-                                    }
-                                } catch {}
-                            }
-                        },
-                        onError: (err: Error) => {
-                            flushThinking();
-                            storeSetGenerating(false);
-                            storeSetActiveThinking("");
-                            genAbortRef.current = null;
-                            storeUpdateOptimistically(tempMessage.id, {
-                                message: `Error: ${err.message}`,
-                            });
-                        },
-                    }, userConfig.generation_settings?.enable_reasoning !== false && userConfig.generation_settings?.enable_reasoning_chat === true);
+                    sseClient.streamChat(
+                        apiUrl,
+                        apiKey,
+                        model,
+                        msgArr,
+                        makeStreamCallbacks({
+                            tempMessage,
+                            msgBuffer,
+                            flushThinking,
+                            addThinking,
+                            enableThinking,
+                            characterId,
+                            chatId,
+                            storeSetGenerating,
+                            storeSetActiveThinking,
+                            storeUpdateOptimistically,
+                            genAbortRef,
+                            showChallenge,
+                            showTurnstile,
+                        }),
+                        userConfig.generation_settings?.enable_reasoning !== false &&
+                            userConfig.generation_settings?.enable_reasoning_chat ===
+                                true,
+                    );
                     return; // Skip generateAlpha
                 }
 
@@ -596,84 +657,21 @@ export function useChat() {
                 await chatsApi.generateAlpha(
                     body,
                     abort.signal,
-                    {
-                        onToken: (token: string) => {
-                            const msgs = useChatStore.getState().messages;
-                            const last = msgs[msgs.length - 1];
-                            if (last && last.id === tempMessage.id) {
-                                msgBuffer.add(token);
-                            }
-                        },
-                        onThinking: (thinking: string) => {
-                            if (enableThinking) {
-                                addThinking(thinking);
-                            }
-                        },
-                        onComplete: async (fullMessage: string) => {
-                            msgBuffer.flush();
-                            flushThinking();
-                            storeSetGenerating(false);
-                            genAbortRef.current = null;
-                            if (fullMessage) {
-                                const state = useChatStore.getState();
-                                const message = state.autoFormatEnabled
-                                    ? processText(fullMessage, {
-                                          wrapper: state.narrationWrapper,
-                                          removeTags: true,
-                                      })
-                                    : fullMessage;
-                                try {
-                                    const rawResponse: any = await withChallengeRetry(
-                                        () =>
-                                            chatsApi.createMessage({
-                                                is_bot: true,
-                                                is_main: false,
-                                                message,
-                                                character_id: characterId,
-                                                chat_id: chatId,
-                                                created_at: new Date(),
-                                                rating: null
-                                            }),
-                                        showChallenge,
-                                        showTurnstile,
-                                    );
-                                    const savedMsg = rawResponse?.data ?? rawResponse;
-                                    if (Array.isArray(savedMsg)) {
-                                        useChatStore.setState((s) => {
-                                            const msgs = s.messages.filter((m) => m.id !== tempMessage.id);
-                                            // Only reset is_main on messages in the last bot group (variants being replaced)
-                                            const lastBotGroupIds = new Set<number>();
-                                            for (let i = msgs.length - 1; i >= 0; i--) {
-                                                if (msgs[i].is_bot && msgs[i].id > 0) {
-                                                    lastBotGroupIds.add(msgs[i].id);
-                                                } else {
-                                                    break;
-                                                }
-                                            }
-                                            return {
-                                                messages: msgs
-                                                    .map((m) =>
-                                                        m.is_bot && lastBotGroupIds.has(m.id)
-                                                            ? { ...m, is_main: false }
-                                                            : m,
-                                                    )
-                                                    .concat({ ...savedMsg[0], is_main: true }),
-                                            };
-                                        });
-                                    }
-                                } catch {}
-                            }
-                        },
-                        onError: (err: Error) => {
-                            flushThinking();
-                            storeSetGenerating(false);
-                            storeSetActiveThinking("");
-                            genAbortRef.current = null;
-                            storeUpdateOptimistically(tempMessage.id, {
-                                message: `Error: ${err.message}`,
-                            });
-                        },
-                    },
+                    makeStreamCallbacks({
+                        tempMessage,
+                        msgBuffer,
+                        flushThinking,
+                        addThinking,
+                        enableThinking,
+                        characterId,
+                        chatId,
+                        storeSetGenerating,
+                        storeSetActiveThinking,
+                        storeUpdateOptimistically,
+                        genAbortRef,
+                        showChallenge,
+                        showTurnstile,
+                    }),
                     selectedProxy?.apiUrl,
                     selectedProxy?.apiKey,
                     selectedProxy?.model,
@@ -711,6 +709,7 @@ export function useChat() {
     );
 
     const cancelGeneration = useCallback(async () => {
+        sseClient.abort();
         genAbortRef.current?.abort();
         genAbortRef.current = null;
 
@@ -771,125 +770,6 @@ export function useChat() {
         } catch {}
     }, [storeSetUserConfig]);
 
-    const streamAIResponse = useCallback(
-        (
-            apiUrl: string,
-            apiKey: string,
-            model: string,
-            msgArr: Array<{ role: string; content: string }>,
-            chatId: number,
-            characterId: string,
-            personaId: string | null = null,
-        ) => {
-            storeSetSending(true);
-
-            const tempMessage = {
-                chat_id: chatId,
-                created_at: new Date().toISOString(),
-                id: -Date.now(),
-                is_bot: true,
-                is_main: false,
-                message: "",
-                metadata: null,
-                rating: null,
-            };
-            storeAddMessage(tempMessage);
-
-            let thinkingAccum = "";
-
-            const msgBuffer = createTokenBuffer((accumulated) => {
-                const currentMessages = useChatStore.getState().messages;
-                const lastMsg = currentMessages[currentMessages.length - 1];
-                if (lastMsg && lastMsg.id === tempMessage.id) {
-                    storeUpdateOptimistically(tempMessage.id, {
-                        message: lastMsg.message + accumulated,
-                    });
-                }
-            });
-
-            let thinkingBuf = "";
-            let thinkingTimer: ReturnType<typeof setTimeout> | null = null;
-
-            const flushThinking = () => {
-                if (thinkingTimer) {
-                    clearTimeout(thinkingTimer);
-                    thinkingTimer = null;
-                }
-                if (thinkingBuf) {
-                    thinkingAccum = thinkingBuf;
-                    const state = useChatStore.getState();
-                    if (state.enableThinking) {
-                        storeSetActiveThinking(thinkingAccum);
-                    }
-                    thinkingBuf = "";
-                }
-            };
-
-            const addThinking = (t: string) => {
-                thinkingBuf = t;
-                if (!thinkingTimer) {
-                    thinkingTimer = setTimeout(flushThinking, TOKEN_BUFFER_MS);
-                }
-            };
-
-            const callbacks: SSECallbacks = {
-                onToken: (token) => {
-                    msgBuffer.add(token);
-                },
-                onThinking: (thinking) => {
-                    addThinking(thinking);
-                },
-                onComplete: async (fullMessage) => {
-                    msgBuffer.flush();
-                    flushThinking();
-                    storeSetSending(false);
-                    try {
-                        const rawResponse: any = await withChallengeRetry(
-                            () =>
-                                chatsApi.createMessage({
-                                    is_bot: true,
-                                    is_main: false,
-                                    message: fullMessage,
-                                    metadata: {
-                                        persona_id: personaId,
-                                        persona_name: "",
-                                        persona_avatar: "",
-                                    },
-                                    character_id: characterId,
-                                    chat_id: chatId,
-                                }),
-                            showChallenge,
-                            showTurnstile,
-                        );
-                        const savedMsg = rawResponse?.data ?? rawResponse;
-                        storeRemoveMessages([tempMessage.id]);
-                        if (Array.isArray(savedMsg)) {
-                            storeAddMessage(savedMsg[0]);
-                        }
-                    } catch {}
-                },
-                onError: (err) => {
-                    storeSetSending(false);
-                    storeSetActiveThinking("");
-                    storeUpdateOptimistically(tempMessage.id, {
-                        message: `Error: ${err.message}`,
-                    });
-                },
-            };
-
-            sseClient.streamChat(apiUrl, apiKey, model, msgArr, callbacks);
-        },
-        [
-            storeSetSending,
-            storeAddMessage,
-            storeRemoveMessages,
-            storeUpdateOptimistically,
-            showChallenge,
-            showTurnstile,
-            storeSetActiveThinking,
-        ],
-    );
-
     const abortStream = useCallback(() => {
         sseClient.abort();
         storeSetSending(false);
@@ -916,8 +796,6 @@ export function useChat() {
         deleteMsg,
         startNewChat,
         deleteChat,
-        streamAIResponse,
-        abortStream,
         generateBotResponse,
         cancelGeneration,
         loadUserConfig,

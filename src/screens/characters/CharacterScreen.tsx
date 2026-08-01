@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Pressable,
 } from "react-native";
+import { Skeleton } from "boneyard-js/native";
 import {
   type RouteProp,
   useRoute,
@@ -53,9 +54,30 @@ type Route = RouteProp<CharactersStackParamList, "CharacterScreen">;
 
 const LoadingState = React.memo(function LoadingState() {
   return (
-    <View style={styles.centered}>
-      <ActivityIndicator size="large" color={colors.accent} />
-    </View>
+    <Skeleton
+      name="character-screen"
+      loading
+      animate="shimmer"
+      fallback={
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={colors.accent} />
+        </View>
+      }
+    >
+      <View style={styles.skeletonContainer}>
+        <View style={styles.skeletonAvatar} />
+        <View style={styles.skeletonNameRow}>
+          <View style={styles.skeletonLine} />
+          <View style={[styles.skeletonLine, { width: "50%", marginTop: 8 }]} />
+        </View>
+        <View style={styles.skeletonStatsRow}>
+          {[0, 1, 2].map((i) => (
+            <View key={i} style={styles.skeletonStatChip} />
+          ))}
+        </View>
+        <View style={[styles.skeletonLine, { width: "100%", height: 80, marginTop: 16 }]} />
+      </View>
+    </Skeleton>
   );
 });
 
@@ -141,7 +163,7 @@ const CopyOverlay = React.memo(function CopyOverlay() {
     <View style={styles.copyOverlay}>
       <View style={styles.copyOverlayBox}>
         <ActivityIndicator size="large" color={colors.accent} />
-        <Text style={styles.copyOverlayText}>Copying character...</Text>
+        <Text style={styles.copyOverlayText}>Copying character…</Text>
       </View>
     </View>
   );
@@ -227,16 +249,17 @@ async function buildCopyFormData(character: CharacterDetail) {
 }
 
 function useCharacterData(characterId: string) {
-  const [fetching, setFetching] = useState(true);
+  const [loadedId, setLoadedId] = useState<string | null>(null);
   const [character, setCharacter] = useState<CharacterDetail | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [favoriteCount, setFavoriteCount] = useState(0);
   const [latestChat, setLatestChat] = useState<ChatListItem | null>(null);
 
+  const fetching = loadedId !== characterId;
+
   useEffect(() => {
     let cancelled = false;
-    setFetching(true);
     const fetchData = async () => {
       try {
         const [chats, data, favStatus, favCountRes] = await Promise.all([
@@ -255,12 +278,12 @@ function useCharacterData(characterId: string) {
               new Date(a.updated_at).getTime(),
           );
           setLatestChat(sorted[0] ?? null);
-          setFetching(false);
+          setLoadedId(characterId);
         }
       } catch (err: any) {
         if (!cancelled) {
           setFetchError(err.message || "Failed to load character");
-          setFetching(false);
+          setLoadedId(characterId);
         }
       }
     };
@@ -296,10 +319,12 @@ function useCopyCharacter(
     setCopyLoading(true);
 
     try {
-      const formData = await buildCopyFormData(character);
+      const [formData] = await Promise.all([
+        buildCopyFormData(character),
+        storage.removeCreateBotState(),
+        storage.removeEditBotState(),
+      ]);
 
-      await storage.removeCreateBotState();
-      await storage.removeEditBotState();
       await storage.setCreateBotState(formData);
 
       navigate("CreateTab", {
@@ -719,5 +744,41 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 16,
     fontWeight: "500",
+  },
+  skeletonContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+    padding: 20,
+    gap: 16,
+  },
+  skeletonAvatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: colors.border,
+    alignSelf: "center",
+  },
+  skeletonNameRow: {
+    alignItems: "center",
+    gap: 4,
+  },
+  skeletonLine: {
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.border,
+    width: "70%",
+    alignSelf: "center",
+  },
+  skeletonStatsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 4,
+  },
+  skeletonStatChip: {
+    width: 72,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.border,
   },
 });

@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   Pressable,
   Modal,
   Switch,
@@ -12,15 +11,22 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { ProfileStackParamList } from "../../navigation/types";
-
-type Nav = NativeStackNavigationProp<ProfileStackParamList, "Settings">;
 import Button from "../../components/common/Button";
 import ScreenHeader from "../../components/common/ScreenHeader";
+import CustomAlert from "../../components/common/CustomAlert";
 import { useAuthStore } from "../../stores/authStore";
 import { useChatStore } from "../../stores/chatStore";
 import { useIsTablet } from "../../hooks/useIsTablet";
+import { useAlert } from "../../hooks/useAlert";
 import { colors } from "../../utils/colors";
 import { storage } from "../../utils/storage";
+import { toast } from "../../utils/toast";
+import {
+  StorageAccessFramework,
+  writeAsStringAsync,
+} from "expo-file-system/legacy";
+
+type Nav = NativeStackNavigationProp<ProfileStackParamList, "Settings">;
 
 type LayoutOption = "messaging" | "janitor" | "edgeToEdge";
 
@@ -243,6 +249,27 @@ const AutoFormatSection = React.memo(function AutoFormatSection({
   );
 });
 
+async function exportHiddenCharacters(): Promise<void> {
+  const ids = await storage.getHiddenCharacters();
+  if (ids.length === 0) {
+    toast("No hidden characters to export", "error");
+    return;
+  }
+  const json = JSON.stringify(ids, null, 2);
+  const perm = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+  if (!perm.granted) {
+    toast("Save cancelled", "error");
+    return;
+  }
+  const fileUri = await StorageAccessFramework.createFileAsync(
+    perm.directoryUri,
+    "hidden_characters.json",
+    "application/json",
+  );
+  await writeAsStringAsync(fileUri, json, { encoding: "utf8" as any });
+  toast(`Saved ${ids.length} hidden character IDs`);
+}
+
 const ContentSection = React.memo(function ContentSection() {
   const { navigate } = useNavigation<Nav>();
   const [dateFormat, setDateFormat] = useState<"relative" | "absolute">(
@@ -284,6 +311,14 @@ const ContentSection = React.memo(function ContentSection() {
     [navigate],
   );
 
+  const handleExportHidden = useCallback(async () => {
+    try {
+      await exportHiddenCharacters();
+    } catch {
+      toast("Failed to export hidden characters", "error");
+    }
+  }, []);
+
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Content</Text>
@@ -292,6 +327,13 @@ const ContentSection = React.memo(function ContentSection() {
         detail="Manage blocked creators, characters, and tags"
         chevron="›"
         onPress={openBlockedContent}
+      />
+      <PressableRow
+        label="Export Hidden Characters"
+        detail="Save the list of swiped/hidden character IDs to a file"
+        chevron="↓"
+        spaced
+        onPress={handleExportHidden}
       />
       <ToggleRow
         label="Date Format"
@@ -339,11 +381,12 @@ export default function SettingsScreen() {
   const narrationWrapper = useChatStore((s) => s.narrationWrapper);
   const setNarrationWrapper = useChatStore((s) => s.setNarrationWrapper);
   const isTablet = useIsTablet();
+  const { alert, showAlert, dismissAlert } = useAlert();
   const [layoutPickerVisible, setLayoutPickerVisible] = useState(false);
   const [wrapperPickerVisible, setWrapperPickerVisible] = useState(false);
 
   const handleLogout = useCallback(() => {
-    Alert.alert("Logout", "Are you sure you want to log out?", [
+    showAlert("Logout", "Are you sure you want to log out?", [
       {
         text: "Logout",
         style: "destructive",
@@ -351,7 +394,7 @@ export default function SettingsScreen() {
       },
       { text: "Cancel", style: "cancel" },
     ]);
-  }, [logout]);
+  }, [logout, showAlert]);
 
   const openLayoutPicker = useCallback(() => setLayoutPickerVisible(true), []);
   const closeLayoutPicker = useCallback(() => setLayoutPickerVisible(false), []);
@@ -414,6 +457,14 @@ export default function SettingsScreen() {
         activeKey={narrationWrapper}
         onSelect={selectWrapper}
         onClose={closeWrapperPicker}
+      />
+
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        buttons={alert.buttons}
+        onDismiss={dismissAlert}
       />
     </View>
   );

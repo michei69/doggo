@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { FlashList, type FlashListRef } from "@shopify/flash-list";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { Skeleton } from "boneyard-js/native";
 import ChatBubble from "./ChatBubble";
 import type { ChatMessage } from "../../types/api";
 import type { Pronouns } from "../../types/api";
@@ -119,13 +120,13 @@ const MessageGroupRenderer = React.memo(
         setActiveIdx(newIdx);
         syncVariantToServer(newIdx);
       }
-    }, []);
+    }, [syncVariantToServer]);
 
     const goPrev = useCallback(() => {
       const newIdx = Math.max(0, safeIdxRef.current - 1);
       setActiveIdx(newIdx);
       syncVariantToServer(newIdx);
-    }, []);
+    }, [syncVariantToServer]);
 
     useEffect(() => {
       if (!group.isBot || group.messages.length <= 1) return;
@@ -364,7 +365,7 @@ export default function MessageList({
     }
   }, [scrollToBottom]);
 
-  const renderItem = useCallback(
+    const renderItem = useCallback(
     ({ item, index }: { item: MessageGroup; index: number }) => {
       const isLast = index === groups.length - 1;
       return (
@@ -382,7 +383,7 @@ export default function MessageList({
           personaPronouns={personaPronouns}
           characterAvatar={characterAvatar}
           personaAvatar={personaAvatar}
-          activeThinking={activeThinking}
+          activeThinking={isLast ? activeThinking : undefined}
           enableThinking={enableThinking}
           onReroll={onReroll}
         />
@@ -409,9 +410,25 @@ export default function MessageList({
 
   if (isLoading) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color={colors.accent} />
-      </View>
+      <Skeleton
+        name="message-list"
+        loading
+        animate="shimmer"
+        fallback={
+          <View style={styles.loading}>
+            <ActivityIndicator size="large" color={colors.accent} />
+          </View>
+        }
+      >
+        <View style={styles.flashlist}>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <View key={i} style={styles.skeletonRow}>
+              <View style={[styles.skeletonAvatar, i % 2 === 0 && styles.skeletonAvatarRight]} />
+              <View style={[styles.skeletonBubble, i % 2 === 0 && styles.skeletonBubbleRight]} />
+            </View>
+          ))}
+        </View>
+      </Skeleton>
     );
   }
 
@@ -444,6 +461,32 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  skeletonRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  skeletonAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.border,
+  },
+  skeletonAvatarRight: {
+    marginLeft: "auto",
+  },
+  skeletonBubble: {
+    flex: 1,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: colors.border,
+    maxWidth: "70%",
+  },
+  skeletonBubbleRight: {
+    marginLeft: "auto",
   },
   variantNav: {
     flexDirection: "row",

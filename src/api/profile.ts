@@ -24,15 +24,6 @@ export async function getMyPersonas(): Promise<Persona[]> {
     return response.data;
 }
 
-export async function updateMyProfile(
-    config: Partial<UserProfile["config"]>,
-): Promise<UserProfile> {
-    const response = await apiClient.patch<UserProfile>("/profiles/mine", {
-        config,
-    });
-    return response.data;
-}
-
 export async function updateMainPersona(data: {
     avatar: string;
     name: string;
