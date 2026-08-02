@@ -593,6 +593,8 @@ export default function CreatorScreen() {
     error: null,
   });
   const pageRef = useRef(1);
+  const emptyPagesRef = useRef(0);
+  const reachedEndRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -622,6 +624,10 @@ export default function CreatorScreen() {
     async (pageNum: number, isRefresh = false) => {
       if (isRefresh) dispatch({ type: "REFRESHING" });
       else dispatch({ type: "LOADING" });
+      if (pageNum === 1) {
+        emptyPagesRef.current = 0;
+        reachedEndRef.current = false;
+      }
 
       try {
         const params: CharacterSearchParams = {
@@ -654,6 +660,14 @@ export default function CreatorScreen() {
           },
         });
         pageRef.current = pageNum;
+        if (response.data.length === 0) {
+          emptyPagesRef.current += 1;
+          if (emptyPagesRef.current >= 3) {
+            reachedEndRef.current = true;
+          }
+        } else {
+          emptyPagesRef.current = 0;
+        }
       } catch (err: any) {
         dispatch({ type: "ERROR", payload: err.message });
       }
@@ -666,6 +680,7 @@ export default function CreatorScreen() {
   }, [doFetch]);
 
   const handleLoadMore = useCallback(() => {
+    if (reachedEndRef.current) return;
     if (!list.loading && list.characters.length < list.total) {
       doFetch(pageRef.current + 1);
     }

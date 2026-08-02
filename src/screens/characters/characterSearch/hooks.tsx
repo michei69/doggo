@@ -182,9 +182,15 @@ export function useCreators() {
     const [creatorsRefreshing, setCreatorsRefreshing] = useState(false);
     const creatorsPageRef = useRef(1);
     const loadingMoreCreatorsRef = useRef(false);
+    const creatorsEmptyPagesRef = useRef(0);
+    const creatorsReachedEndRef = useRef(false);
 
     const doFetchCreators = useCallback(
         async (pageNum: number, isRefresh = false) => {
+            if (pageNum === 1) {
+                creatorsEmptyPagesRef.current = 0;
+                creatorsReachedEndRef.current = false;
+            }
             if (isRefresh) {
                 setCreatorsRefreshing(true);
             } else if (pageNum === 1) {
@@ -203,6 +209,14 @@ export function useCreators() {
                 }
                 setCreatorsTotal(response.total);
                 creatorsPageRef.current = pageNum;
+                if (response.data.length === 0) {
+                    creatorsEmptyPagesRef.current += 1;
+                    if (creatorsEmptyPagesRef.current >= 3) {
+                        creatorsReachedEndRef.current = true;
+                    }
+                } else {
+                    creatorsEmptyPagesRef.current = 0;
+                }
                 setCreatorsLoading(false);
                 setCreatorsRefreshing(false);
                 loadingMoreCreatorsRef.current = false;
@@ -216,7 +230,7 @@ export function useCreators() {
     );
 
     const handleLoadMoreCreators = useCallback(() => {
-        if (loadingMoreCreatorsRef.current) return;
+        if (loadingMoreCreatorsRef.current || creatorsReachedEndRef.current) return;
         if (!creatorsLoading && creators.length < creatorsTotal) {
             loadingMoreCreatorsRef.current = true;
             const nextPage = creatorsPageRef.current + 1;
@@ -300,6 +314,9 @@ export function useCharactersList() {
     const pageRef = useRef(1);
     const initialLoadRef = useRef(false);
     const loadingMoreRef = useRef(false);
+    // Server `total` can overcount; 3 consecutive empty pages = real end.
+    const emptyPagesRef = useRef(0);
+    const reachedEndRef = useRef(false);
 
     const doFetch = useCallback(
         async (
@@ -312,6 +329,10 @@ export function useCharactersList() {
             },
             isRefresh = false,
         ) => {
+            if (pageNum === 1) {
+                emptyPagesRef.current = 0;
+                reachedEndRef.current = false;
+            }
             if (isRefresh) {
                 dispatch({ type: "REFRESHING" });
             } else if (pageNum === 1) {
@@ -342,6 +363,15 @@ export function useCharactersList() {
                     payload: { data: filteredData, total: response.total, page: pageNum },
                 });
                 pageRef.current = pageNum;
+
+                if (filteredData.length === 0) {
+                    emptyPagesRef.current += 1;
+                    if (emptyPagesRef.current >= 3) {
+                        reachedEndRef.current = true;
+                    }
+                } else {
+                    emptyPagesRef.current = 0;
+                }
 
                 if (response.top_custom_tags && response.top_custom_tags.length > 0) {
                     const custom: TagEntry[] = response.top_custom_tags.map((slug) => ({
@@ -376,7 +406,7 @@ export function useCharactersList() {
                 filters: FilterState;
             },
         ) => {
-            if (loadingMoreRef.current) return;
+            if (loadingMoreRef.current || reachedEndRef.current) return;
             if (!state.loading && state.characters.length < state.total) {
                 loadingMoreRef.current = true;
                 const nextPage = pageRef.current + 1;
