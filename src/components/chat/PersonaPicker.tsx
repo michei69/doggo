@@ -1,13 +1,13 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
   Pressable,
   Modal,
   ActivityIndicator,
+  ScrollView,
   StyleSheet,
 } from "react-native";
-import { FlashList } from "@shopify/flash-list";
 import { getMyProfile, getMyPersonas } from "../../api/profile";
 import Avatar from "../common/Avatar";
 import { avatarUrl } from "../../utils/assets";
@@ -42,32 +42,47 @@ export default function PersonaPicker({
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const wasVisibleRef = useRef(visible);
 
-  const handleShow = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(false);
     try {
-      let ps: Persona[] = [];
-      try {
-        ps = await getMyPersonas();
-      } catch {}
-      const p = await getMyProfile();
-      setProfile(p);
-      setPersonas(ps);
-    } catch {
+      const [p, ps] = await Promise.allSettled([
+        getMyProfile(),
+        getMyPersonas(),
+      ]);
+      if (p.status === "fulfilled") setProfile(p.value);
+      if (ps.status === "fulfilled") setPersonas(ps.value);
+      if (p.status === "rejected" && ps.status === "rejected") {
+        setError(true);
+      }
     } finally {
       setLoading(false);
     }
   }, []);
 
+  useEffect(() => {
+    const wasVisible = wasVisibleRef.current;
+    wasVisibleRef.current = visible;
+    if (visible && !wasVisible) {
+      fetchData();
+    }
+  }, [visible, fetchData]);
+
   const entries = useMemo((): PersonaEntry[] => {
-    if (!profile) return [];
-    const main: PersonaEntry = {
-      id: "__main__",
-      name: profile.name,
-      avatar: profile.avatar,
-      appearance: profile.profile,
-      order: 0,
-    };
+    const main: PersonaEntry[] = profile
+      ? [
+          {
+            id: "__main__",
+            name: profile.name,
+            avatar: profile.avatar,
+            appearance: profile.profile,
+            order: 0,
+          },
+        ]
+      : [];
     const others: PersonaEntry[] = personas.map((p) => ({
       id: p.id,
       name: p.name,
@@ -75,11 +90,11 @@ export default function PersonaPicker({
       appearance: p.appearance,
       order: 1,
     }));
-    return [main, ...others].sort((a, b) => a.order - b.order);
+    return [...main, ...others].sort((a, b) => a.order - b.order);
   }, [profile, personas]);
 
   const renderPersona = useCallback(
-    ({ item }: { item: PersonaEntry }) => (
+    (item: PersonaEntry) => (
       <Pressable
         style={({ pressed }) => [
           styles.persona,
@@ -117,7 +132,6 @@ export default function PersonaPicker({
       visible={visible}
       transparent
       animationType="fade"
-      onShow={handleShow}
       onRequestClose={onClose}
     >
       <Pressable style={styles.overlay} onPress={onClose}>
@@ -130,16 +144,30 @@ export default function PersonaPicker({
               color={colors.accent}
               style={{ paddingVertical: 24 }}
             />
+          ) : error && entries.length === 0 ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.empty}>Failed to load personas</Text>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.retryBtn,
+                  pressed && { opacity: 0.7 },
+                ]}
+                onPress={fetchData}
+              >
+                <Text style={styles.retryText}>Retry</Text>
+              </Pressable>
+            </View>
           ) : entries.length === 0 ? (
             <Text style={styles.empty}>No personas available</Text>
           ) : (
-            <FlashList
-              data={entries}
-              renderItem={renderPersona}
-              keyExtractor={(item) => item.id}
+            <ScrollView
               style={styles.list}
               showsVerticalScrollIndicator={false}
-            />
+            >
+              {entries.map((item) => (
+                <View key={item.id}>{renderPersona(item)}</View>
+              ))}
+            </ScrollView>
           )}
 
           <Pressable
@@ -216,6 +244,22 @@ const styles = StyleSheet.create({
     color: colors.textFaint,
     textAlign: "center",
     paddingVertical: 24,
+  },
+  errorBox: {
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  retryBtn: {
+    backgroundColor: colors.border,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 24,
+    marginTop: 4,
+  },
+  retryText: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    fontWeight: "600",
   },
   cancelBtn: {
     backgroundColor: colors.border,
