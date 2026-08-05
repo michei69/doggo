@@ -10,6 +10,7 @@ import { avatarUrl, botAvatarUrl } from "../../../utils/assets";
 import { useAlert } from "../../../hooks/useAlert";
 import {
     clearAndResetMessages,
+    deleteMessagesInBatches,
     getCharacterChats,
     fetchSystemPrompt,
     forkChat,
@@ -817,23 +818,7 @@ export function useChatScreen() {
 
             try {
                 // Delete all server messages
-                const validIds = serverIds.filter(
-                    (id) => id > 0 && id <= 99000000000 && Number.isInteger(id),
-                );
-                await Promise.all(
-                    (() => {
-                        const requests: Promise<unknown>[] = [];
-                        for (let i = 0; i < validIds.length; i += 256) {
-                            const batch = validIds.slice(i, i + 256);
-                            requests.push(
-                                apiClient.delete(`/chats/${chatId}/messages`, {
-                                    data: { message_ids: batch },
-                                }),
-                            );
-                        }
-                        return requests;
-                    })(),
-                );
+                await deleteMessagesInBatches(chatId, serverIds);
 
                 // Re-create all messages with new persona metadata, batches of 10
                 const newPersonaId = persona?.id ?? null;

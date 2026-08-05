@@ -121,10 +121,9 @@ export async function getCharacterChats(
     return response.data;
 }
 
-export async function clearAndResetMessages(
+export async function deleteMessagesInBatches(
     chatId: number,
     messageIds: number[],
-    firstMessages: string[],
 ): Promise<void> {
     const validIds = messageIds.filter(
         (id) => id > 0 && id <= 99000000000 && Number.isInteger(id),
@@ -143,6 +142,14 @@ export async function clearAndResetMessages(
             return requests;
         })(),
     );
+}
+
+export async function clearAndResetMessages(
+    chatId: number,
+    messageIds: number[],
+    firstMessages: string[],
+): Promise<void> {
+    await deleteMessagesInBatches(chatId, messageIds);
     if (firstMessages.length > 0) {
         const body = firstMessages.reverse().map((msg, i) => ({
             chat_id: chatId,
