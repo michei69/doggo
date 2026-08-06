@@ -577,11 +577,18 @@ export function useChatScreen() {
                     onPress: async () => {
                         dismissAlert();
                         try {
-                            const ids = activeChatDetail.chatMessages.map((m) => m.id);
+                            const currentMessages =
+                                useChatStore.getState().messages;
+                            const serverIds = currentMessages.reduce<
+                                number[]
+                            >((acc, m) => {
+                                if (m.id > 0) acc.push(m.id);
+                                return acc;
+                            }, []);
                             useChatStore.getState().clearMessages();
                             await clearAndResetMessages(
                                 chatId,
-                                ids,
+                                serverIds,
                                 activeChatDetail.character.first_messages,
                             );
                             await loadMessages(chatId);

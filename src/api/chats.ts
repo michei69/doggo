@@ -151,7 +151,9 @@ export async function clearAndResetMessages(
 ): Promise<void> {
     await deleteMessagesInBatches(chatId, messageIds);
     if (firstMessages.length > 0) {
-        const body = firstMessages.reverse().map((msg, i) => ({
+        const body = [...firstMessages]
+            .reverse()
+            .map((msg, i) => ({
             chat_id: chatId,
             is_bot: true,
             is_main: i === 0,
