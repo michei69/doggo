@@ -28,6 +28,7 @@ import ProfileScreen from "../screens/profile/ProfileScreen";
 import MyPersonasScreen from "../screens/profile/MyPersonasScreen";
 import SettingsScreen from "../screens/profile/SettingsScreen";
 import BlockedContentScreen from "../screens/profile/BlockedContentScreen";
+import HiddenCharactersScreen from "../screens/profile/HiddenCharactersScreen";
 import MyCharactersScreen from "../screens/profile/MyCharactersScreen";
 
 const ChatsStack = createNativeStackNavigator<ChatsStackParamList>();
@@ -88,6 +89,7 @@ function ProfileStackNavigator() {
       <ProfileStack.Screen name="ProfileHome" component={ProfileScreen} />
       <ProfileStack.Screen name="Settings" component={SettingsScreen} />
       <ProfileStack.Screen name="BlockedContent" component={BlockedContentScreen} />
+      <ProfileStack.Screen name="HiddenCharacters" component={HiddenCharactersScreen} />
       <ProfileStack.Screen name="MyPersonas" component={MyPersonasScreen} />
       <ProfileStack.Screen name="MyCharacters" component={MyCharactersScreen} />
       <ProfileStack.Screen

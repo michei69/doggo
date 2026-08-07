@@ -66,7 +66,6 @@ export default function ChatScreen() {
     handleExport,
     handleImport,
     handleReset,
-    handleSwitchPersona,
     actionsTarget,
     isLastMessage,
     handleActionsClose,
@@ -80,9 +79,6 @@ export default function ChatScreen() {
     newChatPickerVisible,
     handleNewChatPickerClose,
     handleNewChatPersonaSelect,
-    switchPersonaPickerVisible,
-    handleSwitchPersonaPickerClose,
-    handleSwitchPersonaSelect,
     deleteAlert,
     dismissAlert,
     allChatsVisible,
@@ -174,7 +170,6 @@ export default function ChatScreen() {
         onExport={handleExport}
         onImport={handleImport}
         onReset={handleReset}
-        onSwitchPersona={handleSwitchPersona}
       />
 
       <ChatMessageActions
@@ -196,15 +191,6 @@ export default function ChatScreen() {
         onClose={handleNewChatPickerClose}
         onSelect={handleNewChatPersonaSelect}
         characterName={characterName}
-      />
-
-      <PersonaPicker
-        visible={switchPersonaPickerVisible}
-        onClose={handleSwitchPersonaPickerClose}
-        onSelect={handleSwitchPersonaSelect}
-        characterName={characterName}
-        title="Switch Persona"
-        subtitle="Messages will be transferred to the selected persona"
       />
 
       <CustomAlert

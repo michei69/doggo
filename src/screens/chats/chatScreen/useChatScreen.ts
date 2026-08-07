@@ -10,7 +10,6 @@ import { avatarUrl, botAvatarUrl } from "../../../utils/assets";
 import { useAlert } from "../../../hooks/useAlert";
 import {
     clearAndResetMessages,
-    deleteMessagesInBatches,
     getCharacterChats,
     fetchSystemPrompt,
     forkChat,
@@ -25,8 +24,8 @@ import { StorageAccessFramework, writeAsStringAsync } from "expo-file-system/leg
 import { toast } from "../../../utils/toast";
 import { cleanTags, generify } from "../../../utils/markdown";
 import { storage } from "../../../utils/storage";
-import { getMyProfile } from "../../../api/profile";
 import { validateMessagesImport } from "./importUtils";
+import { useSheetStore } from "../../../stores/sheetStore";
 
 type Route = RouteProp<ChatsStackParamList, "ChatScreen">;
 type Nav = NativeStackNavigationProp<ChatsStackParamList, "ChatScreen">;
@@ -58,7 +57,8 @@ async function postMessageBatches(
 
 export function useChatScreen() {
     const route = useRoute<Route>();
-    const { goBack, setOptions, navigate, replace } = useNavigation<Nav>();
+    const navigation = useNavigation<Nav>();
+    const { goBack, setOptions, navigate, replace } = navigation;
     const { chatId, characterName, characterId } = route.params;
     const [settingsVisible, setSettingsVisible] = useState(false);
     const [actionsTarget, setActionsTarget] = useState<{
@@ -68,8 +68,6 @@ export function useChatScreen() {
     const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
     const { alert: deleteAlert, showAlert, dismissAlert } = useAlert();
     const [newChatPickerVisible, setNewChatPickerVisible] = useState(false);
-    const [switchPersonaPickerVisible, setSwitchPersonaPickerVisible] =
-        useState(false);
     const [allChatsVisible, setAllChatsVisible] = useState(false);
     const [allChats, setAllChats] = useState<ChatListItem[]>([]);
     const [allChatsLoading, setAllChatsLoading] = useState(false);
@@ -173,6 +171,23 @@ export function useChatScreen() {
     useEffect(() => {
         setOptions({ headerTitle: characterName });
     }, [setOptions, characterName]);
+
+    // When a bottom sheet is open, the navigation back gesture/button
+    // should close the sheet instead of popping the screen. The sheets
+    // render via a portal above the navigator, so without this the back
+    // swipe acts like no sheet is open at all.
+    useEffect(() => {
+        const unsubscribe = navigation.addListener("beforeRemove", (e: any) => {
+            const visibleSheets = useSheetStore
+                .getState()
+                .entries.filter((entry) => entry.visible);
+            if (visibleSheets.length === 0) return;
+            e.preventDefault();
+            // Close the top-most visible sheet; repeat on next back press.
+            visibleSheets[visibleSheets.length - 1].onClose();
+        });
+        return unsubscribe;
+    }, [navigation]);
 
     const handleSend = useCallback(
         async (content: string) => {
@@ -789,79 +804,6 @@ export function useChatScreen() {
         setActionsTarget(null);
     }, [actionsTarget, chatId, editMsg]);
 
-    const handleSwitchPersona = useCallback(() => {
-        showAlert("Switch Persona",
-            "This action is irreversible. All messages will be transferred to the new persona. Continue?",
-            [
-                {
-                    text: "Continue",
-                    onPress: () => {
-                        dismissAlert();
-                        setSwitchPersonaPickerVisible(true);
-                    },
-                },
-                {
-                    text: "Cancel",
-                    style: "cancel",
-                    onPress: () => dismissAlert(),
-                },
-            ]);
-    }, [showAlert, dismissAlert]);
-
-    const handleSwitchPersonaSelect = useCallback(
-        async (
-            persona: { id: string; name: string; avatar: string } | null,
-        ) => {
-            setSwitchPersonaPickerVisible(false);
-            if (!activeChatDetail) return;
-
-            let profile = null
-            if (!persona) profile = await getMyProfile();
-            const currentMessages = useChatStore.getState().messages;
-            const serverIds = currentMessages.reduce<number[]>((acc, m) => {
-                if (m.id > 0) acc.push(m.id);
-                return acc;
-            }, []);
-
-            try {
-                // Delete all server messages
-                await deleteMessagesInBatches(chatId, serverIds);
-
-                // Re-create all messages with new persona metadata, batches of 10
-                const newPersonaId = persona?.id ?? null;
-                const newPersonaName = persona?.name ?? profile?.name ?? "user";
-                const newPersonaAvatar = persona?.avatar ?? "";
-
-                const msgBodies = currentMessages.map((m) => ({
-                    is_bot: m.is_bot,
-                    is_main: m.is_main,
-                    message: m.message.replaceAll(personaName, newPersonaName),
-                    metadata: {
-                        persona_id: newPersonaId,
-                        persona_name: newPersonaName,
-                        persona_avatar: newPersonaAvatar,
-                    },
-                    character_id: characterId,
-                    chat_id: chatId,
-                    created_at: m.created_at,
-                }));
-
-                await postMessageBatches(chatId, msgBodies);
-
-                await loadMessages(chatId);
-                toast("Persona switched successfully");
-            } catch {
-                toast("Failed to switch persona", "error");
-            }
-        },
-        [chatId, characterId, activeChatDetail, loadMessages, personaName],
-    );
-
-    const handleSwitchPersonaPickerClose = useCallback(
-        () => setSwitchPersonaPickerVisible(false),
-        [],
-    );
-
     const handleRetry = useCallback(() => loadMessages(chatId), [
         loadMessages,
         chatId,
@@ -934,7 +876,6 @@ export function useChatScreen() {
         handleExport,
         handleImport,
         handleReset,
-        handleSwitchPersona,
         actionsTarget,
         isLastMessage,
         handleActionsClose,
@@ -948,9 +889,6 @@ export function useChatScreen() {
         newChatPickerVisible,
         handleNewChatPickerClose,
         handleNewChatPersonaSelect,
-        switchPersonaPickerVisible,
-        handleSwitchPersonaPickerClose,
-        handleSwitchPersonaSelect,
         deleteAlert,
         dismissAlert,
         allChatsVisible,

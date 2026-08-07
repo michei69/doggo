@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet, ActivityIndicator } from "react-nati
 import { FlashList } from "@shopify/flash-list";
 import CustomBottomSheet from "../../../components/common/CustomBottomSheet";
 import Avatar from "../../../components/common/Avatar";
-import { botAvatarUrl } from "../../../utils/assets";
+import { botAvatarUrl, avatarUrl } from "../../../utils/assets";
 import type { ChatListItem } from "../../../types/api";
 import { colors } from "../../../utils/colors";
 
@@ -26,29 +26,41 @@ const AllChatsSheet = React.memo(
     onSelectChat: (item: ChatListItem) => void;
   }) {
     const renderRow = useCallback(
-      ({ item }: { item: ChatListItem }) => (
-        <Pressable
-          style={({ pressed }) => [
-            styles.allChatsRow,
-            pressed && { opacity: 0.7 },
-          ]}
-          onPress={() => onSelectChat(item)}
-        >
-          <Avatar
-            uri={botAvatarUrl(item.character.avatar)}
-            name={item.character.name}
-            size={36}
-          />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.allChatsRowName} numberOfLines={1}>
-              {item.character.name}
-            </Text>
-            <Text style={styles.allChatsRowMeta}>
-              {item.chat_count} messages
-            </Text>
-          </View>
-        </Pressable>
-      ),
+      ({ item }: { item: ChatListItem }) => {
+        const persona = Array.isArray(item.personas)
+          ? (item.personas as Array<{ id?: string; name?: string; avatar?: string }>).find(
+              (p) => p?.id === item.persona_id,
+            ) ??
+            (item.personas as Array<{ id?: string; name?: string; avatar?: string }>)[0]
+          : undefined;
+        return (
+          <Pressable
+            style={({ pressed }) => [
+              styles.allChatsRow,
+              pressed && { opacity: 0.7 },
+            ]}
+            onPress={() => onSelectChat(item)}
+          >
+            <Avatar
+              uri={botAvatarUrl(item.character.avatar)}
+              name={item.character.name}
+              size={36}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.allChatsRowName} numberOfLines={1}>
+                {item.character.name}
+              </Text>
+              <Text style={styles.allChatsRowMeta}>
+                {item.chat_count} messages
+                {persona?.name ? ` · ${persona.name}` : ""}
+              </Text>
+            </View>
+            {persona?.avatar ? (
+              <Avatar uri={avatarUrl(persona.avatar)} name={persona.name} size={28} />
+            ) : null}
+          </Pressable>
+        );
+      },
       [onSelectChat],
     );
     return (

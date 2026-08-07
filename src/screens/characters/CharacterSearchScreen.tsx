@@ -137,6 +137,13 @@ export default function CharacterSearchScreen() {
     [sortMode, searchText, selectedTagIds, filters],
   );
 
+  // Keep a ref of the latest params so the debounced search callback
+  // never reads a stale closure (setSearchText updates state async).
+  const paramsRef = useRef(currentSearchParams);
+  useEffect(() => {
+    paramsRef.current = currentSearchParams;
+  }, [currentSearchParams]);
+
   const handleSearchChange = useCallback(
     (text: string) => {
       setSearchText(text);
@@ -145,10 +152,10 @@ export default function CharacterSearchScreen() {
       }
 
       searchTimeoutRef.current = setTimeout(() => {
-        doFetch(1, currentSearchParams);
+        doFetch(1, { ...paramsRef.current, search: text });
       }, 500);
     },
-    [setSearchText, doFetch, currentSearchParams],
+    [setSearchText, doFetch],
   );
 
   const handleToggleMode = useCallback(() => {

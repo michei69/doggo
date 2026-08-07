@@ -83,6 +83,9 @@ interface StreamCallbacksDeps {
     genAbortRef: React.MutableRefObject<AbortController | null>;
     showChallenge: (html: string) => Promise<string>;
     showTurnstile: (siteKey: string) => Promise<string>;
+    badWords: string[];
+    onForbiddenWord: () => void;
+    onMessageSaved?: () => void;
 }
 
 function makeStreamCallbacks({
@@ -99,6 +102,9 @@ function makeStreamCallbacks({
     genAbortRef,
     showChallenge,
     showTurnstile,
+    badWords,
+    onForbiddenWord,
+    onMessageSaved,
 }: StreamCallbacksDeps) {
     return {
         onToken: (token: string) => {
@@ -119,6 +125,19 @@ function makeStreamCallbacks({
             storeSetGenerating(false);
             genAbortRef.current = null;
             if (fullMessage) {
+                // Forbidden words: drop the message and reroll instead of
+                // saving it.
+                if (
+                    badWords.length > 0 &&
+                    badWords.some((word) =>
+                        fullMessage.toLowerCase().includes(word.toLowerCase()),
+                    )
+                ) {
+                    useChatStore.getState().removeMessages([tempMessage.id]);
+                    storeSetActiveThinking("");
+                    onForbiddenWord();
+                    return;
+                }
                 const state = useChatStore.getState();
                 const message = state.autoFormatEnabled
                     ? processText(fullMessage, {
@@ -143,6 +162,7 @@ function makeStreamCallbacks({
                     );
                     const savedMsg = rawResponse?.data ?? rawResponse;
                     if (Array.isArray(savedMsg)) {
+                        onMessageSaved?.();
                         useChatStore.setState((s) => {
                             const msgs = s.messages.filter(
                                 (m) => m.id !== tempMessage.id,
@@ -218,6 +238,8 @@ export function useChat() {
     const storeSetUserConfig = useChatStore((s) => s.setUserConfig);
 
     const genAbortRef = useRef<AbortController | null>(null);
+    const forbiddenRerollRef = useRef(0);
+    const forbiddenRerollLimitRef = useRef(3);
 
     const { showChallenge, showTurnstile } = useTurnstile();
 
@@ -533,6 +555,18 @@ export function useChat() {
                         })),
                     ];
 
+                    const prefillEnabled =
+                        userConfig.generation_settings?.prefill_enabled === true;
+                    const prefillText = prefillEnabled
+                        ? (userConfig.generation_settings?.prefill_text ?? "")
+                        : "";
+                    if (prefillText) {
+                        // Seed the temp bubble with the prefill so the UI shows it.
+                        storeUpdateOptimistically(tempMessage.id, {
+                            message: prefillText,
+                        });
+                    }
+
                     const msgBuffer = createTokenBuffer((accumulated) => {
                         const msgs = useChatStore.getState().messages;
                         const last = msgs[msgs.length - 1];
@@ -562,10 +596,35 @@ export function useChat() {
                             genAbortRef,
                             showChallenge,
                             showTurnstile,
+                            badWords: userConfig.bad_words ?? [],
+                            onMessageSaved: () => {
+                                forbiddenRerollRef.current = 0;
+                            },
+                            onForbiddenWord: () => {
+                                if (
+                                    forbiddenRerollRef.current >=
+                                    forbiddenRerollLimitRef.current
+                                ) {
+                                    forbiddenRerollRef.current = 0;
+                                    toast(
+                                        "Generation stopped: repeated forbidden words",
+                                        "error",
+                                    );
+                                    return;
+                                }
+                                forbiddenRerollRef.current += 1;
+                                void generateBotResponse(
+                                    chatId,
+                                    characterId,
+                                    personaId,
+                                    generateMode,
+                                );
+                            },
                         }),
                         userConfig.generation_settings?.enable_reasoning !== false &&
                             userConfig.generation_settings?.enable_reasoning_chat ===
                                 true,
+                        prefillText || undefined,
                     );
                     return; // Skip generateAlpha
                 }
@@ -671,6 +730,30 @@ export function useChat() {
                         genAbortRef,
                         showChallenge,
                         showTurnstile,
+                        badWords: userConfig.bad_words ?? [],
+                        onMessageSaved: () => {
+                            forbiddenRerollRef.current = 0;
+                        },
+                        onForbiddenWord: () => {
+                            if (
+                                forbiddenRerollRef.current >=
+                                forbiddenRerollLimitRef.current
+                            ) {
+                                forbiddenRerollRef.current = 0;
+                                toast(
+                                    "Generation stopped: repeated forbidden words",
+                                    "error",
+                                );
+                                return;
+                            }
+                            forbiddenRerollRef.current += 1;
+                            void generateBotResponse(
+                                chatId,
+                                characterId,
+                                personaId,
+                                generateMode,
+                            );
+                        },
                     }),
                     selectedProxy?.apiUrl,
                     selectedProxy?.apiKey,

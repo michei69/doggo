@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import {
   ActivityIndicator,
@@ -10,6 +10,11 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from "react-native-reanimated";
 import { createPrompt, deletePrompt, updatePrompt } from "../../../api/settings";
 import { colors } from "../../../utils/colors";
 import type { PromptEditForm, PromptLibraryItem, ShowAlert } from "./types";
@@ -113,6 +118,24 @@ export default function PromptSelectorModal({
 
   const isFormView = mode === "editing" || mode === "creating";
 
+  // Animate the form view sliding in (matches the modal open/close feel).
+  const formAnim = useSharedValue(0);
+  useEffect(() => {
+    if (isFormView) {
+      formAnim.value = 0;
+      formAnim.value = withTiming(1, { duration: 200 });
+    }
+  }, [isFormView, mode, formAnim]);
+
+  const formStyle = useAnimatedStyle(() => ({
+    opacity: formAnim.value,
+    transform: [
+      {
+        translateY: (1 - formAnim.value) * 24,
+      },
+    ],
+  }));
+
   return (
     <Modal
       visible={visible}
@@ -160,6 +183,7 @@ export default function PromptSelectorModal({
             </View>
 
             {isFormView ? (
+              <Animated.View style={formStyle}>
               <ScrollView
                 style={styles.modalScroll}
                 keyboardShouldPersistTaps="handled"
@@ -204,6 +228,7 @@ export default function PromptSelectorModal({
                   </Pressable>
                 </View>
               </ScrollView>
+              </Animated.View>
             ) : (
               <ScrollView
                 style={styles.modalScroll}
@@ -234,8 +259,8 @@ export default function PromptSelectorModal({
                         onClose();
                       }}
                     >
-                      <Text style={styles.promptItemName} numberOfLines={1}>
-                        {p.name}
+                      <Text style={styles.promptItemName} numberOfLines={2}>
+                        {p.name || "(unnamed)"}
                       </Text>
                     </Pressable>
                     <Pressable
@@ -245,17 +270,10 @@ export default function PromptSelectorModal({
                       <Text style={styles.promptItemActionText}>Edit</Text>
                     </Pressable>
                     <Pressable
-                      style={styles.promptItemActionBtn}
+                      style={styles.promptItemIconBtn}
                       onPress={() => handleDeletePrompt(p)}
                     >
-                      <Text
-                        style={[
-                          styles.promptItemActionText,
-                          { color: colors.danger },
-                        ]}
-                      >
-                        Del
-                      </Text>
+                      <Text style={styles.promptItemIconText}>{"\u{1F5D1}"}</Text>
                     </Pressable>
                   </View>
                 ))}
@@ -280,8 +298,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,
-    width: "90%",
-    maxHeight: "80%",
+    width: "94%",
+    maxHeight: "85%",
     padding: 20,
   },
   modalTitle: {
@@ -408,5 +426,20 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 12,
     fontWeight: "500",
+  },
+  promptItemIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 6,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  promptItemIconText: {
+    color: colors.danger,
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

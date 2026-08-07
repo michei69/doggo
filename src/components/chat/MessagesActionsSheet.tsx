@@ -6,14 +6,12 @@ export default function MessagesActionsSheet({
   onExport,
   onImport,
   onReset,
-  onSwitchPersona,
 }: {
   visible: boolean;
   onClose: () => void;
   onExport: () => void;
   onImport: () => void;
   onReset: () => void;
-  onSwitchPersona?: () => void;
 }) {
   const actions: OptionSheetAction[] = [
     {
@@ -31,18 +29,6 @@ export default function MessagesActionsSheet({
       },
       destructive: true,
     },
-    ...(onSwitchPersona
-      ? [
-          {
-            label: "Switch Persona",
-            onPress: () => {
-              onClose();
-              onSwitchPersona();
-            },
-            destructive: true,
-          },
-        ]
-      : []),
     {
       label: "Reset Messages",
       onPress: () => {

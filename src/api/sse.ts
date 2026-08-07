@@ -98,6 +98,7 @@ class SSEClient {
         messages: Array<{ role: string; content: string }>,
         callbacks: SSECallbacks,
         enableReasoning?: boolean,
+        prefill?: string,
     ): Promise<void> {
         this.abort();
         this.abortController = new AbortController();
@@ -107,6 +108,17 @@ class SSEClient {
 
         const thinkingParam = { type: enableReasoning ? "enabled" as const : "disabled" as const };
 
+        const body: Record<string, unknown> = {
+            model,
+            messages,
+            stream: true,
+            thinking: thinkingParam,
+        };
+        if (prefill) {
+            // Assistant prefill: the model continues from this text.
+            body.prefill = prefill;
+        }
+
         try {
             const response = await fetch(url, {
                 method: "POST",
@@ -114,7 +126,7 @@ class SSEClient {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${apiKey}`,
                 },
-                body: JSON.stringify({ model, messages, stream: true, thinking: thinkingParam }),
+                body: JSON.stringify(body),
                 signal: this.abortController.signal,
             });
 

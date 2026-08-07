@@ -104,6 +104,16 @@ const MessageGroupRenderer = React.memo(
       if (!g.isBot || g.messages.length <= 1 || !cId) return;
       const chosen = g.messages[newIdx];
       if (!chosen) return;
+      // Commit the choice locally too, otherwise the group's is_main-based
+      // reset effect snaps the display back to the old main (usually the
+      // last variant) the moment a new message arrives.
+      useChatStore.setState((s) => ({
+        messages: s.messages.map((m) =>
+          g.messages.some((gm) => gm.id === m.id)
+            ? { ...m, is_main: m.id === chosen.id }
+            : m,
+        ),
+      }));
       for (const msg of g.messages) {
         const isMain = msg.id === chosen.id;
         if (msg.is_main !== isMain) {

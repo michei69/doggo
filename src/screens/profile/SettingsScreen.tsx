@@ -20,11 +20,6 @@ import { useIsTablet } from "../../hooks/useIsTablet";
 import { useAlert } from "../../hooks/useAlert";
 import { colors } from "../../utils/colors";
 import { storage } from "../../utils/storage";
-import { toast } from "../../utils/toast";
-import {
-  StorageAccessFramework,
-  writeAsStringAsync,
-} from "expo-file-system/legacy";
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList, "Settings">;
 
@@ -249,27 +244,6 @@ const AutoFormatSection = React.memo(function AutoFormatSection({
   );
 });
 
-async function exportHiddenCharacters(): Promise<void> {
-  const ids = await storage.getHiddenCharacters();
-  if (ids.length === 0) {
-    toast("No hidden characters to export", "error");
-    return;
-  }
-  const json = JSON.stringify(ids, null, 2);
-  const perm = await StorageAccessFramework.requestDirectoryPermissionsAsync();
-  if (!perm.granted) {
-    toast("Save cancelled", "error");
-    return;
-  }
-  const fileUri = await StorageAccessFramework.createFileAsync(
-    perm.directoryUri,
-    "hidden_characters.json",
-    "application/json",
-  );
-  await writeAsStringAsync(fileUri, json, { encoding: "utf8" as any });
-  toast(`Saved ${ids.length} hidden character IDs`);
-}
-
 const ContentSection = React.memo(function ContentSection() {
   const { navigate } = useNavigation<Nav>();
   const [dateFormat, setDateFormat] = useState<"relative" | "absolute">(
@@ -311,13 +285,10 @@ const ContentSection = React.memo(function ContentSection() {
     [navigate],
   );
 
-  const handleExportHidden = useCallback(async () => {
-    try {
-      await exportHiddenCharacters();
-    } catch {
-      toast("Failed to export hidden characters", "error");
-    }
-  }, []);
+  const openHiddenCharacters = useCallback(
+    () => navigate("HiddenCharacters"),
+    [navigate],
+  );
 
   return (
     <View style={styles.section}>
@@ -329,11 +300,11 @@ const ContentSection = React.memo(function ContentSection() {
         onPress={openBlockedContent}
       />
       <PressableRow
-        label="Export Hidden Characters"
-        detail="Save the list of swiped/hidden character IDs to a file"
-        chevron="↓"
+        label="Hidden Characters"
+        detail="View, import, and export swiped/hidden character IDs"
+        chevron="›"
         spaced
-        onPress={handleExportHidden}
+        onPress={openHiddenCharacters}
       />
       <ToggleRow
         label="Date Format"

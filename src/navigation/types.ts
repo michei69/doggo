@@ -23,6 +23,7 @@ export type ProfileStackParamList = {
     ProfileHome: undefined;
     Settings: undefined;
     BlockedContent: undefined;
+    HiddenCharacters: undefined;
     MyPersonas: undefined;
     MyCharacters: undefined;
     ProfileCharacterScreen: { characterId: string; characterName: string };
