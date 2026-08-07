@@ -176,8 +176,12 @@ export function useChatScreen() {
     // should close the sheet instead of popping the screen. The sheets
     // render via a portal above the navigator, so without this the back
     // swipe acts like no sheet is open at all.
+    // Only intercept GO_BACK/POP: other removal actions (REPLACE, RESET,
+    // NAVIGATE) are app-initiated (e.g. fork chat) and must not be blocked.
     useEffect(() => {
         const unsubscribe = navigation.addListener("beforeRemove", (e: any) => {
+            const actionType = e.data?.action?.type;
+            if (actionType !== "GO_BACK" && actionType !== "POP") return;
             const visibleSheets = useSheetStore
                 .getState()
                 .entries.filter((entry) => entry.visible);

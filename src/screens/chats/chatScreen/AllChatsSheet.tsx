@@ -27,12 +27,13 @@ const AllChatsSheet = React.memo(
   }) {
     const renderRow = useCallback(
       ({ item }: { item: ChatListItem }) => {
-        const persona = Array.isArray(item.personas)
-          ? (item.personas as Array<{ id?: string; name?: string; avatar?: string }>).find(
-              (p) => p?.id === item.persona_id,
-            ) ??
-            (item.personas as Array<{ id?: string; name?: string; avatar?: string }>)[0]
-          : undefined;
+        const personas = Array.isArray(item.personas)
+          ? (item.personas as Array<{ id?: string; name?: string; avatar?: string }>)
+          : [];
+        const persona =
+          item.persona_id != null
+            ? personas.find((p) => p?.id === item.persona_id)
+            : undefined;
         return (
           <Pressable
             style={({ pressed }) => [

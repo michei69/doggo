@@ -86,6 +86,7 @@ interface StreamCallbacksDeps {
     badWords: string[];
     onForbiddenWord: () => void;
     onMessageSaved?: () => void;
+    prefill?: string;
 }
 
 function makeStreamCallbacks({
@@ -105,6 +106,7 @@ function makeStreamCallbacks({
     badWords,
     onForbiddenWord,
     onMessageSaved,
+    prefill,
 }: StreamCallbacksDeps) {
     return {
         onToken: (token: string) => {
@@ -124,13 +126,16 @@ function makeStreamCallbacks({
             flushThinking();
             storeSetGenerating(false);
             genAbortRef.current = null;
-            if (fullMessage) {
+            if (fullMessage || prefill) {
+                // The prefill was seeded into the temp bubble but never
+                // streamed, so re-attach it for the check and the save.
+                const fullText = (prefill ?? "") + fullMessage;
                 // Forbidden words: drop the message and reroll instead of
                 // saving it.
                 if (
                     badWords.length > 0 &&
                     badWords.some((word) =>
-                        fullMessage.toLowerCase().includes(word.toLowerCase()),
+                        fullText.toLowerCase().includes(word.toLowerCase()),
                     )
                 ) {
                     useChatStore.getState().removeMessages([tempMessage.id]);
@@ -140,11 +145,11 @@ function makeStreamCallbacks({
                 }
                 const state = useChatStore.getState();
                 const message = state.autoFormatEnabled
-                    ? processText(fullMessage, {
+                    ? processText(fullText, {
                           wrapper: state.narrationWrapper,
                           removeTags: true,
                       })
-                    : fullMessage;
+                    : fullText;
                 try {
                     const rawResponse: any = await withChallengeRetry(
                         () =>
@@ -597,6 +602,7 @@ export function useChat() {
                             showChallenge,
                             showTurnstile,
                             badWords: userConfig.bad_words ?? [],
+                            prefill: prefillText || undefined,
                             onMessageSaved: () => {
                                 forbiddenRerollRef.current = 0;
                             },
