@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from "react";
 import {
     createProxyConfig,
     deleteProxyConfig,
+    getApiSettings,
     updateProxyConfig,
 } from "../../../api/settings";
 import type {
@@ -113,7 +114,7 @@ export function useProxyEditor({
     const duplicateProxy = useCallback(
         async (proxy: ApiProxyConfig) => {
             try {
-                const created = await createProxyConfig({
+                await createProxyConfig({
                     api_key: proxy.api_key,
                     api_url: proxy.api_url,
                     client_id: clientIdRef.current,
@@ -121,14 +122,23 @@ export function useProxyEditor({
                     name: `${proxy.name} (Copy)`,
                     prompt_id: proxy.prompt?.id ?? null,
                 });
-                setProxyConfigs((prev) => [...prev, created]);
+                // Refetch from the server so the new entry shows up even if
+                // the create response is a wrapper/204 or the server assigns
+                // its own position/id. The list is server truth.
+                const apiSettings = await getApiSettings();
+                setProxyConfigs(apiSettings.proxy_configs);
+                setSettings((s) => ({
+                    ...s,
+                    selected_proxy_config_id:
+                        s.selected_proxy_config_id || apiSettings.settings.selected_proxy_config_id,
+                }));
             } catch (err: any) {
                 showAlert("Error", err.message || "Failed to duplicate proxy", [
                     { text: "OK" },
                 ]);
             }
         },
-        [clientIdRef, setProxyConfigs, showAlert],
+        [clientIdRef, setProxyConfigs, setSettings, showAlert],
     );
 
     const deleteProxy = useCallback(
