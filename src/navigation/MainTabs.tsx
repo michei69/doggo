@@ -22,6 +22,8 @@ import ChatScreen from "../screens/chats/ChatScreen";
 import GenerationSettingsScreen from "../screens/chats/GenerationSettingsScreen";
 import CharacterSearchScreen from "../screens/characters/CharacterSearchScreen";
 import CharacterScreen from "../screens/characters/CharacterScreen";
+import SwipeDiscoverScreen from "../screens/characters/SwipeDiscoverScreen";
+import WebBrowserScreen from "../screens/characters/WebBrowserScreen";
 import CreateBotScreen from "../screens/characters/CreateBotScreen";
 import CreatorScreen from "../screens/profile/CreatorScreen";
 import ProfileScreen from "../screens/profile/ProfileScreen";
@@ -72,6 +74,15 @@ function CharactersStackNavigator() {
         component={CharacterScreen}
       />
       <CharactersStack.Screen name="CreatorScreen" component={CreatorScreen} />
+      <CharactersStack.Screen
+        name="SwipeDiscover"
+        component={SwipeDiscoverScreen}
+      />
+      <CharactersStack.Screen
+        name="WebBrowser"
+        component={WebBrowserScreen}
+        options={{ presentation: "fullScreenModal" }}
+      />
     </CharactersStack.Navigator>
   );
 }
@@ -124,14 +135,16 @@ function CreateStackNavigator() {
 }
 
 function getTabBarVisibility(
-  route: Partial<RouteProp<MainTabParamList, "ChatsTab">>,
+  route: Partial<RouteProp<MainTabParamList, "ChatsTab">> | Partial<RouteProp<MainTabParamList, "DiscoverTab">>,
 ): object {
   const routeName = getFocusedRouteNameFromRoute(route);
   if (
     routeName === "ChatScreen" ||
     routeName === "ChatCharacter" ||
     routeName === "GenerationSettings" ||
-    routeName === "CreatorScreen"
+    routeName === "CreatorScreen" ||
+    routeName === "SwipeDiscover" ||
+    routeName === "WebBrowser"
   ) {
     return { display: "none" as const };
   }
@@ -184,13 +197,16 @@ export default function MainTabs() {
       <Tab.Screen
         name="DiscoverTab"
         component={CharactersStackNavigator}
-        options={{
+        options={({ route }) => ({
           tabBarLabel: "Discover",
           tabBarIcon: ({ color, size }) => (
             <Compass color={color} size={size || 22} />
           ),
-          tabBarStyle: baseTabBarStyle,
-        }}
+          tabBarStyle: {
+            ...baseTabBarStyle,
+            ...getTabBarVisibility(route),
+          },
+        })}
       />
       <Tab.Screen
         name="CreateTab"

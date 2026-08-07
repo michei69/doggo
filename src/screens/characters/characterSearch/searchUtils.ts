@@ -1,8 +1,16 @@
-import type { RouteProp } from "@react-navigation/native";
+import type {
+    CompositeNavigationProp,
+    RouteProp,
+} from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import type { CharacterSearchParams } from "../../../api/characters";
 import type { TagEntry } from "../../../components/discover/TagsModal";
-import type { CharactersStackParamList } from "../../../navigation/types";
+import type {
+    CharactersStackParamList,
+    MainTabParamList,
+    SwipeDiscoverParams,
+} from "../../../navigation/types";
 import type { TrendingCharacter } from "../../../types/api";
 import {
     INITIAL_FILTERS,
@@ -14,7 +22,26 @@ export type Nav = NativeStackNavigationProp<
     "CharacterSearch"
 >;
 
+export type SwipeNav = CompositeNavigationProp<
+    NativeStackNavigationProp<CharactersStackParamList, "SwipeDiscover">,
+    BottomTabNavigationProp<MainTabParamList>
+>;
+
 export type SearchRoute = RouteProp<CharactersStackParamList, "CharacterSearch">;
+
+export interface DiscoverParamsLike {
+    search?: string;
+    tag_id?: string;
+    custom_tags?: string;
+    mode?: string;
+    sort?: string;
+    messages?: string;
+    messages_mode?: string;
+    tokens?: string;
+    tokens_mode?: string;
+    proxyenabled?: string;
+    tag?: string;
+}
 
 export interface ListState {
     characters: TrendingCharacter[];
@@ -178,7 +205,7 @@ export function filterDisplayCharacters(
     return result;
 }
 
-export function hasFilterOverrides(p?: SearchRoute["params"]): boolean {
+export function hasFilterOverrides(p?: DiscoverParamsLike): boolean {
     if (!p) return false;
     return (
         p.messages !== undefined ||
@@ -193,7 +220,9 @@ export function hasFilterOverrides(p?: SearchRoute["params"]): boolean {
     );
 }
 
-export function initialTagsFromParams(p?: SearchRoute["params"]): Set<string> {
+export function initialTagsFromParams(
+    p?: DiscoverParamsLike,
+): Set<string> {
     const tags = new Set<string>();
     if (!p) return tags;
     if (p.tag) {
@@ -207,10 +236,20 @@ export function initialTagsFromParams(p?: SearchRoute["params"]): Set<string> {
             tags.add(id);
         }
     }
+    if (p.custom_tags) {
+        for (const slug of p.custom_tags.split(",").flatMap((s) => {
+            const trimmed = s.trim();
+            return trimmed ? [trimmed] : [];
+        })) {
+            tags.add(`top_${slug}`);
+        }
+    }
     return tags;
 }
 
-export function initialFiltersFromParams(p?: SearchRoute["params"]): FilterState {
+export function initialFiltersFromParams(
+    p?: DiscoverParamsLike,
+): FilterState {
     if (!p) return INITIAL_FILTERS;
     const f = { ...INITIAL_FILTERS };
     if (p.messages !== undefined) f.messages = p.messages;
@@ -230,4 +269,82 @@ export function initialFiltersFromParams(p?: SearchRoute["params"]): FilterState
         f.proxyOnly = true;
     }
     return f;
+}
+
+export interface SwipeParamsInput {
+    sort: string;
+    search: string;
+    tags: Set<string>;
+    filters: FilterState;
+    advancedKeywords: string[];
+    advancedBlacklist: string[];
+    keywordMatchMode: "any" | "all";
+}
+
+export function buildSwipeParams(input: SwipeParamsInput): SwipeDiscoverParams {
+    const p: SwipeDiscoverParams = { sort: input.sort };
+    if (input.search.trim()) {
+        p.search = input.search.trim();
+    }
+    if (input.filters.messages && Number(input.filters.messages) > 0) {
+        p.messages = String(input.filters.messages);
+        p.messages_mode = input.filters.messagesMode;
+    }
+    if (input.filters.tokens && Number(input.filters.tokens) > 0) {
+        p.tokens = String(input.filters.tokens);
+        p.tokens_mode = input.filters.tokensMode;
+    }
+    if (input.filters.proxyOnly) {
+        p.proxyenabled = "true";
+    }
+    p.mode = input.filters.limitlessMode ? "all" : "sfw";
+    if (input.tags.size > 0) {
+        const normalIds: string[] = [];
+        const customSlugs: string[] = [];
+        for (const id of input.tags) {
+            if (id.startsWith("top_")) {
+                customSlugs.push(id.slice(4));
+            } else {
+                normalIds.push(id);
+            }
+        }
+        if (normalIds.length > 0) {
+            p.tag_id = normalIds.join(",");
+        }
+        if (customSlugs.length > 0) {
+            p.custom_tags = customSlugs.join(",");
+        }
+    }
+    if (input.advancedKeywords.length > 0) {
+        p.advancedKeywords = input.advancedKeywords.join("\n");
+    }
+    if (input.advancedBlacklist.length > 0) {
+        p.advancedBlacklist = input.advancedBlacklist.join("\n");
+    }
+    p.keywordMatchMode = input.keywordMatchMode;
+    return p;
+}
+
+export function parseSwipeParams(p?: SwipeDiscoverParams): {
+    filters: FilterState;
+    tags: Set<string>;
+    search: string;
+    sort: string;
+    advancedKeywords: string[];
+    advancedBlacklist: string[];
+    keywordMatchMode: "any" | "all";
+} {
+    return {
+        filters: initialFiltersFromParams(p),
+        tags: initialTagsFromParams(p),
+        search: p?.search ?? "",
+        sort: p?.sort ?? "trending24",
+        advancedKeywords: p?.advancedKeywords
+            ? p.advancedKeywords.split("\n").filter(Boolean)
+            : [],
+        advancedBlacklist: p?.advancedBlacklist
+            ? p.advancedBlacklist.split("\n").filter(Boolean)
+            : [],
+        keywordMatchMode: p?.keywordMatchMode ?? "any",
+    };
 }

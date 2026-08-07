@@ -13,10 +13,29 @@ export type ChatsStackParamList = {
     CreatorScreen: { userId: string; userName: string };
 };
 
+export interface SwipeDiscoverParams {
+    search?: string;
+    tag_id?: string;
+    custom_tags?: string;
+    mode?: string;
+    sort?: string;
+    messages?: string;
+    messages_mode?: string;
+    tokens?: string;
+    tokens_mode?: string;
+    proxyenabled?: string;
+    tag?: string;
+    advancedKeywords?: string;
+    advancedBlacklist?: string;
+    keywordMatchMode?: "any" | "all";
+}
+
 export type CharactersStackParamList = {
     CharacterSearch: { search?: string; tag_id?: string; custom_tags?: string; mode?: string; sort?: string; messages?: string; messages_mode?: string; tokens?: string; tokens_mode?: string; proxyenabled?: string; tag?: string } | undefined;
     CharacterScreen: { characterId: string; characterName: string };
     CreatorScreen: { userId: string; userName: string };
+    SwipeDiscover: SwipeDiscoverParams;
+    WebBrowser: { url: string };
 };
 
 export type ProfileStackParamList = {

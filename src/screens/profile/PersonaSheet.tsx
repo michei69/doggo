@@ -447,7 +447,7 @@ function PersonaSheetContent({
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
       showAlert("Permission needed", "Allow access to photos to change your avatar.", [
-        { text: "OK" },
+        { text: "OK", onPress: dismissAlert },
       ]);
       return;
     }
@@ -490,15 +490,15 @@ function PersonaSheetContent({
       });
       setForm((f) => ({ ...f, avatar: upload.filename }));
     } catch {
-      showAlert("Error", "Failed to upload avatar", [{ text: "OK" }]);
+      showAlert("Error", "Failed to upload avatar", [{ text: "OK", onPress: dismissAlert }]);
     } finally {
       setUploading(false);
     }
-  }, [animateIn, showAlert]);
+  }, [animateIn, showAlert, dismissAlert]);
 
   const handleSave = useCallback(async () => {
     if (!form.name.trim()) {
-      showAlert("Error", "Name is required", [{ text: "OK" }]);
+      showAlert("Error", "Name is required", [{ text: "OK", onPress: dismissAlert }]);
       return;
     }
     setSaving(true);
@@ -536,11 +536,11 @@ function PersonaSheetContent({
         onSaved();
       });
     } catch {
-      showAlert("Error", "Failed to save persona", [{ text: "OK" }]);
+      showAlert("Error", "Failed to save persona", [{ text: "OK", onPress: dismissAlert }]);
     } finally {
       setSaving(false);
     }
-  }, [form, isMainPersona, editingId, onSaved, animateOut, showAlert]);
+  }, [form, isMainPersona, editingId, onSaved, animateOut, showAlert, dismissAlert]);
 
   const handleDelete = useCallback(() => {
     if (!editingId) return;

@@ -97,7 +97,7 @@ export default function MyPersonasScreen() {
     handlePersonaSaved,
     handlePersonaDeleteRequested,
     handleDelete,
-  } = usePersonaSheet(profile, setProfile, setPersonas, showAlert);
+  } = usePersonaSheet(profile, setProfile, setPersonas, showAlert, () => setAlertVisible(false));
   const {
     groupModalVisible,
     setGroupModalVisible,
@@ -111,7 +111,7 @@ export default function MyPersonasScreen() {
     handleGroupSaved,
     handleGroupDeleteRequested,
     handleDeleteGroup,
-  } = useGroupSheet(setPersonaGroups, showAlert);
+  } = useGroupSheet(setPersonaGroups, showAlert, () => setAlertVisible(false));
   const {
     drag,
     dragDy,

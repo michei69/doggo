@@ -3,6 +3,7 @@ import {
   View,
   ScrollView,
   ActivityIndicator,
+  RefreshControl,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
@@ -15,7 +16,6 @@ import CustomAlert from "../../components/common/CustomAlert";
 import { useNavigateToJanitorLink } from "../../utils/janitorLinks";
 import { useCreateBotForm } from "./createBot/useCreateBotForm";
 import {
-  BotRefreshControl,
   AvatarPickerMemo,
   MultilineFieldMemo,
   FirstMessageEditorMemo,
@@ -84,13 +84,6 @@ export default function CreateBotScreen() {
     [setField],
   );
 
-  const refreshControl = (
-    <BotRefreshControl
-      refreshing={refreshing}
-      onRefresh={handleRefresh}
-    />
-  );
-
   if (!loaded) {
     return (
       <View style={styles.loadingContainer}>
@@ -117,7 +110,14 @@ export default function CreateBotScreen() {
             Platform.OS === "android" && { paddingBottom: keyboardHeight + 40 },
           ]}
           keyboardShouldPersistTaps="handled"
-          refreshControl={refreshControl}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.accent}
+              colors={[colors.accent]}
+            />
+          }
         >
           <AvatarPickerMemo
             uri={form.avatar ? botAvatarUrl(form.avatar) : ""}

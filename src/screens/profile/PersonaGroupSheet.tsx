@@ -118,11 +118,11 @@ function PersonaGroupContent({
         onSaved();
       });
     } catch {
-      showAlert("Error", "Failed to save group", [{ text: "OK" }]);
+      showAlert("Error", "Failed to save group", [{ text: "OK", onPress: dismissAlert }]);
     } finally {
       setSaving(false);
     }
-  }, [form, editingId, onSaved, animateOut, showAlert]);
+  }, [form, editingId, onSaved, animateOut, showAlert, dismissAlert]);
 
   const handleDelete = useCallback(() => {
     if (!editingId) return;

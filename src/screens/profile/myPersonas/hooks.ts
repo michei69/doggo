@@ -117,6 +117,7 @@ export function usePersonaSheet(
   setProfile: Dispatch<SetStateAction<UserProfile | null>>,
   setPersonas: Dispatch<SetStateAction<Persona[]>>,
   showAlert: ShowAlert,
+  dismissAlert: () => void,
 ) {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [sheetMode, setSheetMode] = useState<"create" | "edit" | "editMain">(
@@ -175,12 +176,12 @@ export function usePersonaSheet(
       setPersonas((prev) => prev.filter((p) => p.id !== deletingId));
       setEditModalVisible(false);
     } catch {
-      showAlert("Error", "Failed to delete persona", [{ text: "OK" }]);
+      showAlert("Error", "Failed to delete persona", [{ text: "OK", onPress: dismissAlert }]);
     } finally {
       setDeleteAlertVisible(false);
       deletingIdRef.current = null;
     }
-  }, [setPersonas, showAlert]);
+  }, [setPersonas, showAlert, dismissAlert]);
 
   return {
     editModalVisible,
@@ -203,6 +204,7 @@ export function usePersonaSheet(
 export function useGroupSheet(
   setPersonaGroups: Dispatch<SetStateAction<PersonaGroup[]>>,
   showAlert: ShowAlert,
+  dismissAlert: () => void,
 ) {
   const [groupModalVisible, setGroupModalVisible] = useState(false);
   const [editingGroup, setEditingGroup] = useState<PersonaGroup | undefined>();
@@ -247,12 +249,12 @@ export function useGroupSheet(
       setPersonaGroups((prev) => prev.filter((g) => g.id !== deletingGroupId));
       setGroupModalVisible(false);
     } catch {
-      showAlert("Error", "Failed to delete group", [{ text: "OK" }]);
+      showAlert("Error", "Failed to delete group", [{ text: "OK", onPress: dismissAlert }]);
     } finally {
       setDeleteGroupAlert(false);
       deletingGroupIdRef.current = null;
     }
-  }, [setPersonaGroups, showAlert]);
+  }, [setPersonaGroups, showAlert, dismissAlert]);
 
   return {
     groupModalVisible,

@@ -151,12 +151,12 @@ export function useLocalSettings({
             }
         } catch (err: any) {
             showAlert("Error", err.message || "Failed to fetch scenario", [
-                { text: "OK" },
+                { text: "OK", onPress: dismissAlert },
             ]);
         } finally {
             setFetchingScenario(false);
         }
-    }, [activeChatId, showAlert]);
+    }, [activeChatId, showAlert, dismissAlert]);
 
     const handleToggleLocalMode = useCallback(
         (v: boolean) => {

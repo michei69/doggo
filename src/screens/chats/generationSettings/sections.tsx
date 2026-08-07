@@ -88,6 +88,7 @@ export const GlobalPromptInput = memo(function GlobalPromptInput({
 export const ProxyConfigList = memo(function ProxyConfigList({
   proxies,
   selectedId,
+  duplicatingId,
   onSelect,
   onEdit,
   onAdd,
@@ -97,6 +98,7 @@ export const ProxyConfigList = memo(function ProxyConfigList({
 }: {
   proxies: ApiProxyConfig[];
   selectedId: string;
+  duplicatingId: string | null;
   onSelect: (id: string) => void;
   onEdit: (proxy: ApiProxyConfig) => void;
   onAdd: () => void;
@@ -142,8 +144,13 @@ export const ProxyConfigList = memo(function ProxyConfigList({
                       pressed && { opacity: 0.7 },
                     ]}
                     onPress={() => onDuplicate(proxy)}
+                    disabled={duplicatingId === proxy.id}
                   >
-                    <Text style={styles.proxyActionText}>Duplicate</Text>
+                    {duplicatingId === proxy.id ? (
+                      <ActivityIndicator size="small" color={colors.textSecondary} />
+                    ) : (
+                      <Text style={styles.proxyActionText}>Duplicate</Text>
+                    )}
                   </Pressable>
                   <Pressable
                     style={({ pressed }) => [

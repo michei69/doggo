@@ -6,7 +6,7 @@ import {
     TextInput,
     View,
 } from "react-native";
-import { SlidersHorizontal, Filter } from "lucide-react-native";
+import { SlidersHorizontal, Filter, Globe } from "lucide-react-native";
 import CharacterDiscoverActionsSheet from "../../../components/character/CharacterDiscoverActionsSheet";
 import CharacterReportModal from "../../../components/character/CharacterReportModal";
 import CustomAlert, {
@@ -33,6 +33,8 @@ export const SearchHeader = React.memo(function SearchHeader({
     totalCount,
     creatorsTotal,
     onToggleMode,
+    onOpenSwipe,
+    onOpenBrowser,
 }: {
     discoveryMode: "characters" | "creators";
     hasAdvancedFilters: boolean;
@@ -40,11 +42,19 @@ export const SearchHeader = React.memo(function SearchHeader({
     totalCount: number;
     creatorsTotal: number;
     onToggleMode: () => void;
+    onOpenSwipe: () => void;
+    onOpenBrowser: () => void;
 }) {
     return (
         <>
             <View style={styles.titleRow}>
                 <Text style={styles.title}>Discover</Text>
+                <Pressable style={styles.browserButton} onPress={onOpenBrowser}>
+                    <Globe size={18} color={colors.textSecondary} />
+                </Pressable>
+                <Pressable style={styles.swipeButton} onPress={onOpenSwipe}>
+                    <Text style={styles.swipeButtonText}>Swipe</Text>
+                </Pressable>
                 <Pressable style={styles.modeToggle} onPress={onToggleMode}>
                     <Text style={styles.modeToggleText}>
                         {discoveryMode === "characters" ? "Creators" : "Characters"}
@@ -347,9 +357,9 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         paddingRight: 20,
+        gap: 8,
     },
     modeToggle: {
-        marginLeft: "auto",
         backgroundColor: colors.card,
         borderColor: colors.border,
         borderWidth: 1,
@@ -362,5 +372,29 @@ const styles = StyleSheet.create({
         color: colors.accent,
         fontSize: 14,
         fontWeight: "600",
+    },
+    swipeButton: {
+        backgroundColor: colors.accent,
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        marginTop: 60,
+    },
+    swipeButtonText: {
+        color: colors.background,
+        fontSize: 14,
+        fontWeight: "700",
+    },
+    browserButton: {
+        marginLeft: "auto",
+        backgroundColor: colors.card,
+        borderColor: colors.border,
+        borderWidth: 1,
+        borderRadius: 10,
+        width: 36,
+        height: 36,
+        alignItems: "center",
+        justifyContent: "center",
+        marginTop: 60,
     },
 });

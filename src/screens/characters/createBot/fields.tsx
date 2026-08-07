@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   StyleSheet,
   TextInput as RNTextInput,
-  RefreshControl,
   Modal,
 } from "react-native";
 import Avatar from "../../../components/common/Avatar";
@@ -16,23 +15,6 @@ import { colors } from "../../../utils/colors";
 import { EnrichedMarkdownText } from "react-native-enriched-markdown";
 import { markdownStyle } from "../../../utils/markdownStyle";
 import type { TagEntry } from "./botFormState";
-
-export const BotRefreshControl = memo(function BotRefreshControl({
-  refreshing,
-  onRefresh,
-}: {
-  refreshing: boolean;
-  onRefresh: () => void;
-}) {
-  return (
-    <RefreshControl
-      refreshing={refreshing}
-      onRefresh={onRefresh}
-      tintColor={colors.accent}
-      colors={[colors.accent]}
-    />
-  );
-});
 
 function AvatarPicker({
   uri,

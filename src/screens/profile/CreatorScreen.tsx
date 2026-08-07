@@ -581,8 +581,10 @@ export default function CreatorScreen() {
   );
 
   const handleFollowError = useCallback(() => {
-    showAlert("Error", "Failed to update follow status", [{ text: "OK" }]);
-  }, [showAlert]);
+    showAlert("Error", "Failed to update follow status", [
+      { text: "OK", onPress: () => setAlertVisible(false) },
+    ]);
+  }, [showAlert, setAlertVisible]);
 
   const [list, dispatch] = useReducer(listReducer, {
     characters: [],

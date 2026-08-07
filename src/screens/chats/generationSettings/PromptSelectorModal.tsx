@@ -27,6 +27,7 @@ export default function PromptSelectorModal({
   onSelect,
   onClose,
   showAlert,
+  dismissAlert,
 }: {
   visible: boolean;
   prompts: PromptLibraryItem[];
@@ -35,6 +36,7 @@ export default function PromptSelectorModal({
   onSelect: (id: string | null) => void;
   onClose: () => void;
   showAlert: ShowAlert;
+  dismissAlert: () => void;
 }) {
   type PromptMode = "list" | "editing" | "creating";
   const [mode, setMode] = useState<PromptMode>("list");
@@ -85,12 +87,12 @@ export default function PromptSelectorModal({
       }
     } catch (err: any) {
       showAlert("Error", err.message || "Failed to save prompt", [
-        { text: "OK" },
+        { text: "OK", onPress: dismissAlert },
       ]);
     } finally {
       setFormSaving(false);
     }
-  }, [mode, form, setPrompts, onSelect, showAlert]);
+  }, [mode, form, setPrompts, onSelect, showAlert, dismissAlert]);
 
   const handleDeletePrompt = useCallback(
     (prompt: PromptLibraryItem) => {
@@ -99,21 +101,22 @@ export default function PromptSelectorModal({
           text: "Delete",
           style: "destructive",
           onPress: async () => {
+            dismissAlert();
             try {
               await deletePrompt(prompt.id);
               setPrompts((prev) => prev.filter((p) => p.id !== prompt.id));
               if (selectedPromptId === prompt.id) onSelect(null);
             } catch (err: any) {
               showAlert("Error", err.message || "Failed to delete prompt", [
-                { text: "OK" },
+                { text: "OK", onPress: dismissAlert },
               ]);
             }
           },
         },
-        { text: "Cancel", style: "cancel" },
+        { text: "Cancel", style: "cancel", onPress: dismissAlert },
       ]);
     },
-    [showAlert, selectedPromptId, setPrompts, onSelect],
+    [showAlert, dismissAlert, selectedPromptId, setPrompts, onSelect],
   );
 
   const isFormView = mode === "editing" || mode === "creating";

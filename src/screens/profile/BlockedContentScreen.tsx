@@ -519,11 +519,11 @@ export default function BlockedContentScreen() {
       setAllTags(tags);
       initialRef.current = JSON.parse(JSON.stringify(data));
     } catch {
-      showAlert("Error", "Failed to load blocked content", [{ text: "OK" }]);
+      showAlert("Error", "Failed to load blocked content", [{ text: "OK", onPress: dismissAlert }]);
     } finally {
       setLoading(false);
     }
-  }, [showAlert]);
+  }, [showAlert, dismissAlert]);
 
   useEffect(() => {
     loadBlockedContent();
@@ -539,13 +539,13 @@ export default function BlockedContentScreen() {
     try {
       await updateBlockedContent(blocked);
       initialRef.current = JSON.parse(JSON.stringify(blocked));
-      showAlert("Saved", "Blocked content updated", [{ text: "OK" }]);
+      showAlert("Saved", "Blocked content updated", [{ text: "OK", onPress: dismissAlert }]);
     } catch {
-      showAlert("Error", "Failed to save blocked content", [{ text: "OK" }]);
+      showAlert("Error", "Failed to save blocked content", [{ text: "OK", onPress: dismissAlert }]);
     } finally {
       setSaving(false);
     }
-  }, [blocked, hasChanges, showAlert]);
+  }, [blocked, hasChanges, showAlert, dismissAlert]);
 
   const handleAddKeyword = useCallback(
     (keyword: string) => {

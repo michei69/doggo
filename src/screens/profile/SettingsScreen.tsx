@@ -363,9 +363,9 @@ export default function SettingsScreen() {
         style: "destructive",
         onPress: () => logout(),
       },
-      { text: "Cancel", style: "cancel" },
+      { text: "Cancel", style: "cancel", onPress: dismissAlert },
     ]);
-  }, [logout, showAlert]);
+  }, [logout, showAlert, dismissAlert]);
 
   const openLayoutPicker = useCallback(() => setLayoutPickerVisible(true), []);
   const closeLayoutPicker = useCallback(() => setLayoutPickerVisible(false), []);

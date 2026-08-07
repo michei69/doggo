@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { StyleSheet } from "react-native";
+import type { CharacterSearchParams } from "../../../api/characters";
 import { getCharacters, searchProfiles } from "../../../api/characters";
 import type { ProfileSearchResult } from "../../../api/characters";
 import { getBlockedContent, updateBlockedContent } from "../../../api/profile";
 import CharacterCard from "../../../components/character/CharacterCard";
 import type { AlertButton } from "../../../components/common/CustomAlert";
 import type { TagEntry } from "../../../components/discover/TagsModal";
+import type { SwipeDiscoverParams } from "../../../navigation/types";
 import type { TrendingCharacter, TrendingResponse } from "../../../types/api";
 import {
     INITIAL_FILTERS,
@@ -15,10 +17,12 @@ import { storage } from "../../../utils/storage";
 import { CreatorCard } from "./cards";
 import {
     buildParams,
+    filterDisplayCharacters,
     hasFilterOverrides,
     initialFiltersFromParams,
     initialTagsFromParams,
     listReducer,
+    parseSwipeParams,
     type Nav,
     type SearchRoute,
 } from "./searchUtils";
@@ -417,6 +421,143 @@ export function useCharactersList() {
     );
 
     return { state, doFetch, handleLoadMore, topCustomTags };
+}
+
+export function useSwipeDeck(
+    params?: SwipeDiscoverParams,
+    hiddenIds: Set<string> = new Set(),
+) {
+    const {
+        filters,
+        tags,
+        search,
+        sort,
+        advancedKeywords,
+        advancedBlacklist,
+        keywordMatchMode,
+    } = parseSwipeParams(params);
+    const [state, dispatch] = useReducer(listReducer, {
+        characters: [],
+        page: 1,
+        loading: true,
+        refreshing: false,
+        total: 0,
+        error: null,
+    });
+    const pageRef = useRef(1);
+    const initialLoadRef = useRef(false);
+    const loadingMoreRef = useRef(false);
+    const emptyPagesRef = useRef(0);
+    const reachedEndRef = useRef(false);
+    const firstRenderRef = useRef(true);
+
+    const current = useMemo(
+        () => ({ sort, search, tags, filters }),
+        [sort, search, tags, filters],
+    );
+
+    const doFetch = useCallback(
+        async (pageNum: number, isRefresh = false) => {
+            if (pageNum === 1) {
+                emptyPagesRef.current = 0;
+                reachedEndRef.current = false;
+            }
+            if (isRefresh) {
+                dispatch({ type: "REFRESHING" });
+            } else if (pageNum === 1) {
+                dispatch({ type: "RESET" });
+            } else {
+                dispatch({ type: "LOADING" });
+            }
+
+            try {
+                const apiParams = buildParams(
+                    current.sort,
+                    current.search,
+                    current.tags,
+                    current.filters,
+                    pageNum,
+                );
+                const response: TrendingResponse = await getCharacters(apiParams);
+                let filteredData = response.data;
+                if (current.filters.customAvatar) {
+                    filteredData = filteredData.filter(
+                        (c) =>
+                            c.avatar !== "placeholder-nsfw.webp" &&
+                            c.avatar !== "countdown.webp",
+                    );
+                }
+                dispatch({
+                    type: "LOADED",
+                    payload: {
+                        data: filteredData,
+                        total: response.total,
+                        page: pageNum,
+                    },
+                });
+                pageRef.current = pageNum;
+
+                if (filteredData.length === 0) {
+                    emptyPagesRef.current += 1;
+                    if (emptyPagesRef.current >= 3) {
+                        reachedEndRef.current = true;
+                    }
+                } else {
+                    emptyPagesRef.current = 0;
+                }
+
+                loadingMoreRef.current = false;
+            } catch (err: any) {
+                loadingMoreRef.current = false;
+                dispatch({ type: "ERROR", payload: err.message });
+            }
+        },
+        [current],
+    );
+
+    useEffect(() => {
+        if (initialLoadRef.current) return;
+        initialLoadRef.current = true;
+        doFetch(1);
+    }, [doFetch]);
+
+    const deck = useMemo(
+        () =>
+            filterDisplayCharacters(
+                state.characters,
+                advancedKeywords,
+                advancedBlacklist,
+                keywordMatchMode,
+                true,
+                hiddenIds,
+            ),
+        [state.characters, advancedKeywords, advancedBlacklist, keywordMatchMode, hiddenIds],
+    );
+
+    const refresh = useCallback(() => {
+        doFetch(1, true);
+    }, [doFetch]);
+
+    const loadMore = useCallback(() => {
+        if (loadingMoreRef.current || reachedEndRef.current) return;
+        if (!state.loading && state.characters.length < state.total) {
+            loadingMoreRef.current = true;
+            const nextPage = pageRef.current + 1;
+            doFetch(nextPage);
+        }
+    }, [state.loading, state.characters.length, state.total, doFetch]);
+
+    useEffect(() => {
+        if (firstRenderRef.current) {
+            firstRenderRef.current = false;
+            return;
+        }
+        if (deck.length < 5) {
+            loadMore();
+        }
+    }, [deck.length, loadMore]);
+
+    return { deck, loading: state.loading, refreshing: state.refreshing, error: state.error, refresh, loadMore };
 }
 
 export function useCharacterCardRenderer(

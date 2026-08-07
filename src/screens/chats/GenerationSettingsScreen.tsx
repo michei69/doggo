@@ -103,6 +103,7 @@ export default function GenerationSettingsScreen() {
     setSettings,
     clientIdRef,
     showAlert,
+    dismissAlert,
     setIsDirty,
   });
   const local = useLocalSettings({
@@ -143,12 +144,12 @@ export default function GenerationSettingsScreen() {
       ]);
     } catch (err: any) {
       showAlert("Error", err.message || "Failed to save settings", [
-        { text: "OK" },
+        { text: "OK", onPress: dismissAlert },
       ]);
     } finally {
       setSaving(false);
     }
-  }, [settings, goBack, showAlert]);
+  }, [settings, goBack, showAlert, dismissAlert]);
 
   const addBadWord = useCallback((word: string) => {
     setSettings((s) => ({ ...s, bad_words: [...s.bad_words, word] }));
@@ -189,7 +190,7 @@ export default function GenerationSettingsScreen() {
       } catch (err: any) {
         if (cancelled) return;
         showAlert("Error", err.message || "Failed to load settings", [
-          { text: "OK" },
+          { text: "OK", onPress: dismissAlert },
         ]);
         setLoading(false);
       }
@@ -198,7 +199,7 @@ export default function GenerationSettingsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [showAlert]);
+  }, [showAlert, dismissAlert]);
 
   useEffect(() => {
     const onBeforeRemove = (e: any) => {
@@ -208,7 +209,7 @@ export default function GenerationSettingsScreen() {
         "Unsaved Changes",
         "You have unsaved changes. Discard them?",
         [
-          { text: "Stay", style: "cancel" as const, onPress: () => {} },
+          { text: "Stay", style: "cancel" as const, onPress: dismissAlert },
           {
             text: "Leave",
             style: "destructive" as const,
@@ -219,7 +220,7 @@ export default function GenerationSettingsScreen() {
     };
     navigation.addListener("beforeRemove", onBeforeRemove);
     return () => navigation.removeListener("beforeRemove", onBeforeRemove);
-  }, [navigation, isDirty, showAlert]);
+  }, [navigation, isDirty, showAlert, dismissAlert]);
 
   if (loading) {
     return (
@@ -260,6 +261,7 @@ export default function GenerationSettingsScreen() {
         <ProxyConfigList
           proxies={proxyConfigs}
           selectedId={settings.selected_proxy_config_id}
+          duplicatingId={proxy.duplicatingId}
           onSelect={proxy.selectProxy}
           onEdit={proxy.openEdit}
           onAdd={proxy.openAdd}
@@ -352,6 +354,7 @@ export default function GenerationSettingsScreen() {
         }
         onClose={proxy.closePromptSelector}
         showAlert={showAlert}
+        dismissAlert={dismissAlert}
       />
 
       <CustomAlert

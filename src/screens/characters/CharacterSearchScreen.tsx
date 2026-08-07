@@ -49,6 +49,7 @@ import {
 import { useAlert } from "../../hooks/useAlert";
 import {
   filterDisplayCharacters,
+  buildSwipeParams,
   mergeTags,
   type Nav,
   type SearchRoute,
@@ -259,6 +260,36 @@ export default function CharacterSearchScreen() {
     [handleLoadMore, currentSearchParams],
   );
 
+  const handleOpenSwipe = useCallback(() => {
+    navigate(
+      "SwipeDiscover",
+      buildSwipeParams({
+        sort: sortMode,
+        search: searchText,
+        tags: selectedTagIds,
+        filters,
+        advancedKeywords,
+        advancedBlacklist,
+        keywordMatchMode,
+      }),
+    );
+  }, [
+    navigate,
+    sortMode,
+    searchText,
+    selectedTagIds,
+    filters,
+    advancedKeywords,
+    advancedBlacklist,
+    keywordMatchMode,
+  ]);
+
+  const handleOpenBrowser = useCallback(() => {
+    navigate("WebBrowser", {
+      url: "https://jannyai.com/characters/search",
+    });
+  }, [navigate]);
+
   return (
     <View style={styles.container}>
       <SearchHeader
@@ -268,6 +299,8 @@ export default function CharacterSearchScreen() {
         totalCount={state.total}
         creatorsTotal={creatorsTotal}
         onToggleMode={handleToggleMode}
+        onOpenSwipe={handleOpenSwipe}
+        onOpenBrowser={handleOpenBrowser}
       />
       {discoveryMode === "characters" && (
         <>

@@ -19,6 +19,7 @@ export function useProxyEditor({
     setSettings,
     clientIdRef,
     showAlert,
+    dismissAlert,
     setIsDirty,
 }: {
     proxyConfigs: ApiProxyConfig[];
@@ -26,6 +27,7 @@ export function useProxyEditor({
     setSettings: Dispatch<SetStateAction<ApiSettingsSettings>>;
     clientIdRef: React.MutableRefObject<string>;
     showAlert: ShowAlert;
+    dismissAlert: () => void;
     setIsDirty: Dispatch<SetStateAction<boolean>>;
 }) {
     const [editingProxyId, setEditingProxyId] = useState<string | null>(null);
@@ -39,6 +41,7 @@ export function useProxyEditor({
     });
     const [showApiKey, setShowApiKey] = useState(false);
     const [proxySaving, setProxySaving] = useState(false);
+    const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
     const [promptSelectorVisible, setPromptSelectorVisible] = useState(false);
 
     const selectProxy = useCallback(
@@ -104,15 +107,17 @@ export function useProxyEditor({
             setIsCreatingProxy(false);
         } catch (err: any) {
             showAlert("Error", err.message || "Failed to save proxy", [
-                { text: "OK" },
+                { text: "OK", onPress: dismissAlert },
             ]);
         } finally {
             setProxySaving(false);
         }
-    }, [editingProxyId, isCreatingProxy, editForm, clientIdRef, setProxyConfigs, showAlert]);
+    }, [editingProxyId, isCreatingProxy, editForm, clientIdRef, setProxyConfigs, showAlert, dismissAlert]);
 
     const duplicateProxy = useCallback(
         async (proxy: ApiProxyConfig) => {
+            if (duplicatingId) return;
+            setDuplicatingId(proxy.id);
             try {
                 await createProxyConfig({
                     api_key: proxy.api_key,
@@ -134,11 +139,13 @@ export function useProxyEditor({
                 }));
             } catch (err: any) {
                 showAlert("Error", err.message || "Failed to duplicate proxy", [
-                    { text: "OK" },
+                    { text: "OK", onPress: dismissAlert },
                 ]);
+            } finally {
+                setDuplicatingId(null);
             }
         },
-        [clientIdRef, setProxyConfigs, setSettings, showAlert],
+        [clientIdRef, setProxyConfigs, setSettings, showAlert, dismissAlert, duplicatingId],
     );
 
     const deleteProxy = useCallback(
@@ -148,6 +155,7 @@ export function useProxyEditor({
                     text: "Delete",
                     style: "destructive",
                     onPress: async () => {
+                        dismissAlert();
                         try {
                             await deleteProxyConfig(proxy.id);
                             setProxyConfigs((prev) => prev.filter((p) => p.id !== proxy.id));
@@ -160,22 +168,24 @@ export function useProxyEditor({
                             }));
                         } catch (err: any) {
                             showAlert("Error", err.message || "Failed to delete proxy", [
-                                { text: "OK" },
+                                { text: "OK", onPress: dismissAlert },
                             ]);
                         }
                     },
                 },
-                { text: "Cancel", style: "cancel" },
+                { text: "Cancel", style: "cancel", onPress: dismissAlert },
             ]);
         },
-        [showAlert, proxyConfigs, setProxyConfigs, setSettings],
+        [showAlert, dismissAlert, proxyConfigs, setProxyConfigs, setSettings],
     );
 
     const copyJson = useCallback(
         (proxy: ApiProxyConfig) => {
-            showAlert("Proxy JSON", JSON.stringify(proxy, null, 2), [{ text: "OK" }]);
+            showAlert("Proxy JSON", JSON.stringify(proxy, null, 2), [
+                { text: "OK", onPress: dismissAlert },
+            ]);
         },
-        [showAlert],
+        [showAlert, dismissAlert],
     );
 
     const openPromptSelector = useCallback(
@@ -195,6 +205,7 @@ export function useProxyEditor({
         showApiKey,
         setShowApiKey,
         proxySaving,
+        duplicatingId,
         promptSelectorVisible,
         selectProxy,
         openEdit,
