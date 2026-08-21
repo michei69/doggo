@@ -6,6 +6,7 @@ import {
   type LayoutChangeEvent,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { scheduleOnRN } from "react-native-worklets";
 import { colors } from "../../utils/colors";
 
 export default function Slider({
@@ -52,8 +53,8 @@ export default function Slider({
     () =>
       Gesture.Pan()
         .minDistance(0)
-        .onBegin((e) => setFromPageX(e.absoluteX))
-        .onUpdate((e) => setFromPageX(e.absoluteX)),
+        .onBegin((e) => scheduleOnRN(setFromPageX, e.absoluteX))
+        .onUpdate((e) => scheduleOnRN(setFromPageX, e.absoluteX)),
     [setFromPageX],
   );
 
