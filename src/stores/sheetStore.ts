@@ -1,7 +1,7 @@
 import type React from "react";
 import { create } from "zustand";
 
-export interface SheetEntry {
+interface SheetEntry {
   key: number;
   visible: boolean;
   onClose: () => void;

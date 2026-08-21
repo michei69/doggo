@@ -53,19 +53,10 @@ async function scheduleRefresh(
         0,
         expiresAt * 1000 - Date.now() - REFRESH_MARGIN_MS,
     );
-    console.log(
-        "[AUTH] scheduling token refresh in",
-        (delay / 1000 / 60).toFixed(1),
-        "minutes",
-    );
     refreshTimer = setTimeout(async () => {
-        console.log("[AUTH] background token refresh triggered");
         try {
             await refreshFn();
         } catch {
-            console.log(
-                "[AUTH] background token refresh failed, will retry at next interval",
-            );
             const state = useAuthStore.getState();
             const now = Date.now();
             const fallbackDelay = Math.max(60000, now - REFRESH_MARGIN_MS);
@@ -145,7 +136,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 if (expiresAt) {
                     const now = Date.now();
                     if (expiresAt * 1000 <= now) {
-                        console.log("[AUTH] token expired, refreshing");
                         try {
                             await performRefresh(get, set);
                         } catch {
@@ -170,17 +160,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     },
 
     login: async (email, password, captchaToken) => {
-        console.log("[STORE] login called for:", email);
         try {
             const response = await authApi.login({
                 email,
                 password,
                 gotrue_meta_security: { captcha_token: captchaToken },
             });
-            console.log(
-                "[STORE] login success, access_token:",
-                `${response.access_token?.slice(0, 20)}...`,
-            );
             await Promise.all([
                 storage.setAccessToken(response.access_token),
                 storage.setRefreshToken(response.refresh_token),
@@ -197,12 +182,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 performRefresh(get, set),
             );
         } catch (err: any) {
-            console.log(
-                "[STORE] login failed:",
-                err.response?.status,
-                err.response?.data,
-                err.message,
-            );
             throw err;
         }
     },

@@ -6,7 +6,15 @@ import type {
     UserProfile,
 } from "../types/api";
 import * as chatsApi from "../api/chats";
-import { storage } from "../utils/storage";
+import {
+    storage,
+    chatLayoutPref,
+    showTimestampsPref,
+    autoFormatEnabledPref,
+    narrationWrapperPref,
+    chatCenteredPref,
+} from "../utils/storage";
+import type { LayoutOption } from "../utils/constants";
 
 function formatError(err: any): string {
     if (err.message?.includes("Request failed")) {
@@ -30,7 +38,7 @@ interface ChatState {
     activeThinking: string;
     enableThinking: boolean;
     userConfig: UserProfile["config"] | null;
-    chatLayout: "messaging" | "janitor" | "edgeToEdge";
+    chatLayout: LayoutOption;
     showTimestamps: boolean;
     chosenVariantIds: Set<number>;
     autoFormatEnabled: boolean;
@@ -56,7 +64,7 @@ interface ChatState {
     setActiveThinking: (thinking: string) => void;
     setEnableThinking: (enabled: boolean) => void;
     setUserConfig: (config: UserProfile["config"]) => void;
-    setChatLayout: (layout: "messaging" | "janitor" | "edgeToEdge") => void;
+    setChatLayout: (layout: LayoutOption) => void;
     loadChatLayout: () => Promise<void>;
     setShowTimestamps: (show: boolean) => void;
     setChosenVariant: (groupIds: number[], chosenId: number) => void;
@@ -162,7 +170,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     summary: "",
                     updated_at: response.updated_at,
                     user_id: response.user_id,
-                } as ChatListItem,
+                },
                 ...state.chats,
             ],
         }));
@@ -238,14 +246,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     },
 
     setChatLayout: (layout) => {
-        storage.setChatLayout(layout);
+        chatLayoutPref.set(layout);
         set({ chatLayout: layout });
     },
 
     loadChatLayout: async () => {
         const [saved, showTs] = await Promise.all([
-            storage.getChatLayout(),
-            storage.getShowTimestamps(),
+            chatLayoutPref.get(),
+            showTimestampsPref.get(),
         ]);
         if (
             saved === "messaging" ||
@@ -258,7 +266,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     },
 
     setShowTimestamps: (show) => {
-        storage.setShowTimestamps(show);
+        showTimestampsPref.set(show);
         set({ showTimestamps: show });
     },
 
@@ -274,30 +282,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
     },
 
     setAutoFormatEnabled: (enabled: boolean) => {
-        storage.setAutoFormatEnabled(enabled);
+        autoFormatEnabledPref.set(enabled);
         set({ autoFormatEnabled: enabled });
     },
 
     setNarrationWrapper: (wrapper: string) => {
-        storage.setNarrationWrapper(wrapper);
+        narrationWrapperPref.set(wrapper);
         set({ narrationWrapper: wrapper });
     },
 
     loadAutoFormatSettings: async () => {
         const [enabled, wrapper] = await Promise.all([
-            storage.getAutoFormatEnabled(),
-            storage.getNarrationWrapper(),
+            autoFormatEnabledPref.get(),
+            narrationWrapperPref.get(),
         ]);
-        set({ autoFormatEnabled: enabled, narrationWrapper: wrapper });
+        set({ autoFormatEnabled: enabled, narrationWrapper: wrapper ?? "*" });
     },
 
     setChatCentered: (centered) => {
-        storage.setChatCentered(centered);
+        chatCenteredPref.set(centered);
         set({ chatCentered: centered });
     },
 
     loadChatCentered: async () => {
-        const centered = await storage.getChatCentered();
+        const centered = await chatCenteredPref.get();
         set({ chatCentered: centered });
     },
 }));
