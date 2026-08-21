@@ -419,7 +419,7 @@ export default function MessageList({
 
   if (isLoading) {
     return (
-      <Skeleton>
+      <Skeleton style={{ flex: 1 }}>
         <View style={styles.flashlist}>
           {[0, 1, 2, 3, 4].map((i) => (
             <View key={i} style={styles.skeletonRow}>

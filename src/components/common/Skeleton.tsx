@@ -14,10 +14,10 @@ export default function Skeleton({
   style?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
 }) {
-  const opacity = useSharedValue(0.4);
+  const opacity = useSharedValue(0.5);
 
   useEffect(() => {
-    opacity.value = withRepeat(withTiming(0.8, { duration: 800 }), -1, true);
+    opacity.value = withRepeat(withTiming(1, { duration: 800 }), -1, true);
   }, [opacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
