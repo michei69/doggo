@@ -11,21 +11,23 @@ import {
   Keyboard,
 } from "react-native";
 import Animated, {
-  useSharedValue,
   useAnimatedStyle,
-  withTiming,
 } from "react-native-reanimated";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { FlashList } from "@shopify/flash-list";
+import { GestureDetector } from "react-native-gesture-handler";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import ScreenHeader from "../../components/common/ScreenHeader";
 import CustomAlert from "../../components/common/CustomAlert";
+import EmptyState from "../../components/common/EmptyState";
 import { useAlert } from "../../hooks/useAlert";
+import { useTabSwipe } from "../../hooks/useTabSwipe";
 import { colors } from "../../utils/colors";
 import { getBlockedContent, updateBlockedContent } from "../../api/profile";
 import { getTagSuggestions, getTags } from "../../api/characters";
 import type { BlockedContent, CharacterTag } from "../../types/api";
 import type { ProfileStackParamList } from "../../navigation/types";
+import type { OptionRow } from "../../utils/constants";
 import { scheduleOnRN } from "react-native-worklets";
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList, "BlockedContent">;
@@ -42,97 +44,6 @@ const TAB_COUNT = TABS.length;
 
 function tabIndex(tab: Tab): number {
   return TABS.findIndex((t) => t.key === tab);
-}
-
-function useTabSwipe({
-  activeTab,
-  screenWidth,
-  onChangeTab,
-}: {
-  activeTab: Tab;
-  screenWidth: number;
-  onChangeTab: (tab: Tab) => void;
-}) {
-  const tabIndicator = useSharedValue(0);
-  const tabRowWidth = useSharedValue(1);
-  const translateX = useSharedValue(0);
-  const startX = useSharedValue(0);
-
-  const snapToTab = useCallback(
-    (t: Tab) => {
-      const idx = tabIndex(t);
-      onChangeTab(t);
-      translateX.value = withTiming(-idx * screenWidth, { duration: 250 });
-      tabIndicator.value = withTiming(
-        idx * (tabRowWidth.value / TAB_COUNT),
-        { duration: 250 },
-      );
-    },
-    [translateX, tabIndicator, tabRowWidth, screenWidth, onChangeTab],
-  );
-
-  const panGesture = useMemo(
-    () =>
-      Gesture.Pan()
-        .activeOffsetX([-10, 10])
-        .failOffsetY([-10, 10])
-        .onBegin(() => {
-          startX.value = translateX.value;
-        })
-        .onUpdate((event) => {
-          const maxOffset = -(TAB_COUNT - 1) * screenWidth;
-          const raw = startX.value + event.translationX;
-          const clamped = Math.max(maxOffset, Math.min(0, raw));
-          translateX.value = clamped;
-          const progress = -clamped / screenWidth;
-          tabIndicator.value = (progress / TAB_COUNT) * tabRowWidth.value;
-        })
-        .onEnd((event) => {
-          const velocity = event.velocityX ?? 0;
-          const currentIdx = Math.round(-translateX.value / screenWidth);
-
-          if (velocity > 300) {
-            const target = Math.max(0, currentIdx - 1);
-            scheduleOnRN(snapToTab, TABS[target].key);
-          } else if (velocity < -300) {
-            const target = Math.min(TAB_COUNT - 1, currentIdx + 1);
-            scheduleOnRN(snapToTab, TABS[target].key);
-          } else {
-            const idx = Math.max(
-              0,
-              Math.min(TAB_COUNT - 1, currentIdx),
-            );
-            scheduleOnRN(snapToTab, TABS[idx].key);
-          }
-        }),
-    [translateX, startX, tabIndicator, tabRowWidth, screenWidth, snapToTab],
-  );
-
-  const indicatorStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: tabIndicator.value }],
-  }));
-
-  const contentTranslateStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
-
-  const handleTabRowLayout = useCallback(
-    (width: number) => {
-      tabRowWidth.value = width;
-      const idx = tabIndex(activeTab);
-      tabIndicator.value = idx * (width / TAB_COUNT);
-      translateX.value = -idx * screenWidth;
-    },
-    [activeTab, tabIndicator, translateX, tabRowWidth, screenWidth],
-  );
-
-  return {
-    snapToTab,
-    panGesture,
-    indicatorStyle,
-    contentTranslateStyle,
-    handleTabRowLayout,
-  };
 }
 
 const SaveButton = React.memo(function SaveButton({
@@ -201,14 +112,6 @@ const TabBar = React.memo(function TabBar({
   );
 });
 
-const EmptyState = React.memo(function EmptyState({ text }: { text: string }) {
-  return (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyText}>{text}</Text>
-    </View>
-  );
-});
-
 function RemoveButton({
   onPress,
 }: {
@@ -237,7 +140,7 @@ const ItemRows = React.memo(function ItemRows({
   onRemove: (item: string) => void;
 }) {
   if (items.length === 0) {
-    return <EmptyState text={emptyText} />;
+    return <EmptyState text={emptyText} containerStyle={styles.emptyState} />;
   }
   return (
     <>
@@ -291,6 +194,26 @@ const AddButton = React.memo(function AddButton({
   );
 });
 
+const SuggestionRow = React.memo(function SuggestionRow({
+  item,
+  onSelect,
+}: {
+  item: OptionRow;
+  onSelect: (key: string) => void;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.suggestionItem,
+        pressed && { backgroundColor: colors.accentFaded },
+      ]}
+      onPress={() => onSelect(item.key)}
+    >
+      <Text style={styles.suggestionText}>{item.label}</Text>
+    </Pressable>
+  );
+});
+
 const AutocompleteInput = React.memo(function AutocompleteInput({
   value,
   placeholder,
@@ -300,6 +223,7 @@ const AutocompleteInput = React.memo(function AutocompleteInput({
   onBlur,
   showDropdown,
   suggestions,
+  onSelectSuggestion,
 }: {
   value: string;
   placeholder: string;
@@ -308,8 +232,21 @@ const AutocompleteInput = React.memo(function AutocompleteInput({
   onFocus?: () => void;
   onBlur: () => void;
   showDropdown: boolean;
-  suggestions: { key: string; label: string; onPress: () => void }[];
+  suggestions: OptionRow[];
+  onSelectSuggestion: (key: string) => void;
 }) {
+  const renderSuggestion = useCallback(
+    ({ item }: { item: OptionRow }) => (
+      <SuggestionRow item={item} onSelect={onSelectSuggestion} />
+    ),
+    [onSelectSuggestion],
+  );
+
+  const suggestionKeyExtractor = useCallback(
+    (item: OptionRow) => item.key,
+    [],
+  );
+
   return (
     <View style={styles.autocompleteContainer}>
       <TextInput
@@ -327,26 +264,15 @@ const AutocompleteInput = React.memo(function AutocompleteInput({
       />
       {showDropdown && (
         <View style={styles.suggestionsDropdown}>
-          <ScrollView
-            nestedScrollEnabled
+          <FlashList
+            data={suggestions}
+            renderItem={renderSuggestion}
+            keyExtractor={suggestionKeyExtractor}
             keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={false}
             style={styles.suggestionsList}
-          >
-            {suggestions.map((s) => (
-              <Pressable
-                key={s.key}
-                style={({ pressed }) => [
-                  styles.suggestionItem,
-                  pressed && {
-                    backgroundColor: colors.accentFaded,
-                  },
-                ]}
-                onPress={s.onPress}
-              >
-                <Text style={styles.suggestionText}>{s.label}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+          />
         </View>
       )}
     </View>
@@ -397,13 +323,8 @@ const TagsPanel = React.memo(function TagsPanel({
   onAddTag: (tag: CharacterTag) => void;
 }) {
   const keywordSuggestions = useMemo(
-    () =>
-      suggestions.map((s) => ({
-        key: s,
-        label: s,
-        onPress: () => onAddKeyword(s),
-      })),
-    [suggestions, onAddKeyword],
+    () => suggestions.map((s) => ({ key: s, label: s })),
+    [suggestions],
   );
 
   const tagSuggestions = useMemo(
@@ -411,8 +332,20 @@ const TagsPanel = React.memo(function TagsPanel({
       filteredTagSuggestions.map((tag) => ({
         key: String(tag.id),
         label: tag.name,
-        onPress: () => onAddTag(tag),
       })),
+    [filteredTagSuggestions],
+  );
+
+  const handleSelectKeyword = useCallback(
+    (key: string) => onAddKeyword(key),
+    [onAddKeyword],
+  );
+
+  const handleSelectTag = useCallback(
+    (key: string) => {
+      const tag = filteredTagSuggestions.find((t) => String(t.id) === key);
+      if (tag) onAddTag(tag);
+    },
     [filteredTagSuggestions, onAddTag],
   );
 
@@ -433,6 +366,7 @@ const TagsPanel = React.memo(function TagsPanel({
           onBlur={onKeywordBlur}
           showDropdown={showSuggestions}
           suggestions={keywordSuggestions}
+          onSelectSuggestion={handleSelectKeyword}
         />
         <AddButton onPress={onSubmitKeyword} />
       </View>
@@ -454,11 +388,12 @@ const TagsPanel = React.memo(function TagsPanel({
           onBlur={onTagBlur}
           showDropdown={showTagSuggestions && filteredTagSuggestions.length > 0}
           suggestions={tagSuggestions}
+          onSelectSuggestion={handleSelectTag}
         />
       </View>
 
       {tags.length === 0 ? (
-        <EmptyState text="No blocked tags" />
+        <EmptyState text="No blocked tags" containerStyle={styles.emptyState} />
       ) : (
         tags.map((id) => {
           const tag = allTags.find((t) => t.id === id);
@@ -501,13 +436,53 @@ export default function BlockedContentScreen() {
 
   const { width: screenWidth } = useWindowDimensions();
 
+  const handleChangeTab = useCallback(
+    (index: number) => setActiveTab(TABS[index].key),
+    [],
+  );
+
   const {
-    snapToTab,
-    panGesture,
+    translateX,
+    snapToTab: snapToTabIndex,
+    panGesture: basePanGesture,
     indicatorStyle,
     contentTranslateStyle,
     handleTabRowLayout,
-  } = useTabSwipe({ activeTab, screenWidth, onChangeTab: setActiveTab });
+  } = useTabSwipe({
+    tabCount: TAB_COUNT,
+    screenWidth,
+    pageWidthMode: "screen",
+    activeIndex: tabIndex(activeTab),
+    onChangeIndex: handleChangeTab,
+  });
+
+  const snapToTab = useCallback(
+    (t: Tab) => snapToTabIndex(tabIndex(t)),
+    [snapToTabIndex],
+  );
+
+  const panGesture = useMemo(
+    () =>
+      basePanGesture.onEnd((event) => {
+        const velocity = event.velocityX ?? 0;
+        const currentIdx = Math.round(-translateX.value / screenWidth);
+
+        if (velocity > 300) {
+          const target = Math.max(0, currentIdx - 1);
+          scheduleOnRN(snapToTab, TABS[target].key);
+        } else if (velocity < -300) {
+          const target = Math.min(TAB_COUNT - 1, currentIdx + 1);
+          scheduleOnRN(snapToTab, TABS[target].key);
+        } else {
+          const idx = Math.max(
+            0,
+            Math.min(TAB_COUNT - 1, currentIdx),
+          );
+          scheduleOnRN(snapToTab, TABS[idx].key);
+        }
+      }),
+    [basePanGesture, translateX, screenWidth, snapToTab],
+  );
 
   const loadBlockedContent = useCallback(async () => {
     try {
@@ -891,10 +866,6 @@ const styles = StyleSheet.create({
   emptyState: {
     paddingVertical: 24,
     alignItems: "center",
-  },
-  emptyText: {
-    color: colors.textDim,
-    fontSize: 14,
   },
   itemRow: {
     flexDirection: "row",

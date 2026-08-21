@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import { FlashList } from "@shopify/flash-list";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import ScreenHeader from "../../components/common/ScreenHeader";
+import EmptyState from "../../components/common/EmptyState";
 import { colors } from "../../utils/colors";
 import { storage } from "../../utils/storage";
 import { toast } from "../../utils/toast";
@@ -265,9 +266,11 @@ export default function HiddenCharactersScreen() {
           style={{ paddingVertical: 24 }}
         />
       ) : entries.length === 0 ? (
-        <View style={styles.emptyBox}>
-          <Text style={styles.emptyText}>No hidden characters</Text>
-        </View>
+        <EmptyState
+          text="No hidden characters"
+          containerStyle={styles.emptyBox}
+          textStyle={styles.emptyText}
+        />
       ) : (
         <FlashList
           data={entries}

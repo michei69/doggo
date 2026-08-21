@@ -7,12 +7,7 @@ import {
   type SetStateAction,
 } from "react";
 import { View } from "react-native";
-import {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-} from "react-native-reanimated";
-import { Gesture } from "react-native-gesture-handler";
+import { useSharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import {
   getMyProfile,
@@ -29,78 +24,55 @@ import type {
   PersonaGroup,
 } from "../../../types/api";
 import { type ShowAlert, type DragState } from "./personaUtils";
+import { useTabSwipe as useSharedTabSwipe } from "../../../hooks/useTabSwipe";
 
 export function useTabSwipe(screenWidth: number) {
   const [tab, setTab] = useState<"personas" | "groups">("personas");
-  const tabIndicator = useSharedValue(0);
-  const tabRowWidth = useSharedValue(1);
-  const translateX = useSharedValue(0);
-  const startX = useSharedValue(0);
+  const handleChangeTab = useCallback(
+    (index: number) => setTab(index === 0 ? "personas" : "groups"),
+    [],
+  );
+  const {
+    tabIndicator,
+    translateX,
+    tabRowWidth,
+    snapToTab: snapToTabIndex,
+    panGesture: basePanGesture,
+    contentTranslateStyle,
+    handleTabRowLayout,
+  } = useSharedTabSwipe({
+    tabCount: 2,
+    screenWidth,
+    pageWidthMode: "row",
+    activeIndex: tab === "personas" ? 0 : 1,
+    onChangeIndex: handleChangeTab,
+  });
 
   const snapToTab = useCallback(
-    (t: "personas" | "groups") => {
-      setTab(t);
-      const target = t === "personas" ? 0 : -tabRowWidth.value;
-      translateX.value = withTiming(target, { duration: 250 });
-      tabIndicator.value = withTiming(
-        t === "personas" ? 0 : tabRowWidth.value / 2,
-        { duration: 250 },
-      );
-    },
-    [translateX, tabIndicator, tabRowWidth],
+    (t: "personas" | "groups") => snapToTabIndex(t === "personas" ? 0 : 1),
+    [snapToTabIndex],
   );
 
   const panGesture = useMemo(
     () =>
-      Gesture.Pan()
-        .activeOffsetX([-10, 10])
-        .failOffsetY([-10, 10])
-        .onBegin(() => {
-          startX.value = translateX.value;
-        })
-        .onUpdate((event) => {
-          const raw = startX.value + event.translationX;
-          const clamped = Math.max(-tabRowWidth.value, Math.min(0, raw));
-          translateX.value = clamped;
-          const ratio = -clamped / tabRowWidth.value;
-          tabIndicator.value = ratio * (tabRowWidth.value / 2);
-        })
-        .onEnd((event) => {
-          const threshold = tabRowWidth.value * 0.3;
-          const velocity = event.velocityX ?? 0;
-          if (velocity > 300) {
-            scheduleOnRN(snapToTab, "personas");
-          } else if (velocity < -300) {
+      basePanGesture.onEnd((event) => {
+        const threshold = tabRowWidth.value * 0.3;
+        const velocity = event.velocityX ?? 0;
+        if (velocity > 300) {
+          scheduleOnRN(snapToTab, "personas");
+        } else if (velocity < -300) {
+          scheduleOnRN(snapToTab, "groups");
+        } else {
+          const dist = Math.abs(translateX.value);
+          if (dist > threshold) {
             scheduleOnRN(snapToTab, "groups");
           } else {
-            const dist = Math.abs(translateX.value);
-            if (dist > threshold) {
-              scheduleOnRN(snapToTab, "groups");
-            } else {
-              scheduleOnRN(snapToTab, "personas");
-            }
+            scheduleOnRN(snapToTab, "personas");
           }
-        }),
-    [translateX, startX, tabIndicator, tabRowWidth, snapToTab],
+        }
+      }),
+    [basePanGesture, translateX, tabRowWidth, snapToTab],
   );
-
-  const handleTabRowLayout = useCallback(
-    (width: number) => {
-      tabRowWidth.value = width;
-      tabIndicator.value = tab === "personas" ? 0 : width / 2;
-      translateX.value = tab === "personas" ? 0 : -width;
-    },
-    [tab, tabIndicator, translateX, tabRowWidth],
-  );
-
-  const contentTranslateStyle = useAnimatedStyle(() => ({
-    transform: [
-      {
-        translateX:
-          (translateX.value / Math.max(tabRowWidth.value, 1)) * screenWidth,
-      },
-    ],
-  }));
 
   return {
     tab,
@@ -112,6 +84,81 @@ export function useTabSwipe(screenWidth: number) {
   };
 }
 
+export function useSheetModal<T>() {
+  const [visible, setVisible] = useState(false);
+  const [editing, setEditing] = useState<T | undefined>();
+  const [session, setSession] = useState(0);
+
+  const openCreate = useCallback(() => {
+    setEditing(undefined);
+    setSession((s) => s + 1);
+    setVisible(true);
+  }, []);
+
+  const openEdit = useCallback((item: T) => {
+    setEditing(item);
+    setSession((s) => s + 1);
+    setVisible(true);
+  }, []);
+
+  const close = useCallback(() => {
+    setVisible(false);
+  }, []);
+
+  return {
+    visible,
+    setVisible,
+    editing,
+    session,
+    openCreate,
+    openEdit,
+    close,
+  };
+}
+
+export function useDeleteConfirmAlert({
+  onDelete,
+  onDeleted,
+  errorMessage,
+  showAlert,
+  dismissAlert,
+}: {
+  onDelete: (id: string) => Promise<unknown>;
+  onDeleted: (id: string) => void;
+  errorMessage: string;
+  showAlert: ShowAlert;
+  dismissAlert: () => void;
+}) {
+  const [deleteAlertVisible, setDeleteAlertVisible] = useState(false);
+  const deletingIdRef = useRef<string | null>(null);
+
+  const handleDeleteRequested = useCallback((id: string) => {
+    deletingIdRef.current = id;
+    setDeleteAlertVisible(true);
+  }, []);
+
+  const handleDelete = useCallback(async () => {
+    const deletingId = deletingIdRef.current;
+    if (!deletingId) return;
+    try {
+      await onDelete(deletingId);
+      onDeleted(deletingId);
+    } catch {
+      showAlert("Error", errorMessage, [{ text: "OK", onPress: dismissAlert }]);
+    } finally {
+      setDeleteAlertVisible(false);
+      deletingIdRef.current = null;
+    }
+  }, [onDelete, onDeleted, showAlert, dismissAlert, errorMessage]);
+
+  return {
+    deleteAlertVisible,
+    setDeleteAlertVisible,
+    handleDeleteRequested,
+    handleDelete,
+  };
+}
+
 export function usePersonaSheet(
   profile: UserProfile | null,
   setProfile: Dispatch<SetStateAction<UserProfile | null>>,
@@ -119,40 +166,37 @@ export function usePersonaSheet(
   showAlert: ShowAlert,
   dismissAlert: () => void,
 ) {
-  const [editModalVisible, setEditModalVisible] = useState(false);
   const [sheetMode, setSheetMode] = useState<"create" | "edit" | "editMain">(
     "create",
   );
-  const [editingPersona, setEditingPersona] = useState<Persona | undefined>();
-  const [sheetSession, setSheetSession] = useState(0);
-  const [deleteAlertVisible, setDeleteAlertVisible] = useState(false);
-  const deletingIdRef = useRef<string | null>(null);
+  const {
+    visible: editModalVisible,
+    setVisible: setEditModalVisible,
+    editing: editingPersona,
+    session: sheetSession,
+    openCreate,
+    openEdit,
+    close: handlePersonaSheetClose,
+  } = useSheetModal<Persona>();
 
   const openEditMain = useCallback(() => {
     if (!profile) return;
     setSheetMode("editMain");
-    setEditingPersona(undefined);
-    setSheetSession((s) => s + 1);
-    setEditModalVisible(true);
-  }, [profile]);
+    openCreate();
+  }, [profile, openCreate]);
 
-  const openEditPersona = useCallback((p: Persona) => {
-    setSheetMode("edit");
-    setEditingPersona(p);
-    setSheetSession((s) => s + 1);
-    setEditModalVisible(true);
-  }, []);
+  const openEditPersona = useCallback(
+    (p: Persona) => {
+      setSheetMode("edit");
+      openEdit(p);
+    },
+    [openEdit],
+  );
 
   const openCreatePersona = useCallback(() => {
     setSheetMode("create");
-    setEditingPersona(undefined);
-    setSheetSession((s) => s + 1);
-    setEditModalVisible(true);
-  }, []);
-
-  const handlePersonaSheetClose = useCallback(() => {
-    setEditModalVisible(false);
-  }, []);
+    openCreate();
+  }, [openCreate]);
 
   const handlePersonaSaved = useCallback(async () => {
     setEditModalVisible(false);
@@ -161,27 +205,28 @@ export function usePersonaSheet(
       setProfile(p);
       setPersonas(ps);
     } catch {}
-  }, [setProfile, setPersonas]);
+  }, [setProfile, setPersonas, setEditModalVisible]);
 
-  const handlePersonaDeleteRequested = useCallback((personaId: string) => {
-    deletingIdRef.current = personaId;
-    setDeleteAlertVisible(true);
-  }, []);
-
-  const handleDelete = useCallback(async () => {
-    const deletingId = deletingIdRef.current;
-    if (!deletingId) return;
-    try {
-      await deletePersona(deletingId);
-      setPersonas((prev) => prev.filter((p) => p.id !== deletingId));
+  const handlePersonaDeleted = useCallback(
+    (id: string) => {
+      setPersonas((prev) => prev.filter((p) => p.id !== id));
       setEditModalVisible(false);
-    } catch {
-      showAlert("Error", "Failed to delete persona", [{ text: "OK", onPress: dismissAlert }]);
-    } finally {
-      setDeleteAlertVisible(false);
-      deletingIdRef.current = null;
-    }
-  }, [setPersonas, showAlert, dismissAlert]);
+    },
+    [setPersonas, setEditModalVisible],
+  );
+
+  const {
+    deleteAlertVisible,
+    setDeleteAlertVisible,
+    handleDeleteRequested: handlePersonaDeleteRequested,
+    handleDelete,
+  } = useDeleteConfirmAlert({
+    onDelete: deletePersona,
+    onDeleted: handlePersonaDeleted,
+    errorMessage: "Failed to delete persona",
+    showAlert,
+    dismissAlert,
+  });
 
   return {
     editModalVisible,
@@ -206,27 +251,15 @@ export function useGroupSheet(
   showAlert: ShowAlert,
   dismissAlert: () => void,
 ) {
-  const [groupModalVisible, setGroupModalVisible] = useState(false);
-  const [editingGroup, setEditingGroup] = useState<PersonaGroup | undefined>();
-  const [groupSheetSession, setGroupSheetSession] = useState(0);
-  const [deleteGroupAlert, setDeleteGroupAlert] = useState(false);
-  const deletingGroupIdRef = useRef<string | null>(null);
-
-  const openCreateGroup = useCallback(() => {
-    setEditingGroup(undefined);
-    setGroupSheetSession((s) => s + 1);
-    setGroupModalVisible(true);
-  }, []);
-
-  const openEditGroup = useCallback((g: PersonaGroup) => {
-    setEditingGroup(g);
-    setGroupSheetSession((s) => s + 1);
-    setGroupModalVisible(true);
-  }, []);
-
-  const handleGroupSheetClose = useCallback(() => {
-    setGroupModalVisible(false);
-  }, []);
+  const {
+    visible: groupModalVisible,
+    setVisible: setGroupModalVisible,
+    editing: editingGroup,
+    session: groupSheetSession,
+    openCreate: openCreateGroup,
+    openEdit: openEditGroup,
+    close: handleGroupSheetClose,
+  } = useSheetModal<PersonaGroup>();
 
   const handleGroupSaved = useCallback(async () => {
     setGroupModalVisible(false);
@@ -234,27 +267,28 @@ export function useGroupSheet(
       const gs = await getPersonaGroups();
       setPersonaGroups(gs);
     } catch {}
-  }, [setPersonaGroups]);
+  }, [setPersonaGroups, setGroupModalVisible]);
 
-  const handleGroupDeleteRequested = useCallback((groupId: string) => {
-    deletingGroupIdRef.current = groupId;
-    setDeleteGroupAlert(true);
-  }, []);
-
-  const handleDeleteGroup = useCallback(async () => {
-    const deletingGroupId = deletingGroupIdRef.current;
-    if (!deletingGroupId) return;
-    try {
-      await deletePersonaGroup(deletingGroupId);
-      setPersonaGroups((prev) => prev.filter((g) => g.id !== deletingGroupId));
+  const handleGroupDeleted = useCallback(
+    (id: string) => {
+      setPersonaGroups((prev) => prev.filter((g) => g.id !== id));
       setGroupModalVisible(false);
-    } catch {
-      showAlert("Error", "Failed to delete group", [{ text: "OK", onPress: dismissAlert }]);
-    } finally {
-      setDeleteGroupAlert(false);
-      deletingGroupIdRef.current = null;
-    }
-  }, [setPersonaGroups, showAlert, dismissAlert]);
+    },
+    [setPersonaGroups, setGroupModalVisible],
+  );
+
+  const {
+    deleteAlertVisible: deleteGroupAlert,
+    setDeleteAlertVisible: setDeleteGroupAlert,
+    handleDeleteRequested: handleGroupDeleteRequested,
+    handleDelete: handleDeleteGroup,
+  } = useDeleteConfirmAlert({
+    onDelete: deletePersonaGroup,
+    onDeleted: handleGroupDeleted,
+    errorMessage: "Failed to delete group",
+    showAlert,
+    dismissAlert,
+  });
 
   return {
     groupModalVisible,

@@ -6,20 +6,23 @@ import {
   Pressable,
   Modal,
   ActivityIndicator,
-  RefreshControl,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { FlashList } from "@shopify/flash-list";
 import ScreenHeader from "../../components/common/ScreenHeader";
+import EmptyState from "../../components/common/EmptyState";
+import { useRefreshControl } from "../../components/common/useRefreshControl";
 import CharacterCard from "../../components/character/CharacterCard";
 import CharacterDiscoverActionsSheet from "../../components/character/CharacterDiscoverActionsSheet";
 import CharacterReportModal from "../../components/character/CharacterReportModal";
-import CustomAlert, {
-  type AlertButton,
-} from "../../components/common/CustomAlert";
+import CustomAlert from "../../components/common/CustomAlert";
+import { useAlert } from "../../hooks/useAlert";
 import { getMyCharacters } from "../../api/characters";
-import { getBlockedContent, updateBlockedContent } from "../../api/profile";
+import {
+  useLongPressActions,
+  useBlockAlert,
+} from "../characters/characterSearch/hooks";
 import type { ProfileStackParamList } from "../../navigation/types";
 import type { TrendingCharacter } from "../../types/api";
 import { colors } from "../../utils/colors";
@@ -34,6 +37,8 @@ const FILTER_OPTIONS: { key: PrivacyFilter; label: string }[] = [
   { key: "private", label: "Private" },
 ];
 
+const ANDROID_SPINNER_COLORS = [colors.accent];
+
 export default function MyCharactersScreen() {
   const { navigate, goBack } = useNavigation<Nav>();
   const [characters, setCharacters] = useState<TrendingCharacter[]>([]);
@@ -45,13 +50,19 @@ export default function MyCharactersScreen() {
   const [filter, setFilter] = useState<PrivacyFilter>("all");
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
-  const [longPressCharacter, setLongPressCharacter] = useState<TrendingCharacter | null>(null);
-  const [actionsVisible, setActionsVisible] = useState(false);
-  const [reportVisible, setReportVisible] = useState(false);
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [alertTitle, setAlertTitle] = useState("");
-  const [alertMessage, setAlertMessage] = useState("");
-  const [alertButtons, setAlertButtons] = useState<AlertButton[]>([]);
+  const { alert, showAlert, dismissAlert } = useAlert();
+  const showBlockAlert = useBlockAlert(showAlert, dismissAlert);
+  const {
+    longPressCharacter,
+    actionsVisible,
+    reportVisible,
+    handleLongPress,
+    handleViewCharacter,
+    handleViewCreator,
+    handleReportCharacter,
+    handleCloseReport,
+    handleActionsClose,
+  } = useLongPressActions(navigate, "ProfileCharacterScreen");
 
   const filterLabel = useMemo(
     () => FILTER_OPTIONS.find((o) => o.key === filter)?.label ?? "All",
@@ -103,16 +114,10 @@ export default function MyCharactersScreen() {
     fetchCharacters(1, filter, false).finally(() => setRefreshing(false));
   }, [filter, fetchCharacters]);
 
-  const refreshControl = useMemo(
-    () => (
-      <RefreshControl
-        refreshing={refreshing}
-        onRefresh={handleRefresh}
-        tintColor={colors.accent}
-        colors={[colors.accent]}
-      />
-    ),
-    [refreshing, handleRefresh],
+  const refreshControl = useRefreshControl(
+    refreshing,
+    handleRefresh,
+    ANDROID_SPINNER_COLORS,
   );
 
   const handleFilterSelect = useCallback((key: PrivacyFilter) => {
@@ -132,67 +137,10 @@ export default function MyCharactersScreen() {
     });
   }, []);
 
-  const handleLongPress = useCallback((item: TrendingCharacter) => {
-    setLongPressCharacter(item);
-    setActionsVisible(true);
-  }, []);
-
-  const handleViewCharacter = useCallback(() => {
-    if (!longPressCharacter) return;
-    navigate("ProfileCharacterScreen", {
-      characterId: longPressCharacter.id,
-      characterName: longPressCharacter.name,
-    });
-  }, [longPressCharacter, navigate]);
-
-  const handleViewCreator = useCallback(() => {
-    if (!longPressCharacter?.creator_id) return;
-    navigate("CreatorScreen" as any, {
-      userId: longPressCharacter.creator_id,
-      userName: longPressCharacter.creator_name || "Creator",
-    });
-  }, [longPressCharacter, navigate]);
-
   const handleBlockCharacter = useCallback(() => {
     if (!longPressCharacter) return;
-    setAlertTitle("Block Character");
-    setAlertMessage(
-      `Block "${longPressCharacter.name}"? Hidden characters won't appear in your discover feed.`,
-    );
-    setAlertButtons([
-      {
-        text: "Block",
-        style: "destructive",
-        onPress: async () => {
-          setAlertVisible(false);
-          try {
-            const blocked = await getBlockedContent();
-            if (!blocked.bots.includes(longPressCharacter.id)) {
-              blocked.bots.push(longPressCharacter.id);
-            }
-            await updateBlockedContent(blocked);
-          } catch {}
-        },
-      },
-      { text: "Cancel", style: "cancel", onPress: () => setAlertVisible(false) },
-    ]);
-    setAlertVisible(true);
-  }, [longPressCharacter]);
-
-  const handleReportCharacter = useCallback(() => {
-    setActionsVisible(false);
-    setReportVisible(true);
-  }, []);
-
-  const handleActionsClose = useCallback(() => {
-    setActionsVisible(false);
-  }, []);
-
-  const handleAlertDismiss = useCallback(() => setAlertVisible(false), []);
-
-  const handleCloseReport = useCallback(() => {
-    setReportVisible(false);
-  }, []);
+    showBlockAlert(longPressCharacter);
+  }, [longPressCharacter, showBlockAlert]);
 
   const renderItem = useCallback(
     ({ item }: { item: TrendingCharacter }) => (
@@ -226,9 +174,10 @@ export default function MyCharactersScreen() {
   const renderEmpty = useCallback(() => {
     if (initialLoad) return null;
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No characters found</Text>
-      </View>
+      <EmptyState
+        text="No characters found"
+        containerStyle={styles.emptyContainer}
+      />
     );
   }, [initialLoad]);
 
@@ -318,11 +267,11 @@ export default function MyCharactersScreen() {
       />
 
       <CustomAlert
-        visible={alertVisible}
-        title={alertTitle}
-        message={alertMessage}
-        buttons={alertButtons}
-        onDismiss={handleAlertDismiss}
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        buttons={alert.buttons}
+        onDismiss={dismissAlert}
       />
     </View>
   );
@@ -367,13 +316,9 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     alignItems: "center",
   },
-  emptyText: {
-    color: colors.textDim,
-    fontSize: 14,
-  },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: colors.overlayMedium,
     justifyContent: "center",
     alignItems: "center",
   },

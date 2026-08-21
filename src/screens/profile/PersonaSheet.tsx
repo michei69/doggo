@@ -1,34 +1,20 @@
-import { useState, useCallback, useEffect, useRef, useEffectEvent } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
   ScrollView,
   Pressable,
-  ActivityIndicator,
   StyleSheet,
   TextInput as RNTextInput,
-  KeyboardAvoidingView,
-  Platform,
-  useWindowDimensions,
 } from "react-native";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  cancelAnimation,
-} from "react-native-reanimated";
-import * as ImagePicker from "expo-image-picker";
-import * as ImageManipulator from "expo-image-manipulator";
+import { pickAndUploadAvatar } from "../../api/uploads";
 import Avatar from "../../components/common/Avatar";
-import CustomAlert from "../../components/common/CustomAlert";
 import { avatarUrl } from "../../utils/assets";
 import { colors } from "../../utils/colors";
 import {
   updateMainPersona,
   createPersona,
   updatePersona,
-  uploadFile,
 } from "../../api/profile";
 import type {
   Persona,
@@ -39,13 +25,9 @@ import type {
   UpdatePersonaRequest,
 } from "../../types/api";
 import { scheduleOnRN } from "react-native-worklets";
-import {
-  registerSheet,
-  updateSheet,
-  unregisterSheet,
-} from "../../stores/sheetStore";
-import { useKeyboardHeight } from "../../hooks/useKeyboardHeight";
 import { useAlert } from "../../hooks/useAlert";
+import FormSheet from "../../components/common/FormSheet";
+import type { FormSheetHandle } from "../../components/common/FormSheet";
 
 const EMPTY_PRONOUNS: Pronouns = {
   subjective: "",
@@ -171,47 +153,6 @@ function AvatarField({
         </Text>
       </View>
     </Pressable>
-  );
-}
-
-function SheetActions({
-  saving,
-  uploading,
-  onCancel,
-  onSave,
-}: {
-  saving: boolean;
-  uploading: boolean;
-  onCancel: () => void;
-  onSave: () => void;
-}) {
-  return (
-    <View style={styles.modalActions}>
-      <Pressable
-        onPress={onCancel}
-        style={({ pressed }) => [
-          styles.modalCancelBtn,
-          pressed && { opacity: 0.7 },
-        ]}
-      >
-        <Text style={styles.modalCancelText}>Cancel</Text>
-      </Pressable>
-      <Pressable
-        onPress={onSave}
-        disabled={saving || uploading}
-        style={({ pressed }) => [
-          styles.modalSaveBtn,
-          pressed && { opacity: 0.7 },
-          (saving || uploading) && { opacity: 0.5 },
-        ]}
-      >
-        {saving ? (
-          <ActivityIndicator color={colors.text} size="small" />
-        ) : (
-          <Text style={styles.modalSaveText}>Save</Text>
-        )}
-      </Pressable>
-    </View>
   );
 }
 
@@ -392,7 +333,8 @@ function PronounsFormSection({
   );
 }
 
-function PersonaSheetContent({
+export default function PersonaSheet({
+  visible,
   mode,
   persona,
   profile,
@@ -400,15 +342,8 @@ function PersonaSheetContent({
   onClose,
   onSaved,
   onDeleteRequested,
-  keyboardHeight,
-  windowHeight,
-  isTablet,
-  sheetInset,
-  translateY,
-  backdropOpacity,
-  animateIn,
-  animateOut,
 }: {
+  visible: boolean;
   mode: "create" | "edit" | "editMain";
   persona?: Persona;
   profile?: UserProfile | null;
@@ -416,15 +351,8 @@ function PersonaSheetContent({
   onClose: () => void;
   onSaved: () => void;
   onDeleteRequested: (personaId: string) => void;
-  keyboardHeight: number;
-  windowHeight: number;
-  isTablet: boolean;
-  sheetInset: number;
-  translateY: ReturnType<typeof useSharedValue<number>>;
-  backdropOpacity: ReturnType<typeof useSharedValue<number>>;
-  animateIn: () => void;
-  animateOut: (onFinish: () => void) => void;
 }) {
+  const sheetRef = useRef<FormSheetHandle>(null);
   const isMainPersona = mode === "editMain";
   const editingId = mode === "edit" ? persona?.id ?? null : null;
   const { alert, showAlert, dismissAlert } = useAlert();
@@ -438,63 +366,31 @@ function PersonaSheetContent({
   const pronounPresetKey = form.pronounPreset;
 
   const handleCancel = useCallback(() => {
-    animateOut(() => {
-      onClose();
-    });
-  }, [onClose, animateOut]);
+    sheetRef.current?.close(onClose);
+  }, [onClose]);
 
   const handlePickAndUploadAvatar = useCallback(async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      showAlert("Permission needed", "Allow access to photos to change your avatar.", [
-        { text: "OK", onPress: dismissAlert },
-      ]);
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.9,
-    });
-    if (result.canceled || !result.assets[0]) return;
-
     setUploading(true);
     try {
-      const manipResult = await ImageManipulator.manipulateAsync(
-        result.assets[0].uri,
-        [{ resize: { width: 256, height: 256 } }],
-        { format: ImageManipulator.SaveFormat.WEBP, compress: 0.85 },
-      );
-
-      scheduleOnRN(() => {
-        requestAnimationFrame(() => animateIn());
+      const result = await pickAndUploadAvatar("avatar", "avatar.webp", () => {
+        scheduleOnRN(() => {
+          requestAnimationFrame(() => sheetRef.current?.animateIn());
+        });
       });
-
-      const upload = await uploadFile("webp", "avatar");
-
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("PUT", upload.url);
-        xhr.setRequestHeader("Content-Type", "image/webp");
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) resolve();
-          else reject(new Error(`HTTP ${xhr.status}`));
-        };
-        xhr.onerror = () => reject(new Error("Upload failed"));
-        xhr.send({
-          uri: manipResult.uri,
-          type: "image/webp",
-          name: "avatar.webp",
-        } as any);
-      });
-      setForm((f) => ({ ...f, avatar: upload.filename }));
+      if (result.status === "denied") {
+        showAlert("Permission needed", "Allow access to photos to change your avatar.", [
+          { text: "OK", onPress: dismissAlert },
+        ]);
+        return;
+      }
+      if (result.status === "cancelled") return;
+      setForm((f) => ({ ...f, avatar: result.filename }));
     } catch {
       showAlert("Error", "Failed to upload avatar", [{ text: "OK", onPress: dismissAlert }]);
     } finally {
       setUploading(false);
     }
-  }, [animateIn, showAlert, dismissAlert]);
+  }, [showAlert, dismissAlert]);
 
   const handleSave = useCallback(async () => {
     if (!form.name.trim()) {
@@ -532,321 +428,114 @@ function PersonaSheetContent({
         await createPersona(body);
       }
 
-      animateOut(() => {
-        onSaved();
-      });
+      sheetRef.current?.close(onSaved);
     } catch {
       showAlert("Error", "Failed to save persona", [{ text: "OK", onPress: dismissAlert }]);
     } finally {
       setSaving(false);
     }
-  }, [form, isMainPersona, editingId, onSaved, animateOut, showAlert, dismissAlert]);
+  }, [form, isMainPersona, editingId, onSaved, showAlert, dismissAlert]);
 
   const handleDelete = useCallback(() => {
     if (!editingId) return;
     onDeleteRequested(editingId);
   }, [editingId, onDeleteRequested]);
 
-  const rContainerStyle = useAnimatedStyle(() => ({
-    pointerEvents:
-      backdropOpacity.value > 0.01 ? ("auto" as const) : ("none" as const),
-  }));
-
-  const rBackdropStyle = useAnimatedStyle(() => ({
-    opacity: backdropOpacity.value,
-  }));
-
-  const rSheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }));
-
-  const sheetStaticStyle = {
-    maxHeight: windowHeight * 0.9,
-    ...(isTablet && {
-      marginLeft: sheetInset,
-      marginRight: sheetInset,
-    }),
-  };
+  const title = isMainPersona
+    ? "Edit Main Persona"
+    : editingId
+      ? "Edit Persona"
+      : "Create Persona";
 
   return (
-    <Animated.View style={[styles.container, rContainerStyle]}>
-      <Animated.View style={[styles.backdrop, rBackdropStyle]} />
-      <KeyboardAvoidingView
-        style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <Animated.View style={[styles.sheet, rSheetStyle, sheetStaticStyle]}>
-          <Text style={styles.modalTitle}>
-            {isMainPersona
-              ? "Edit Main Persona"
-              : editingId
-                ? "Edit Persona"
-                : "Create Persona"}
-          </Text>
-
-          <ScrollView
-            style={styles.modalScroll}
-            contentContainerStyle={[
-              styles.modalScrollInner,
-              Platform.OS === "android" && {
-                paddingBottom: keyboardHeight + 40,
-              },
-            ]}
-            keyboardShouldPersistTaps="handled"
-          >
-            <AvatarField
-              avatar={form.avatar}
-              name={form.name}
-              uploading={uploading}
-              onPress={handlePickAndUploadAvatar}
-            />
-
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Name</Text>
-              <RNTextInput
-                style={styles.formInput}
-                placeholder="Persona name"
-                placeholderTextColor={colors.textPlaceholder}
-                value={form.name}
-                onChangeText={(v) =>
-                  setForm((f) => ({
-                    ...f,
-                    name: v,
-                  }))
-                }
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Appearance</Text>
-              <RNTextInput
-                style={[styles.formInput, styles.formInputMultiline]}
-                placeholder="Describe how this persona looks and acts"
-                placeholderTextColor={colors.textPlaceholder}
-                value={form.appearance}
-                onChangeText={(v) =>
-                  setForm((f) => ({
-                    ...f,
-                    appearance: v,
-                  }))
-                }
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            </View>
-
-            {!isMainPersona && (
-              <GroupField
-                personaGroups={personaGroups}
-                groupId={form.groupId}
-                onGroupIdChange={(groupId) =>
-                  setForm((f) => ({ ...f, groupId }))
-                }
-              />
-            )}
-
-            {!isMainPersona && (
-              <PronounsFormSection
-                pronouns={form.pronouns}
-                preset={pronounPresetKey}
-                onPresetChange={(preset) =>
-                  setForm((f) => ({ ...f, pronounPreset: preset }))
-                }
-                onPronounsChange={(pronouns) =>
-                  setForm((f) => ({ ...f, pronouns }))
-                }
-              />
-            )}
-          </ScrollView>
-
-          <SheetActions
-            saving={saving}
-            uploading={uploading}
-            onCancel={handleCancel}
-            onSave={handleSave}
-          />
-          {mode === "edit" && editingId && (
-            <Pressable
-              onPress={handleDelete}
-              style={({ pressed }) => [
-                styles.modalDeleteBtn,
-                pressed && { opacity: 0.7 },
-              ]}
-            >
-              <Text style={styles.modalDeleteText}>Delete Persona</Text>
-            </Pressable>
-          )}
-        </Animated.View>
-      </KeyboardAvoidingView>
-      <CustomAlert
-        visible={alert.visible}
-        title={alert.title}
-        message={alert.message}
-        buttons={alert.buttons}
-        onDismiss={dismissAlert}
-      />
-    </Animated.View>
-  );
-}
-
-export default function PersonaSheet({
-  visible,
-  mode,
-  persona,
-  profile,
-  personaGroups,
-  onClose,
-  onSaved,
-  onDeleteRequested,
-}: {
-  visible: boolean;
-  mode: "create" | "edit" | "editMain";
-  persona?: Persona;
-  profile?: UserProfile | null;
-  personaGroups: PersonaGroup[];
-  onClose: () => void;
-  onSaved: () => void;
-  onDeleteRequested: (personaId: string) => void;
-}) {
-  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
-  const isTablet = Math.min(windowWidth, windowHeight) >= 600;
-  const sheetInset = isTablet ? windowWidth * 0.1 : 0;
-  const translateY = useSharedValue(windowHeight);
-  const backdropOpacity = useSharedValue(0);
-  const isClosing = useSharedValue(false);
-  const keyboardHeight = useKeyboardHeight();
-
-  const windowHeightRef = useRef(windowHeight);
-
-  useEffect(() => {
-    windowHeightRef.current = windowHeight;
-  });
-
-  const animateIn = useCallback(() => {
-    "worklet";
-    const h = windowHeightRef.current;
-    cancelAnimation(translateY);
-    cancelAnimation(backdropOpacity);
-    translateY.value = h;
-    translateY.value = withSpring(0, {
-      damping: 24,
-      stiffness: 200,
-      mass: 0.8,
-    });
-    backdropOpacity.value = withTiming(1, { duration: 200 });
-  }, [backdropOpacity, translateY]);
-
-  const animateOut = useCallback((onFinish: () => void) => {
-    "worklet";
-    if (isClosing.value) return;
-    isClosing.value = true;
-    const h = windowHeightRef.current;
-    cancelAnimation(translateY);
-    cancelAnimation(backdropOpacity);
-    translateY.value = withTiming(h, { duration: 250 });
-    backdropOpacity.value = withTiming(0, { duration: 250 }, () => {
-      scheduleOnRN(onFinish);
-    });
-  }, [backdropOpacity, isClosing, translateY]);
-
-  const animateInEvent = useEffectEvent(animateIn);
-
-  const prevVisible = useRef(false);
-  useEffect(() => {
-    if (visible && !prevVisible.current) {
-      // Opening
-      isClosing.value = false;
-      translateY.value = windowHeightRef.current;
-      backdropOpacity.value = 0;
-      requestAnimationFrame(() => animateInEvent());
-    } else if (!visible && prevVisible.current) {
-      // Closing
-      animateOut(() => {
-        onClose();
-      });
-    }
-    prevVisible.current = visible;
-  }, [visible, animateOut, backdropOpacity, isClosing, onClose, translateY]);
-
-  const overlay = (
-    <PersonaSheetContent
-      key={`${mode}-${persona?.id ?? ""}`}
-      mode={mode}
-      persona={persona}
-      profile={profile}
-      personaGroups={personaGroups}
+    <FormSheet
+      ref={sheetRef}
+      visible={visible}
+      title={title}
       onClose={onClose}
-      onSaved={onSaved}
-      onDeleteRequested={onDeleteRequested}
-      keyboardHeight={keyboardHeight}
-      windowHeight={windowHeight}
-      isTablet={isTablet}
-      sheetInset={sheetInset}
-      translateY={translateY}
-      backdropOpacity={backdropOpacity}
-      animateIn={animateIn}
-      animateOut={animateOut}
-    />
+      onCancel={handleCancel}
+      onSave={handleSave}
+      saving={saving}
+      saveDisabled={uploading}
+      deleteLabel={editingId ? "Delete Persona" : undefined}
+      onDelete={handleDelete}
+      alert={{
+        visible: alert.visible,
+        title: alert.title,
+        message: alert.message,
+        buttons: alert.buttons,
+        onDismiss: dismissAlert,
+      }}
+    >
+      <AvatarField
+        avatar={form.avatar}
+        name={form.name}
+        uploading={uploading}
+        onPress={handlePickAndUploadAvatar}
+      />
+
+      <View style={styles.formGroup}>
+        <Text style={styles.formLabel}>Name</Text>
+        <RNTextInput
+          style={styles.formInput}
+          placeholder="Persona name"
+          placeholderTextColor={colors.textPlaceholder}
+          value={form.name}
+          onChangeText={(v) =>
+            setForm((f) => ({
+              ...f,
+              name: v,
+            }))
+          }
+        />
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.formLabel}>Appearance</Text>
+        <RNTextInput
+          style={[styles.formInput, styles.formInputMultiline]}
+          placeholder="Describe how this persona looks and acts"
+          placeholderTextColor={colors.textPlaceholder}
+          value={form.appearance}
+          onChangeText={(v) =>
+            setForm((f) => ({
+              ...f,
+              appearance: v,
+            }))
+          }
+          multiline
+          numberOfLines={4}
+          textAlignVertical="top"
+        />
+      </View>
+
+      {!isMainPersona && (
+        <GroupField
+          personaGroups={personaGroups}
+          groupId={form.groupId}
+          onGroupIdChange={(groupId) =>
+            setForm((f) => ({ ...f, groupId }))
+          }
+        />
+      )}
+
+      {!isMainPersona && (
+        <PronounsFormSection
+          pronouns={form.pronouns}
+          preset={pronounPresetKey}
+          onPresetChange={(preset) =>
+            setForm((f) => ({ ...f, pronounPreset: preset }))
+          }
+          onPronounsChange={(pronouns) =>
+            setForm((f) => ({ ...f, pronouns }))
+          }
+        />
+      )}
+    </FormSheet>
   );
-
-  // Register with portal so the sheet renders above the tab bar
-  const portalKeyRef = useRef(-1);
-
-  useEffect(() => {
-    if (portalKeyRef.current < 0) {
-      portalKeyRef.current = registerSheet(visible, onClose, overlay, true);
-    }
-    updateSheet(portalKeyRef.current, visible, onClose, overlay, true);
-  });
-
-  useEffect(() => {
-    const key = portalKeyRef.current;
-    return () => {
-      if (key >= 0) unregisterSheet(key);
-    };
-  }, []);
-
-  return null;
 }
 
 const styles = StyleSheet.create({
-  container: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 50,
-    justifyContent: "flex-end",
-  },
-  backdrop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: colors.overlayDark,
-  },
-  keyboardView: {
-    justifyContent: "flex-end",
-  },
-  sheet: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-  },
-  modalTitle: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: "700",
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  modalScroll: { maxHeight: "100%" },
-  modalScrollInner: { paddingBottom: 16 },
-
   avatarWrapper: { alignSelf: "center", marginBottom: 16 },
   avatarBadge: {
     position: "absolute",
@@ -976,44 +665,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
-  modalActions: {
-    flexDirection: "row",
-    gap: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  modalCancelBtn: {
-    flex: 1,
-    backgroundColor: colors.border,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  modalCancelText: {
-    color: colors.textSecondary,
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  modalSaveBtn: {
-    flex: 1,
-    backgroundColor: colors.accent,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  modalSaveText: { color: colors.text, fontSize: 15, fontWeight: "600" },
-
   groupDot: { width: 10, height: 10, borderRadius: 5 },
-
-  modalDeleteBtn: {
-    marginTop: 8,
-    paddingVertical: 10,
-    alignItems: "center" as const,
-  },
-  modalDeleteText: {
-    color: colors.danger,
-    fontSize: 14,
-    fontWeight: "600",
-  },
 });

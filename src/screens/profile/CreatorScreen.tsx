@@ -30,9 +30,9 @@ import CharacterReportModal from "../../components/character/CharacterReportModa
 import CustomAlert, {
   type AlertButton,
 } from "../../components/common/CustomAlert";
-import { getProfile, followUser, unfollowUser, getMyFollowing, getBlockedContent, updateBlockedContent } from "../../api/profile";
+import { useAlert } from "../../hooks/useAlert";
+import { getProfile, followUser, unfollowUser, getMyFollowing } from "../../api/profile";
 import { getCharacters } from "../../api/characters";
-import type { CharacterSearchParams } from "../../api/characters";
 import { stripHtml } from "../../utils/markdown";
 import { assetUrl, avatarUrl } from "../../utils/assets";
 import { colors } from "../../utils/colors";
@@ -41,7 +41,14 @@ import type {
   UserProfile,
   TrendingCharacter,
   TrendingResponse,
+  AvatarPreviewState,
+  CharacterSearchParams,
 } from "../../types/api";
+import { listReducer } from "../characters/characterSearch/searchUtils";
+import {
+  useLongPressActions,
+  useBlockAlert,
+} from "../characters/characterSearch/hooks";
 import type { CharactersStackParamList } from "../../navigation/types";
 import FilterModal, {
   type FilterModalHandle,
@@ -51,54 +58,6 @@ import AdvancedSearchModal from "../../components/discover/AdvancedSearchModal";
 import { BadgeCheck, CirclePlus, Search, SlidersHorizontal } from "lucide-react-native";
 
 type Route = RouteProp<CharactersStackParamList, "CreatorScreen">;
-
-interface ListState {
-  characters: TrendingCharacter[];
-  page: number;
-  loading: boolean;
-  refreshing: boolean;
-  total: number;
-  error: string | null;
-}
-
-type ListAction =
-  | { type: "LOADING" }
-  | { type: "REFRESHING" }
-  | {
-      type: "LOADED";
-      payload: { data: TrendingCharacter[]; total: number; page: number };
-    }
-  | { type: "ERROR"; payload: string };
-
-function listReducer(state: ListState, action: ListAction): ListState {
-  switch (action.type) {
-    case "LOADING":
-      return { ...state, loading: true, error: null };
-    case "REFRESHING":
-      return { ...state, refreshing: true, error: null };
-    case "LOADED": {
-      const { data, total, page } = action.payload;
-      return {
-        ...state,
-        characters: page === 1 ? data : [...state.characters, ...data],
-        total,
-        page,
-        loading: false,
-        refreshing: false,
-        error: null,
-      };
-    }
-    case "ERROR":
-      return {
-        ...state,
-        loading: false,
-        refreshing: false,
-        error: action.payload,
-      };
-    default:
-      return state;
-  }
-}
 
 const ProfileSection = React.memo(function ProfileSection({
   profile,
@@ -376,99 +335,34 @@ function CharacterList({
 }
 
 const ScreenModals = React.memo(function ScreenModals({
-  navigate,
-  characterScreenName,
   longPressCharacter,
   actionsVisible,
   reportVisible,
-  alertVisible,
-  alertTitle,
-  alertMessage,
-  alertButtons,
+  alert,
+  dismissAlert,
   preview,
   setPreview,
-  setActionsVisible,
-  setReportVisible,
-  setAlertVisible,
-  setAlertTitle,
-  setAlertMessage,
-  setAlertButtons,
+  handleViewCharacter,
+  handleViewCreator,
+  handleBlockCharacter,
+  handleReportCharacter,
+  handleActionsClose,
+  handleCloseReport,
 }: {
-  navigate: (name: string, params?: any) => void;
-  characterScreenName: string;
   longPressCharacter: TrendingCharacter | null;
   actionsVisible: boolean;
   reportVisible: boolean;
-  alertVisible: boolean;
-  alertTitle: string;
-  alertMessage: string;
-  alertButtons: AlertButton[];
-  preview: { uri: string; name: string } | null;
-  setPreview: React.Dispatch<React.SetStateAction<{ uri: string; name: string } | null>>;
-  setActionsVisible: React.Dispatch<React.SetStateAction<boolean>>;
-  setReportVisible: React.Dispatch<React.SetStateAction<boolean>>;
-  setAlertVisible: React.Dispatch<React.SetStateAction<boolean>>;
-  setAlertTitle: React.Dispatch<React.SetStateAction<string>>;
-  setAlertMessage: React.Dispatch<React.SetStateAction<string>>;
-  setAlertButtons: React.Dispatch<React.SetStateAction<AlertButton[]>>;
+  alert: { visible: boolean; title: string; message: string; buttons: AlertButton[] };
+  dismissAlert: () => void;
+  preview: AvatarPreviewState | null;
+  setPreview: React.Dispatch<React.SetStateAction<AvatarPreviewState | null>>;
+  handleViewCharacter: () => void;
+  handleViewCreator: () => void;
+  handleBlockCharacter: () => void;
+  handleReportCharacter: () => void;
+  handleActionsClose: () => void;
+  handleCloseReport: () => void;
 }) {
-  const handleViewCharacter = useCallback(() => {
-    if (!longPressCharacter) return;
-    navigate(characterScreenName, {
-      characterId: longPressCharacter.id,
-      characterName: longPressCharacter.name,
-    });
-  }, [longPressCharacter, navigate, characterScreenName]);
-
-  const handleViewCreator = useCallback(() => {
-    if (!longPressCharacter?.creator_id) return;
-    navigate("CreatorScreen", {
-      userId: longPressCharacter.creator_id,
-      userName: longPressCharacter.creator_name || "Creator",
-    });
-  }, [longPressCharacter, navigate]);
-
-  const handleBlockCharacter = useCallback(() => {
-    if (!longPressCharacter) return;
-    setAlertTitle("Block Character");
-    setAlertMessage(
-      `Block "${longPressCharacter.name}"? Hidden characters won't appear in your discover feed.`,
-    );
-    setAlertButtons([
-      {
-        text: "Block",
-        style: "destructive",
-        onPress: async () => {
-          setAlertVisible(false);
-          try {
-            const blocked = await getBlockedContent();
-            if (!blocked.bots.includes(longPressCharacter.id)) {
-              blocked.bots.push(longPressCharacter.id);
-            }
-            await updateBlockedContent(blocked);
-          } catch {}
-        },
-      },
-      { text: "Cancel", style: "cancel", onPress: () => setAlertVisible(false) },
-    ]);
-    setAlertVisible(true);
-  }, [longPressCharacter, setAlertTitle, setAlertMessage, setAlertButtons, setAlertVisible]);
-
-  const handleReportCharacter = useCallback(() => {
-    setActionsVisible(false);
-    setReportVisible(true);
-  }, [setActionsVisible, setReportVisible]);
-
-  const handleActionsClose = useCallback(() => {
-    setActionsVisible(false);
-  }, [setActionsVisible]);
-
-  const handleAlertDismiss = useCallback(() => setAlertVisible(false), [setAlertVisible]);
-
-  const handleCloseReport = useCallback(() => {
-    setReportVisible(false);
-  }, [setReportVisible]);
-
   return (
     <>
       <AvatarPreview
@@ -492,11 +386,11 @@ const ScreenModals = React.memo(function ScreenModals({
         onClose={handleCloseReport}
       />
       <CustomAlert
-        visible={alertVisible}
-        title={alertTitle}
-        message={alertMessage}
-        buttons={alertButtons}
-        onDismiss={handleAlertDismiss}
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        buttons={alert.buttons}
+        onDismiss={dismissAlert}
       />
     </>
   );
@@ -517,86 +411,13 @@ function ProfileState({ loading, error }: { loading: boolean; error: string | nu
   );
 }
 
-export default function CreatorScreen() {
-  const route = useRoute<Route>();
-  const navigation = useNavigation<any>();
-  const { navigate, goBack } = navigation;
-  const { userId } = route.params;
-  const isTablet = useIsTablet();
-
-  const characterScreenName = useMemo(() => {
-    try {
-      const routes = navigation.getState()?.routeNames ?? [];
-      if (routes.includes("ChatCharacter")) return "ChatCharacter";
-      if (routes.includes("ProfileCharacterScreen"))
-        return "ProfileCharacterScreen";
-      return "CharacterScreen";
-    } catch {
-      return "CharacterScreen";
-    }
-  }, [navigation.getState]);
-
-  const currentUser = useAuthStore((s) => s.user);
-  const isOwnProfile = currentUser?.id === userId;
-
+function useCreatorProfile(userId: string, isOwnProfile: boolean) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followingLoading, setFollowingLoading] = useState(false);
-  const [aboutExpanded, setAboutExpanded] = useState(false);
-  const [preview, setPreview] = useState<{ uri: string; name: string } | null>(
-    null,
-  );
-
-  const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
-  const filtersRef = useRef<FilterState>(INITIAL_FILTERS);
-  const filterModalRef = useRef<FilterModalHandle>(null);
-
-  const [advancedKeywords, setAdvancedKeywords] = useState<string[]>([]);
-  const [advancedBlacklist, setAdvancedBlacklist] = useState<string[]>([]);
-  const [keywordMatchMode, setKeywordMatchMode] = useState<"any" | "all">(
-    "any",
-  );
-  const [advancedSearchVisible, setAdvancedSearchVisible] = useState(false);
-  const [hideDarkened, setHideDarkened] = useState(false);
-
-  const [longPressCharacter, setLongPressCharacter] = useState<TrendingCharacter | null>(null);
-  const [actionsVisible, setActionsVisible] = useState(false);
-  const [reportVisible, setReportVisible] = useState(false);
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [alertTitle, setAlertTitle] = useState("");
-  const [alertMessage, setAlertMessage] = useState("");
-  const [alertButtons, setAlertButtons] = useState<AlertButton[]>([]);
-
-  const showAlert = useCallback(
-    (title: string, message: string, buttons: AlertButton[]) => {
-      setAlertTitle(title);
-      setAlertMessage(message);
-      setAlertButtons(buttons);
-      setAlertVisible(true);
-    },
-    [setAlertTitle, setAlertMessage, setAlertButtons, setAlertVisible],
-  );
-
-  const handleFollowError = useCallback(() => {
-    showAlert("Error", "Failed to update follow status", [
-      { text: "OK", onPress: () => setAlertVisible(false) },
-    ]);
-  }, [showAlert, setAlertVisible]);
-
-  const [list, dispatch] = useReducer(listReducer, {
-    characters: [],
-    page: 1,
-    loading: true,
-    refreshing: false,
-    total: 0,
-    error: null,
-  });
-  const pageRef = useRef(1);
-  const emptyPagesRef = useRef(0);
-  const reachedEndRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -621,6 +442,34 @@ export default function CreatorScreen() {
       cancelled = true;
     };
   }, [userId, isOwnProfile]);
+
+  return {
+    profile,
+    profileLoading,
+    profileError,
+    isFollowing,
+    followerCount,
+    followingLoading,
+    setIsFollowing,
+    setFollowerCount,
+    setFollowingLoading,
+  };
+}
+
+function useCreatorCharacterList(userId: string) {
+  const [list, dispatch] = useReducer(listReducer, {
+    characters: [],
+    page: 1,
+    loading: true,
+    refreshing: false,
+    total: 0,
+    error: null,
+  });
+  const pageRef = useRef(1);
+  const emptyPagesRef = useRef(0);
+  const reachedEndRef = useRef(false);
+  const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
+  const filtersRef = useRef<FilterState>(INITIAL_FILTERS);
 
   const doFetch = useCallback(
     async (pageNum: number, isRefresh = false) => {
@@ -701,10 +550,88 @@ export default function CreatorScreen() {
     [doFetch],
   );
 
-  const handleLongPress = useCallback((item: TrendingCharacter) => {
-    setLongPressCharacter(item);
-    setActionsVisible(true);
-  }, []);
+  return {
+    list,
+    filters,
+    handleLoadMore,
+    handleRefresh,
+    handleApplyFilters,
+  };
+}
+export default function CreatorScreen() {
+  const route = useRoute<Route>();
+  const navigation = useNavigation<any>();
+  const { navigate, goBack } = navigation;
+  const { userId } = route.params;
+  const isTablet = useIsTablet();
+
+  const characterScreenName = useMemo(() => {
+    try {
+      const routes = navigation.getState()?.routeNames ?? [];
+      if (routes.includes("ChatCharacter")) return "ChatCharacter";
+      if (routes.includes("ProfileCharacterScreen"))
+        return "ProfileCharacterScreen";
+      return "CharacterScreen";
+    } catch {
+      return "CharacterScreen";
+    }
+  }, [navigation.getState]);
+
+  const currentUser = useAuthStore((s) => s.user);
+  const isOwnProfile = currentUser?.id === userId;
+
+  const {
+    profile,
+    profileLoading,
+    profileError,
+    isFollowing,
+    followerCount,
+    followingLoading,
+    setIsFollowing,
+    setFollowerCount,
+    setFollowingLoading,
+  } = useCreatorProfile(userId, isOwnProfile);
+
+  const [aboutExpanded, setAboutExpanded] = useState(false);
+  const [preview, setPreview] = useState<AvatarPreviewState | null>(
+    null,
+  );
+
+  const [advancedKeywords, setAdvancedKeywords] = useState<string[]>([]);
+  const [advancedBlacklist, setAdvancedBlacklist] = useState<string[]>([]);
+  const [keywordMatchMode, setKeywordMatchMode] = useState<"any" | "all">(
+    "any",
+  );
+  const [advancedSearchVisible, setAdvancedSearchVisible] = useState(false);
+  const [hideDarkened, setHideDarkened] = useState(false);
+
+  const filterModalRef = useRef<FilterModalHandle>(null);
+
+  const { list, filters, handleLoadMore, handleRefresh, handleApplyFilters } =
+    useCreatorCharacterList(userId);
+
+  const { alert, showAlert, dismissAlert } = useAlert();
+  const showBlockAlert = useBlockAlert(showAlert, dismissAlert);
+  const {
+    longPressCharacter,
+    actionsVisible,
+    reportVisible,
+    handleLongPress,
+    handleViewCharacter,
+    handleViewCreator,
+    handleReportCharacter,
+    handleCloseReport,
+    handleActionsClose,
+  } = useLongPressActions(navigate, characterScreenName);
+  const handleBlockCharacter = useCallback(() => {
+    if (!longPressCharacter) return;
+    showBlockAlert(longPressCharacter);
+  }, [longPressCharacter, showBlockAlert]);
+  const handleFollowError = useCallback(() => {
+    showAlert("Error", "Failed to update follow status", [
+      { text: "OK", onPress: dismissAlert },
+    ]);
+  }, [showAlert, dismissAlert]);
 
   const handleToggleAbout = useCallback(() => {
     setAboutExpanded((e) => !e);
@@ -811,23 +738,19 @@ export default function CreatorScreen() {
         onClose={() => setAdvancedSearchVisible(false)}
       />
       <ScreenModals
-        navigate={navigate}
-        characterScreenName={characterScreenName}
         longPressCharacter={longPressCharacter}
         actionsVisible={actionsVisible}
         reportVisible={reportVisible}
-        alertVisible={alertVisible}
-        alertTitle={alertTitle}
-        alertMessage={alertMessage}
-        alertButtons={alertButtons}
+        alert={alert}
+        dismissAlert={dismissAlert}
         preview={preview}
         setPreview={setPreview}
-        setActionsVisible={setActionsVisible}
-        setReportVisible={setReportVisible}
-        setAlertVisible={setAlertVisible}
-        setAlertTitle={setAlertTitle}
-        setAlertMessage={setAlertMessage}
-        setAlertButtons={setAlertButtons}
+        handleViewCharacter={handleViewCharacter}
+        handleViewCreator={handleViewCreator}
+        handleBlockCharacter={handleBlockCharacter}
+        handleReportCharacter={handleReportCharacter}
+        handleActionsClose={handleActionsClose}
+        handleCloseReport={handleCloseReport}
       />
     </View>
   );
@@ -882,7 +805,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     marginTop: 6,
     borderWidth: 1,
-    borderColor: "rgba(124, 92, 231, 0.3)",
+    borderColor: colors.accentStrong,
   },
   subBadgeText: { color: colors.accent, fontSize: 11, fontWeight: "600" },
   profileAbout: {

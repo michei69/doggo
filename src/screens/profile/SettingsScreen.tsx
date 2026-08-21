@@ -20,10 +20,9 @@ import { useIsTablet } from "../../hooks/useIsTablet";
 import { useAlert } from "../../hooks/useAlert";
 import { colors } from "../../utils/colors";
 import { storage } from "../../utils/storage";
+import type { LayoutOption, OptionRow } from "../../utils/constants";
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList, "Settings">;
-
-type LayoutOption = "messaging" | "janitor" | "edgeToEdge";
 
 const LAYOUTS: { key: LayoutOption; label: string; desc: string }[] = [
   {
@@ -47,9 +46,7 @@ function layoutLabel(key: LayoutOption): string {
   return LAYOUTS.find((l) => l.key === key)?.label ?? "Messaging";
 }
 
-type WrapperOption = { key: string; label: string };
-
-const WRAPPERS: WrapperOption[] = [
+const WRAPPERS: OptionRow[] = [
   { key: "", label: "None" },
   { key: "*", label: "Italic (*)" },
   { key: "**", label: "Bold (**)" },
@@ -59,8 +56,6 @@ const WRAPPERS: WrapperOption[] = [
 function wrapperLabel(key: string): string {
   return WRAPPERS.find((w) => w.key === key)?.label ?? "Italic (*)";
 }
-
-type PickerOption = { key: string; label: string; desc?: string };
 
 const ToggleRow = React.memo(function ToggleRow({
   label,
@@ -130,7 +125,7 @@ const PickerModal = React.memo(function PickerModal({
 }: {
   visible: boolean;
   title: string;
-  options: PickerOption[];
+  options: OptionRow[];
   activeKey: string;
   onSelect: (key: string) => void;
   onClose: () => void;
@@ -507,7 +502,7 @@ const styles = StyleSheet.create({
   logoutBtn: { marginBottom: 28 },
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: colors.overlayMedium,
     justifyContent: "center",
     alignItems: "center",
     padding: 24,

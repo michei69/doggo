@@ -16,6 +16,7 @@ import { scheduleOnRN } from "react-native-worklets";
 import Avatar from "../../../components/common/Avatar";
 import Button from "../../../components/common/Button";
 import CustomAlert from "../../../components/common/CustomAlert";
+import EmptyState from "../../../components/common/EmptyState";
 import PersonaSheet from "../PersonaSheet";
 import PersonaGroupSheet from "../PersonaGroupSheet";
 import type {
@@ -179,12 +180,13 @@ export const PersonasPanel = memo(function PersonasPanel({
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Personas</Text>
         {personas.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>No personas yet</Text>
-            <Text style={styles.emptySubtext}>
-              Create additional personas to use in chats
-            </Text>
-          </View>
+          <EmptyState
+            text="No personas yet"
+            subtext="Create additional personas to use in chats"
+            containerStyle={styles.emptyCard}
+            textStyle={styles.emptyText}
+            subtextStyle={styles.emptySubtext}
+          />
         ) : (
           personas.map((p, i) => {
             const group = getGroupById(p.groupId);
@@ -327,12 +329,13 @@ export const GroupsPanel = memo(function GroupsPanel({
     >
       <View style={styles.section}>
         {personaGroups.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>No groups</Text>
-            <Text style={styles.emptySubtext}>
-              Create groups to organize your personas
-            </Text>
-          </View>
+          <EmptyState
+            text="No groups"
+            subtext="Create groups to organize your personas"
+            containerStyle={styles.emptyCard}
+            textStyle={styles.emptyText}
+            subtextStyle={styles.emptySubtext}
+          />
         ) : (
           personaGroups.map((g, i) => {
             const members = getMembers(g.id);
