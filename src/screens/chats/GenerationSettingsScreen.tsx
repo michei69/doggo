@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -15,6 +14,7 @@ import { getApiSettings, updateApiSettings } from "../../api/settings";
 import { colors } from "../../utils/colors";
 import ScreenHeader from "../../components/common/ScreenHeader";
 import CustomAlert from "../../components/common/CustomAlert";
+import Skeleton from "../../components/common/Skeleton";
 import { useKeyboardHeight } from "../../hooks/useKeyboardHeight";
 import { useAlert } from "../../hooks/useAlert";
 import { useChatStore } from "../../stores/chatStore";
@@ -75,6 +75,48 @@ function buildDefaultSettings(): ApiSettingsSettings {
     updated_at: "",
   };
 }
+
+const GenerationSettingsSkeleton = React.memo(
+  function GenerationSettingsSkeleton() {
+    return (
+      <View style={styles.container}>
+        <View style={styles.skelScroll}>
+          <Skeleton>
+            <View style={styles.skelCard}>
+              <View style={styles.skelLabelBar} />
+              <View style={styles.skelBtnPair}>
+                <View style={styles.skelBtn} />
+                <View style={[styles.skelBtn, styles.skelBtnActive]} />
+              </View>
+            </View>
+
+            {[0, 1].map((s) => (
+              <View key={s} style={styles.skelSection}>
+                <View style={styles.skelSectionHeader}>
+                  <View style={styles.skelSectionTitle} />
+                  <View style={styles.skelChevron} />
+                </View>
+                <View style={styles.skelSectionBody}>
+                  {[0, 1].map((i) => (
+                    <View key={i} style={styles.skelSlider}>
+                      <View style={styles.skelLabelRow}>
+                        <View style={styles.skelSliderLabel} />
+                        <View style={styles.skelValueChip} />
+                      </View>
+                      <View style={styles.skelTrack} />
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ))}
+
+            <View style={styles.skelSaveBtn} />
+          </Skeleton>
+        </View>
+      </View>
+    );
+  },
+);
 
 export default function GenerationSettingsScreen() {
   const navigation =
@@ -218,11 +260,7 @@ export default function GenerationSettingsScreen() {
   }, [navigation, isDirty, showAlert, dismissAlert]);
 
   if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.accent} />
-      </View>
-    );
+    return <GenerationSettingsSkeleton />;
   }
 
   const gs = settings.generation_settings;
@@ -365,11 +403,108 @@ export default function GenerationSettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  centered: {
+  skelScroll: {
     flex: 1,
-    justifyContent: "center",
+    padding: 16,
+  },
+  skelCard: {
+    backgroundColor: colors.card,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  skelLabelBar: {
+    width: 90,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.border,
+    marginBottom: 10,
+  },
+  skelBtnPair: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  skelBtn: {
+    flex: 1,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: colors.border,
+  },
+  skelBtnActive: {
+    backgroundColor: colors.accentSoft,
+  },
+  skelSection: {
+    marginBottom: 16,
+  },
+  skelSectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: colors.background,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  skelSectionTitle: {
+    width: 130,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.border,
+  },
+  skelChevron: {
+    width: 10,
+    height: 10,
+    borderRadius: 3,
+    backgroundColor: colors.border,
+  },
+  skelSectionBody: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderColor: colors.border,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  skelSlider: {
+    marginBottom: 20,
+  },
+  skelLabelRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  skelSliderLabel: {
+    width: 80,
+    height: 11,
+    borderRadius: 5,
+    backgroundColor: colors.border,
+  },
+  skelValueChip: {
+    width: 40,
+    height: 18,
+    borderRadius: 6,
+    backgroundColor: colors.accentSoft,
+  },
+  skelTrack: {
+    width: "100%",
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.border,
+  },
+  skelSaveBtn: {
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: colors.accentSoft,
+    marginTop: 8,
   },
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 60 },
