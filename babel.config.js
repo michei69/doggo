@@ -7,7 +7,7 @@ module.exports = (api) => {
         "react-native-reanimated/plugin",
         {
           bundleMode: true,
-          workletizableModules: [],
+          workletizableModules: ["remend"],
         },
       ],
     ],
