@@ -14,10 +14,11 @@ import {
 import { X } from "lucide-react-native";
 import PersonaPicker from "../../components/chat/PersonaPicker";
 import CustomAlert from "../../components/common/CustomAlert";
+import EmptyState from "../../components/common/EmptyState";
 import { useAlert } from "../../hooks/useAlert";
 import { useChatStore } from "../../stores/chatStore";
 import { colors } from "../../utils/colors";
-import type { TrendingCharacter } from "../../types/api";
+import type { TrendingCharacter, PersonaRef } from "../../types/api";
 import type { CharactersStackParamList } from "../../navigation/types";
 import { useHiddenCharacters, useSwipeDeck } from "./characterSearch/hooks";
 import SwipeCard, {
@@ -76,7 +77,7 @@ export default function SwipeDiscoverScreen() {
     );
 
     const handlePersonaSelect = useCallback(
-        async (persona: { id: string; name: string; avatar: string } | null) => {
+        async (persona: PersonaRef | null) => {
             if (!pendingCharacter) return;
             const character = pendingCharacter;
             setPickerVisible(false);
@@ -124,11 +125,13 @@ export default function SwipeDiscoverScreen() {
             </View>
 
             {!loading && deck.length === 0 ? (
-                <View style={styles.centerBox}>
-                    <Text style={styles.emptyTitle}>No characters to swipe</Text>
-                    <Text style={styles.emptyText}>
-                        {error ? error : "Try refreshing the feed."}
-                    </Text>
+                <EmptyState
+                    title="No characters to swipe"
+                    text={error ? error : "Try refreshing the feed."}
+                    containerStyle={styles.centerBox}
+                    titleStyle={styles.emptyTitle}
+                    textStyle={styles.emptyText}
+                >
                     <Pressable
                         style={({ pressed }) => [
                             styles.reloadButton,
@@ -140,7 +143,7 @@ export default function SwipeDiscoverScreen() {
                             {refreshing ? "Loading..." : "Try again"}
                         </Text>
                     </Pressable>
-                </View>
+                </EmptyState>
             ) : (
                 <View style={styles.deckArea}>
                     {behind && !caughtUp && (
@@ -158,11 +161,13 @@ export default function SwipeDiscoverScreen() {
                             onSwiped={handleSwiped}
                         />
                     ) : caughtUp && !loading ? (
-                        <View style={styles.centerBox}>
-                            <Text style={styles.emptyTitle}>All caught up</Text>
-                            <Text style={styles.emptyText}>
-                                You have seen every character in this feed.
-                            </Text>
+                        <EmptyState
+                            title="All caught up"
+                            text="You have seen every character in this feed."
+                            containerStyle={styles.centerBox}
+                            titleStyle={styles.emptyTitle}
+                            textStyle={styles.emptyText}
+                        >
                             <Pressable
                                 style={({ pressed }) => [
                                     styles.reloadButton,
@@ -174,7 +179,7 @@ export default function SwipeDiscoverScreen() {
                                     Reload
                                 </Text>
                             </Pressable>
-                        </View>
+                        </EmptyState>
                     ) : null}
                     {loading && (
                         <ActivityIndicator

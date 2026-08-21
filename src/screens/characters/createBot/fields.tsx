@@ -14,7 +14,7 @@ import Button from "../../../components/common/Button";
 import { colors } from "../../../utils/colors";
 import { EnrichedMarkdownText } from "react-native-enriched-markdown";
 import { markdownStyle } from "../../../utils/markdownStyle";
-import type { TagEntry } from "./botFormState";
+import type { TagEntry } from "../../../types/api";
 
 function AvatarPicker({
   uri,
@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
   },
   previewOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.8)",
+    backgroundColor: colors.overlayStrong,
     justifyContent: "center",
     alignItems: "center",
   },

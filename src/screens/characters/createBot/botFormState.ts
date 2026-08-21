@@ -15,12 +15,6 @@ export interface BotFormState {
   editCharacterId?: string;
 }
 
-export interface TagEntry {
-  id: number;
-  name: string;
-  slug: string;
-}
-
 export const EMPTY_FORM: BotFormState = {
   avatar: "",
   name: "",

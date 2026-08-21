@@ -41,7 +41,7 @@ import {
   getChatDetail,
   deleteChat,
 } from "../../api/chats";
-import type { CharacterDetail, ChatListItem, ChatDetail } from "../../types/api";
+import type { CharacterDetail, ChatListItem, ChatDetail, PersonaRef } from "../../types/api";
 import { processSystemMessage } from "../../utils/processText";
 import { storage } from "../../utils/storage";
 import { colors } from "../../utils/colors";
@@ -439,7 +439,7 @@ export default function CharacterScreen() {
   }, []);
 
   const handlePersonaSelect = useCallback(
-    async (persona: { id: string; name: string; avatar: string } | null) => {
+    async (persona: PersonaRef | null) => {
       if (!character) return;
       setLoading(true);
       try {

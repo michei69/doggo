@@ -1,18 +1,17 @@
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import {
     ActivityIndicator,
     Pressable,
-    RefreshControl,
-    ScrollView,
     StyleSheet,
     Text,
     View,
 } from "react-native";
 import { Image } from "expo-image";
 import { FlashList } from "@shopify/flash-list";
-import type { CharacterAvatarPreview, ProfileSearchResult } from "../../../api/characters";
+import type { CharacterAvatarPreview, ProfileSearchResult, TrendingCharacter } from "../../../types/api";
 import Avatar from "../../../components/common/Avatar";
-import type { TrendingCharacter } from "../../../types/api";
+import EmptyState from "../../../components/common/EmptyState";
+import { useRefreshControl } from "../../../components/common/useRefreshControl";
 import { avatarUrl, botAvatarUrl } from "../../../utils/assets";
 import { colors } from "../../../utils/colors";
 
@@ -41,16 +40,7 @@ export const CharacterList = React.memo(function CharacterList({
     error: string | null;
     hasMore: boolean;
 }) {
-    const refreshControl = useMemo(
-        () => (
-            <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                tintColor={colors.accent}
-            />
-        ),
-        [refreshing, onRefresh],
-    );
+    const refreshControl = useRefreshControl(refreshing, onRefresh);
     if (loading && data.length === 0) {
         return (
             <View style={styles.listLoader}>
@@ -80,9 +70,10 @@ export const CharacterList = React.memo(function CharacterList({
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
                 !loading && !error ? (
-                    <View style={styles.listLoader}>
-                        <Text style={styles.emptyText}>No characters found</Text>
-                    </View>
+                    <EmptyState
+                        text="No characters found"
+                        containerStyle={styles.listLoader}
+                    />
                 ) : null
             }
             ListFooterComponent={
@@ -115,16 +106,7 @@ export const CreatorList = React.memo(function CreatorList({
     loading: boolean;
     hasMore: boolean;
 }) {
-    const refreshControl = useMemo(
-        () => (
-            <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                tintColor={colors.accent}
-            />
-        ),
-        [refreshing, onRefresh],
-    );
+    const refreshControl = useRefreshControl(refreshing, onRefresh);
     if (loading && data.length === 0) {
         return (
             <View style={styles.listLoader}>
@@ -145,9 +127,10 @@ export const CreatorList = React.memo(function CreatorList({
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
                 !loading ? (
-                    <View style={styles.listLoader}>
-                        <Text style={styles.emptyText}>No creators found</Text>
-                    </View>
+                    <EmptyState
+                        text="No creators found"
+                        containerStyle={styles.listLoader}
+                    />
                 ) : null
             }
             ListFooterComponent={
@@ -168,6 +151,20 @@ export const CreatorCard = React.memo(function CreatorCard({
     onPress: () => void;
     onPressCharacter: (char: CharacterAvatarPreview) => void;
 }) {
+    const charPreviews = useMemo(
+        () => item.character_avatar_previews.slice(0, 3),
+        [item.character_avatar_previews],
+    );
+    const renderCharPreview = useCallback(
+        ({ item: char }: { item: CharacterAvatarPreview }) => (
+            <CharPreviewRow char={char} onPressCharacter={onPressCharacter} />
+        ),
+        [onPressCharacter],
+    );
+    const charPreviewKeyExtractor = useCallback(
+        (char: CharacterAvatarPreview) => char.id,
+        [],
+    );
     return (
         <Pressable style={styles.creatorCard} onPress={onPress}>
             <View style={styles.creatorRow}>
@@ -182,33 +179,43 @@ export const CreatorCard = React.memo(function CreatorCard({
                 </View>
             </View>
             {item.character_avatar_previews.length > 0 && (
-                <ScrollView
+                <FlashList
                     horizontal
+                    data={charPreviews}
+                    keyExtractor={charPreviewKeyExtractor}
+                    renderItem={renderCharPreview}
                     showsHorizontalScrollIndicator={false}
                     style={styles.charPreviewScroll}
                     contentContainerStyle={styles.charPreviewContent}
-                >
-                    {item.character_avatar_previews.slice(0, 3).map((char) => (
-                        <Pressable
-                            key={char.id}
-                            style={styles.charPreviewItem}
-                            onPress={() => onPressCharacter(char)}
-                        >
-                            <Image
-                                source={{ uri: botAvatarUrl(char.avatar) }}
-                                style={styles.charPreviewAvatar}
-                            />
-                            <Text
-                                style={styles.charPreviewName}
-                                numberOfLines={1}
-                                ellipsizeMode="tail"
-                            >
-                                {char.name}
-                            </Text>
-                        </Pressable>
-                    ))}
-                </ScrollView>
+                />
             )}
+        </Pressable>
+    );
+});
+
+const CharPreviewRow = React.memo(function CharPreviewRow({
+    char,
+    onPressCharacter,
+}: {
+    char: CharacterAvatarPreview;
+    onPressCharacter: (char: CharacterAvatarPreview) => void;
+}) {
+    return (
+        <Pressable
+            style={styles.charPreviewItem}
+            onPress={() => onPressCharacter(char)}
+        >
+            <Image
+                source={{ uri: botAvatarUrl(char.avatar) }}
+                style={styles.charPreviewAvatar}
+            />
+            <Text
+                style={styles.charPreviewName}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+            >
+                {char.name}
+            </Text>
         </Pressable>
     );
 });
@@ -229,10 +236,6 @@ const styles = StyleSheet.create({
     errorText: {
         color: colors.danger,
         fontSize: 16,
-    },
-    emptyText: {
-        color: colors.textDim,
-        fontSize: 14,
     },
     creatorCard: {
         backgroundColor: colors.card,

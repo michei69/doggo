@@ -2,9 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useRoute, useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import * as ImagePicker from "expo-image-picker";
-import * as ImageManipulator from "expo-image-manipulator";
-import { uploadFile } from "../../../api/profile";
+import { pickAndUploadAvatar } from "../../../api/uploads";
 import {
   getTags,
   getCharacterDetail,
@@ -16,15 +14,13 @@ import type { CreateStackParamList } from "../../../navigation/types";
 import type {
   CreateCharacterRequest,
   CharacterResponse,
-  CharacterTag,
+  TagEntry,
 } from "../../../types/api";
-import type {
-  AlertButton,
-} from "../../../components/common/CustomAlert";
+import { useAlert } from "../../../hooks/useAlert";
 import { useKeyboardHeight } from "../../../hooks/useKeyboardHeight";
+import { tagsToTagEntries } from "../characterSearch/searchUtils";
 import {
   type BotFormState,
-  type TagEntry,
   EMPTY_FORM,
   persistForm,
   clearPersistedForm,
@@ -47,20 +43,7 @@ export function useCreateBotForm() {
   const [refreshing, setRefreshing] = useState(false);
   const [firstMsgIndex, setFirstMsgIndex] = useState(0);
   const [previewVisible, setPreviewVisible] = useState(false);
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [alertTitle, setAlertTitle] = useState("");
-  const [alertMessage, setAlertMessage] = useState("");
-  const [alertButtons, setAlertButtons] = useState<AlertButton[]>([]);
-
-  const showAlert = useCallback(
-    (title: string, message: string, buttons: AlertButton[]) => {
-      setAlertTitle(title);
-      setAlertMessage(message);
-      setAlertButtons(buttons);
-      setAlertVisible(true);
-    },
-    [],
-  );
+  const { alert, showAlert, dismissAlert } = useAlert();
 
   const keyboardHeight = useKeyboardHeight();
   const [tagSearch, setTagSearch] = useState("");
@@ -146,13 +129,7 @@ export function useCreateBotForm() {
     const fetchTags = async () => {
       try {
         const tags = await getTags();
-        setAllTags(
-          tags.map((t: CharacterTag) => ({
-            id: t.id,
-            name: t.name,
-            slug: t.slug,
-          })),
-        );
+        setAllTags(tagsToTagEntries(tags));
       } catch {
         // Tags are optional — fail silently
       }
@@ -202,56 +179,25 @@ export function useCreateBotForm() {
   }, [isEditMode, characterId]);
 
   const handlePickAndUploadAvatar = useCallback(async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      showAlert("Permission needed", "Allow access to photos to upload a bot avatar.", [
-        { text: "OK", onPress: () => setAlertVisible(false) },
-      ]);
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.9,
-    });
-    if (result.canceled || !result.assets[0]) return;
-
     setUploading(true);
     try {
-      const [manipResult, upload] = await Promise.all([
-        ImageManipulator.manipulateAsync(
-          result.assets[0].uri,
-          [{ resize: { width: 256, height: 256 } }],
-          { format: ImageManipulator.SaveFormat.WEBP, compress: 0.85 },
-        ),
-        uploadFile("webp", "bot"),
-      ]);
-
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("PUT", upload.url);
-        xhr.setRequestHeader("Content-Type", "image/webp");
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) resolve();
-          else reject(new Error(`HTTP ${xhr.status}`));
-        };
-        xhr.onerror = () => reject(new Error("Upload failed"));
-        xhr.send({
-          uri: manipResult.uri,
-          type: "image/webp",
-          name: "bot.webp",
-        } as any);
-      });
-      setForm((f) => ({ ...f, avatar: upload.filename }));
+      const result = await pickAndUploadAvatar("bot", "bot.webp");
+      if (result.status === "denied") {
+        showAlert("Permission needed", "Allow access to photos to upload a bot avatar.", [
+          { text: "OK", onPress: dismissAlert },
+        ]);
+        return;
+      }
+      if (result.status === "cancelled") return;
+      setForm((f) => ({ ...f, avatar: result.filename }));
     } catch {
       showAlert("Error", "Failed to upload avatar", [
-        { text: "OK", onPress: () => setAlertVisible(false) },
+        { text: "OK", onPress: dismissAlert },
       ]);
     } finally {
       setUploading(false);
     }
-  }, [showAlert]);
+  }, [showAlert, dismissAlert]);
 
   const setField = useCallback(
     <K extends keyof BotFormState>(key: K, value: BotFormState[K]) => {
@@ -322,27 +268,26 @@ export function useCreateBotForm() {
   );
 
   const handleDeleteFirstMessage = useCallback(() => {
-    setAlertTitle("Delete Message");
-    setAlertMessage(
+    showAlert(
+      "Delete Message",
       `Delete first message ${firstMsgIndex + 1}? This cannot be undone.`,
-    );
-    setAlertButtons([
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => {
-          setAlertVisible(false);
-          removeFirstMessage(firstMsgIndex);
+      [
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            dismissAlert();
+            removeFirstMessage(firstMsgIndex);
+          },
         },
-      },
-      {
-        text: "Cancel",
-        style: "cancel",
-        onPress: () => setAlertVisible(false),
-      },
-    ]);
-    setAlertVisible(true);
-  }, [firstMsgIndex, removeFirstMessage]);
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: dismissAlert,
+        },
+      ],
+    );
+  }, [firstMsgIndex, removeFirstMessage, showAlert, dismissAlert]);
 
   const handlePreviewFirstMessage = useCallback(() => {
     setPreviewVisible(true);
@@ -401,13 +346,13 @@ export function useCreateBotForm() {
   const handleSave = useCallback(async () => {
     if (!form.name.trim()) {
       showAlert("Error", "Name is required", [
-        { text: "OK", onPress: () => setAlertVisible(false) },
+        { text: "OK", onPress: dismissAlert },
       ]);
       return;
     }
     if (form.first_messages.filter((m) => m.trim()).length === 0) {
       showAlert("Error", "At least one first message is required", [
-        { text: "OK", onPress: () => setAlertVisible(false) },
+        { text: "OK", onPress: dismissAlert },
       ]);
       return;
     }
@@ -434,38 +379,37 @@ export function useCreateBotForm() {
       });
     } catch (err: any) {
       showAlert("Error", err?.message || "Failed to save character", [
-        { text: "OK", onPress: () => setAlertVisible(false) },
+        { text: "OK", onPress: dismissAlert },
       ]);
     } finally {
       setSaving(false);
     }
-  }, [form, isEditMode, characterId, buildRequest, navigate, showAlert]);
+  }, [form, isEditMode, characterId, buildRequest, navigate, showAlert, dismissAlert]);
 
   const handleReset = useCallback(() => {
-    setAlertTitle("Reset Form");
-    setAlertMessage(
+    showAlert(
+      "Reset Form",
       "Clear all fields and start over? This cannot be undone.",
-    );
-    setAlertButtons([
-      {
-        text: "Reset",
-        style: "destructive",
-        onPress: () => {
-          setAlertVisible(false);
-          setForm(EMPTY_FORM);
-          setFirstMsgIndex(0);
-          setTagSearch("");
-          clearPersistedForm(isEditMode);
+      [
+        {
+          text: "Reset",
+          style: "destructive",
+          onPress: () => {
+            dismissAlert();
+            setForm(EMPTY_FORM);
+            setFirstMsgIndex(0);
+            setTagSearch("");
+            clearPersistedForm(isEditMode);
+          },
         },
-      },
-      {
-        text: "Cancel",
-        style: "cancel",
-        onPress: () => setAlertVisible(false),
-      },
-    ]);
-    setAlertVisible(true);
-  }, [isEditMode]);
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: dismissAlert,
+        },
+      ],
+    );
+  }, [isEditMode, showAlert, dismissAlert]);
 
   const filteredTags = useMemo(
     () =>
@@ -486,10 +430,10 @@ export function useCreateBotForm() {
   return {
     addCustomTag,
     addFirstMessage,
-    alertButtons,
-    alertMessage,
-    alertTitle,
-    alertVisible,
+    alertButtons: alert.buttons,
+    alertMessage: alert.message,
+    alertTitle: alert.title,
+    alertVisible: alert.visible,
     closePreview,
     firstMsgIndex,
     filteredTags,
@@ -513,7 +457,7 @@ export function useCreateBotForm() {
     selectLimited,
     selectLimitless,
     selectedTagIdsSet,
-    setAlertVisible,
+    setAlertVisible: (_visible: boolean) => dismissAlert(),
     setField,
     setTagSearch,
     tagSearch,

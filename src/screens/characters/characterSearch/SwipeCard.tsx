@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
-import { View, Text, Pressable, StyleSheet, useWindowDimensions } from "react-native";
+import { useCallback, useMemo } from "react";
+import { View, Text, StyleSheet, useWindowDimensions } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
     useAnimatedStyle,
@@ -9,18 +9,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { EnrichedMarkdownText } from "react-native-enriched-markdown";
-import {
-    BadgeCheck,
-    CirclePlus,
-    MessageCircle,
-    MessageSquare,
-} from "lucide-react-native";
-import Avatar from "../../../components/common/Avatar";
-import AvatarPreview from "../../../components/common/AvatarPreview";
-import Badge from "../../../components/common/Badge";
-import Tag from "../../../components/common/Tag";
+import CharacterIdentity from "../../../components/character/CharacterIdentity";
 import { colors } from "../../../utils/colors";
-import { botAvatarUrl } from "../../../utils/assets";
 import { htmlToMarkdown } from "../../../utils/markdown";
 import { markdownStyle } from "../../../utils/markdownStyle";
 import { useNavigateToJanitorLink } from "../../../utils/janitorLinks";
@@ -42,9 +32,6 @@ export default function SwipeCard({
     style?: object;
 }) {
     const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
-    const [preview, setPreview] = useState<{ uri: string; name: string } | null>(
-        null,
-    );
     const translateX = useSharedValue(0);
     const translateY = useSharedValue(0);
     const rotate = useSharedValue(0);
@@ -162,7 +149,7 @@ export default function SwipeCard({
             opacity = p * 0.45;
         } else if (y > 0) {
             const p = Math.min(y / TINT_RANGE, 1);
-            backgroundColor = "rgba(30, 30, 40, 0.4)";
+            backgroundColor = colors.scrim;
             opacity = p;
         }
         return { backgroundColor, opacity };
@@ -178,87 +165,30 @@ export default function SwipeCard({
 
     const cardContent = (
         <View style={styles.inner}>
-            <Avatar
-                uri={botAvatarUrl(character.avatar)}
-                onPress={() =>
-                    setPreview({
-                        uri: botAvatarUrl(character.avatar),
-                        name: character.name,
-                    })
+            <CharacterIdentity
+                character={character}
+                variant="full"
+                avatarSize={140}
+                name={
+                    <Text style={styles.name} numberOfLines={2}>
+                        {character.name}
+                    </Text>
                 }
-                name={character.name}
-                size={140}
+                footer={
+                    character.description ? (
+                        <View style={styles.descSection}>
+                            <View style={styles.descCollapsed}>
+                                <EnrichedMarkdownText
+                                    markdown={descriptionMarkdown}
+                                    markdownStyle={markdownStyle}
+                                    selectable={false}
+                                    onLinkPress={onLinkPress}
+                                />
+                            </View>
+                        </View>
+                    ) : null
+                }
             />
-            <Text style={styles.name} numberOfLines={2}>
-                {character.name}
-            </Text>
-            <View style={styles.creatorRow}>
-                <Text style={styles.creator} numberOfLines={1}>
-                    by {character.creator_name}
-                </Text>
-                {character.creator_verified ? (
-                    <BadgeCheck size={14} color={colors.accent} />
-                ) : null}
-                {character.creator_subscriber_badge ? (
-                    <View style={styles.subscriberRow}>
-                        <CirclePlus size={14} color={colors.accent} />
-                        <Text style={styles.subscriberBadge}> Subscriber</Text>
-                    </View>
-                ) : null}
-            </View>
-            <View style={styles.badgesRow}>
-                <Badge
-                    label={character.is_nsfw ? "NSFW" : "Safe"}
-                    variant={character.is_nsfw ? "nsfw" : "safe"}
-                />
-                {character.is_proxy_enabled ? (
-                    <Badge label="Proxy" />
-                ) : null}
-                {!character.is_public ? (
-                    <Badge label="Private" variant="private" />
-                ) : null}
-            </View>
-            {(character.tags.length > 0 ||
-                character.custom_tags.length > 0) && (
-                <View style={styles.tagsRow}>
-                    {character.tags.map((tag) => (
-                        <Tag key={tag.id} label={tag.name} />
-                    ))}
-                    {character.custom_tags.map((tag) => (
-                        <Tag
-                            key={`custom-${tag}`}
-                            label={tag}
-                            variant="custom"
-                        />
-                    ))}
-                </View>
-            )}
-            {character.description ? (
-                <View style={styles.descSection}>
-                    <View style={styles.descCollapsed}>
-                        <EnrichedMarkdownText
-                            markdown={descriptionMarkdown}
-                            markdownStyle={markdownStyle}
-                            selectable={false}
-                            onLinkPress={onLinkPress}
-                        />
-                    </View>
-                </View>
-            ) : null}
-            <View style={styles.statsRow}>
-                <View style={styles.statItem}>
-                    <MessageCircle size={13} color={colors.textDim} />
-                    <Text style={styles.stat}>
-                        {character.stats.chat.toLocaleString()}
-                    </Text>
-                </View>
-                <View style={styles.statItem}>
-                    <MessageSquare size={13} color={colors.textDim} />
-                    <Text style={styles.stat}>
-                        {character.stats.message.toLocaleString()}
-                    </Text>
-                </View>
-            </View>
         </View>
     );
 
@@ -286,11 +216,6 @@ export default function SwipeCard({
                     {cardContent}
                 </Animated.View>
             )}
-            <AvatarPreview
-                visible={preview !== null}
-                uri={preview?.uri ?? ""}
-                onClose={() => setPreview(null)}
-            />
         </>
     );
 }
@@ -323,31 +248,6 @@ const styles = StyleSheet.create({
         textAlign: "center",
         marginTop: 12,
     },
-    creatorRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-        marginTop: 6,
-    },
-    creator: {
-        color: colors.textFaint,
-        fontSize: 14,
-    },
-    subscriberBadge: {
-        color: colors.accent,
-        fontSize: 12,
-        fontWeight: "600",
-    },
-    subscriberRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 2,
-    },
-    badgesRow: {
-        flexDirection: "row",
-        gap: 6,
-        marginTop: 10,
-    },
     descSection: {
         width: "100%",
         paddingHorizontal: 4,
@@ -356,27 +256,5 @@ const styles = StyleSheet.create({
     descCollapsed: {
         maxHeight: 130,
         overflow: "hidden",
-    },
-    statsRow: {
-        flexDirection: "row",
-        gap: 16,
-        marginTop: 8,
-    },
-    statItem: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-    },
-    stat: {
-        color: colors.textDim,
-        fontSize: 13,
-    },
-    tagsRow: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 6,
-        marginTop: 14,
-        justifyContent: "center",
-        paddingHorizontal: 16,
     },
 });

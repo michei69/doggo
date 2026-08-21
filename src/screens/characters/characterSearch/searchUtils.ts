@@ -4,14 +4,14 @@ import type {
 } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
-import type { CharacterSearchParams } from "../../../api/characters";
-import type { TagEntry } from "../../../components/discover/TagsModal";
+import type { CharacterSearchParams } from "../../../types/api";
 import type {
     CharactersStackParamList,
+    DiscoverParamsLike,
     MainTabParamList,
     SwipeDiscoverParams,
 } from "../../../navigation/types";
-import type { TrendingCharacter } from "../../../types/api";
+import type { CharacterTag, TagEntry, TrendingCharacter } from "../../../types/api";
 import {
     INITIAL_FILTERS,
     type FilterState,
@@ -29,22 +29,10 @@ export type SwipeNav = CompositeNavigationProp<
 
 export type SearchRoute = RouteProp<CharactersStackParamList, "CharacterSearch">;
 
-export interface DiscoverParamsLike {
-    search?: string;
-    tag_id?: string;
-    custom_tags?: string;
-    mode?: string;
-    sort?: string;
-    messages?: string;
-    messages_mode?: string;
-    tokens?: string;
-    tokens_mode?: string;
-    proxyenabled?: string;
-    tag?: string;
-}
+export type DiscoveryMode = "characters" | "creators";
 
-export interface ListState {
-    characters: TrendingCharacter[];
+interface ListState<T> {
+    characters: T[];
     page: number;
     loading: boolean;
     refreshing: boolean;
@@ -52,31 +40,41 @@ export interface ListState {
     error: string | null;
 }
 
-export type ListAction =
+type ListAction<T> =
     | { type: "LOADING" }
     | { type: "REFRESHING" }
     | {
           type: "LOADED";
-          payload: { data: TrendingCharacter[]; total: number; page: number };
+          payload: {
+              data: T[];
+              total: number;
+              page: number;
+              dedupe?: boolean;
+          };
       }
     | { type: "ERROR"; payload: string }
     | { type: "RESET" };
 
-export function listReducer(state: ListState, action: ListAction): ListState {
+export function genericListReducer<T extends { id: string }>(
+    state: ListState<T>,
+    action: ListAction<T>,
+): ListState<T> {
     switch (action.type) {
         case "LOADING":
             return { ...state, loading: true, error: null };
         case "REFRESHING":
             return { ...state, refreshing: true, error: null };
         case "LOADED": {
-            const { data, total, page } = action.payload;
+            const { data, total, page, dedupe = true } = action.payload;
             const existingIds = new Set(state.characters.map((c) => c.id));
             return {
                 ...state,
                 characters:
                     page === 1
                         ? data
-                        : [...state.characters, ...data.filter((d) => !existingIds.has(d.id))],
+                        : dedupe
+                          ? [...state.characters, ...data.filter((d) => !existingIds.has(d.id))]
+                          : [...state.characters, ...data],
                 total,
                 page,
                 loading: false,
@@ -98,6 +96,66 @@ export function listReducer(state: ListState, action: ListAction): ListState {
     }
 }
 
+export function listReducer(
+    state: ListState<TrendingCharacter>,
+    action: ListAction<TrendingCharacter>,
+): ListState<TrendingCharacter> {
+    return genericListReducer(state, action);
+}
+
+export function tagsToTagEntries(tags: CharacterTag[]): TagEntry[] {
+    return tags.map((t) => ({ id: t.id, name: t.name, slug: t.slug }));
+}
+
+function splitTagIds(tags: Set<string>): {
+    normalIds: string[];
+    customSlugs: string[];
+} {
+    const normalIds: string[] = [];
+    const customSlugs: string[] = [];
+    for (const id of tags) {
+        if (id.startsWith("top_")) {
+            customSlugs.push(id.slice(4));
+        } else {
+            normalIds.push(id);
+        }
+    }
+    return { normalIds, customSlugs };
+}
+
+function messagesFilterParams(filters: FilterState): {
+    messages: number;
+    messages_mode: FilterState["messagesMode"];
+} | null {
+    if (filters.messages && Number(filters.messages) > 0) {
+        return {
+            messages: Number(filters.messages),
+            messages_mode: filters.messagesMode,
+        };
+    }
+    return null;
+}
+
+function tokensFilterParams(filters: FilterState): {
+    tokens: number;
+    tokens_mode: FilterState["tokensMode"];
+} | null {
+    if (filters.tokens && Number(filters.tokens) > 0) {
+        return {
+            tokens: Number(filters.tokens),
+            tokens_mode: filters.tokensMode,
+        };
+    }
+    return null;
+}
+
+function splitCommaList(value: string): string[] {
+    return value.split(",").flatMap((s) => {
+        const trimmed = s.trim();
+        return trimmed ? [trimmed] : [];
+    });
+}
+
 export function buildParams(
     sortMode: string,
     searchText: string,
@@ -113,14 +171,16 @@ export function buildParams(
         params.search = searchText.trim();
     }
 
-    if (filters.messages && Number(filters.messages) > 0) {
-        params.messages = Number(filters.messages);
-        params.messages_mode = filters.messagesMode;
+    const messages = messagesFilterParams(filters);
+    if (messages) {
+        params.messages = messages.messages;
+        params.messages_mode = messages.messages_mode;
     }
 
-    if (filters.tokens && Number(filters.tokens) > 0) {
-        params.tokens = Number(filters.tokens);
-        params.tokens_mode = filters.tokensMode;
+    const tokens = tokensFilterParams(filters);
+    if (tokens) {
+        params.tokens = tokens.tokens;
+        params.tokens_mode = tokens.tokens_mode;
     }
 
     if (filters.proxyOnly) {
@@ -130,15 +190,7 @@ export function buildParams(
     params.mode = filters.limitlessMode ? "all" : "sfw";
 
     if (selectedTagIds.size > 0) {
-        const normalIds: string[] = [];
-        const customSlugs: string[] = [];
-        for (const id of selectedTagIds) {
-            if (id.startsWith("top_")) {
-                customSlugs.push(id.slice(4));
-            } else {
-                normalIds.push(id);
-            }
-        }
+        const { normalIds, customSlugs } = splitTagIds(selectedTagIds);
         if (normalIds.length > 0) {
             params.tag_id = normalIds;
         }
@@ -179,11 +231,12 @@ export function filterDisplayCharacters(
     hideDarkened: boolean,
     hiddenIds: Set<string>,
 ): TrendingCharacter[] {
+    const searchText = (c: TrendingCharacter) =>
+        `${c.name} ${c.description || ""} ${(c.tags || []).map((t) => t.name).join(" ")} ${(c.custom_tags || []).join(" ")}`.toLowerCase();
     let result = characters;
     if (advancedKeywords.length > 0) {
         result = result.filter((c) => {
-            const text =
-                `${c.name} ${c.description || ""} ${(c.tags || []).map((t) => t.name).join(" ")} ${(c.custom_tags || []).join(" ")}`.toLowerCase();
+            const text = searchText(c);
             if (keywordMatchMode === "all") {
                 return advancedKeywords.every((kw) =>
                     text.includes(kw.toLowerCase()),
@@ -194,8 +247,7 @@ export function filterDisplayCharacters(
     }
     if (advancedBlacklist.length > 0) {
         result = result.filter((c) => {
-            const text =
-                `${c.name} ${c.description || ""} ${(c.tags || []).map((t) => t.name).join(" ")} ${(c.custom_tags || []).join(" ")}`.toLowerCase();
+            const text = searchText(c);
             return !advancedBlacklist.some((kw) => text.includes(kw.toLowerCase()));
         });
     }
@@ -229,18 +281,12 @@ export function initialTagsFromParams(
         tags.add(`top_${p.tag}`);
     }
     if (p.tag_id) {
-        for (const id of p.tag_id.split(",").flatMap((s) => {
-            const trimmed = s.trim();
-            return trimmed ? [trimmed] : [];
-        })) {
+        for (const id of splitCommaList(p.tag_id)) {
             tags.add(id);
         }
     }
     if (p.custom_tags) {
-        for (const slug of p.custom_tags.split(",").flatMap((s) => {
-            const trimmed = s.trim();
-            return trimmed ? [trimmed] : [];
-        })) {
+        for (const slug of splitCommaList(p.custom_tags)) {
             tags.add(`top_${slug}`);
         }
     }
@@ -271,7 +317,7 @@ export function initialFiltersFromParams(
     return f;
 }
 
-export interface SwipeParamsInput {
+interface SwipeParamsInput {
     sort: string;
     search: string;
     tags: Set<string>;
@@ -286,28 +332,22 @@ export function buildSwipeParams(input: SwipeParamsInput): SwipeDiscoverParams {
     if (input.search.trim()) {
         p.search = input.search.trim();
     }
-    if (input.filters.messages && Number(input.filters.messages) > 0) {
-        p.messages = String(input.filters.messages);
-        p.messages_mode = input.filters.messagesMode;
+    const messages = messagesFilterParams(input.filters);
+    if (messages) {
+        p.messages = String(messages.messages);
+        p.messages_mode = messages.messages_mode;
     }
-    if (input.filters.tokens && Number(input.filters.tokens) > 0) {
-        p.tokens = String(input.filters.tokens);
-        p.tokens_mode = input.filters.tokensMode;
+    const tokens = tokensFilterParams(input.filters);
+    if (tokens) {
+        p.tokens = String(tokens.tokens);
+        p.tokens_mode = tokens.tokens_mode;
     }
     if (input.filters.proxyOnly) {
         p.proxyenabled = "true";
     }
     p.mode = input.filters.limitlessMode ? "all" : "sfw";
     if (input.tags.size > 0) {
-        const normalIds: string[] = [];
-        const customSlugs: string[] = [];
-        for (const id of input.tags) {
-            if (id.startsWith("top_")) {
-                customSlugs.push(id.slice(4));
-            } else {
-                normalIds.push(id);
-            }
-        }
+        const { normalIds, customSlugs } = splitTagIds(input.tags);
         if (normalIds.length > 0) {
             p.tag_id = normalIds.join(",");
         }

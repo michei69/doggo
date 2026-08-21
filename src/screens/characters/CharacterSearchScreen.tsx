@@ -8,6 +8,7 @@ import {
 import { StyleSheet, View } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { getTags } from "../../api/characters";
+import type { AdvancedSearchModalHandle } from "../../components/discover/AdvancedSearchModal";
 import FilterModal, {
   type FilterModalHandle,
 } from "../../components/discover/FilterModal";
@@ -15,7 +16,6 @@ import SortModal, {
   type SortModalHandle,
 } from "../../components/discover/SortModal";
 import TagsModal, {
-  type TagEntry,
   type TagsModalHandle,
 } from "../../components/discover/TagsModal";
 import { useIsTablet } from "../../hooks/useIsTablet";
@@ -25,13 +25,10 @@ import {
 } from "../../utils/discover";
 import { colors } from "../../utils/colors";
 import {
-  CharacterList,
-  CreatorList,
-} from "./characterSearch/cards";
-import {
   ActionOverlays,
   ControlsRow,
   DiscoverModals,
+  ResultsList,
   SearchHeader,
   SearchInputRow,
 } from "./characterSearch/components";
@@ -51,84 +48,56 @@ import {
   filterDisplayCharacters,
   buildSwipeParams,
   mergeTags,
+  tagsToTagEntries,
+  type DiscoveryMode,
   type Nav,
   type SearchRoute,
 } from "./characterSearch/searchUtils";
+import type { TagEntry } from "../../types/api";
 
-type DiscoveryMode = "characters" | "creators";
+interface DiscoverSearchParams {
+  sort: string;
+  search: string;
+  tags: Set<string>;
+  filters: FilterState;
+}
 
-export default function CharacterSearchScreen() {
-  const { navigate } = useNavigation<Nav>();
-  const route = useRoute<SearchRoute>();
-  const isTablet = useIsTablet();
-  const [discoveryMode, setDiscoveryMode] =
-    useState<DiscoveryMode>("characters");
-  const [allTags, setAllTags] = useState<TagEntry[]>([]);
-  const { hiddenIds, handleToggleHidden } = useHiddenCharacters();
-  const {
-    filters,
-    setFilters,
-    searchText,
-    setSearchText,
-    sortMode,
-    setSortMode,
-    selectedTagIds,
-    setSelectedTagIds,
-    toggleTag,
-  } = useDiscoverState(route.params);
-  const {
-    advancedKeywords,
-    setAdvancedKeywords,
-    advancedBlacklist,
-    setAdvancedBlacklist,
-    keywordMatchMode,
-    setKeywordMatchMode,
-    hideDarkened,
-    setHideDarkened,
-    advancedSearchVisible,
-    setAdvancedSearchVisible,
-  } = useAdvancedSearch();
-  const { alert, showAlert, dismissAlert } = useAlert();
-  const showBlockAlert = useBlockAlert(showAlert, dismissAlert);
-  const {
-    creators,
-    creatorsTotal,
-    creatorsLoading,
-    creatorsRefreshing,
-    doFetchCreators,
-    handleLoadMoreCreators,
-  } = useCreators();
-  const {
-    longPressCharacter,
-    actionsVisible,
-    reportVisible,
-    handleLongPress,
-    handleViewCharacter,
-    handleViewCreator,
-    handleReportCharacter,
-    handleCloseReport,
-    handleActionsClose,
-  } = useLongPressActions(navigate);
-
-  const sortModalRef = useRef<SortModalHandle>(null);
-  const tagsModalRef = useRef<TagsModalHandle>(null);
-  const filterModalRef = useRef<FilterModalHandle>(null);
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const openSort = useCallback(() => sortModalRef.current?.open(), []);
-  const openTags = useCallback(() => tagsModalRef.current?.open(), []);
-  const openFilters = useCallback(() => filterModalRef.current?.open(), []);
-  const closeAdvancedSearch = useCallback(
-    () => setAdvancedSearchVisible(false),
-    [setAdvancedSearchVisible],
-  );
-  const openAdvancedSearch = useCallback(
-    () => setAdvancedSearchVisible(true),
-    [setAdvancedSearchVisible],
-  );
-
-  const { state, doFetch, handleLoadMore, topCustomTags } = useCharactersList();
-
-  const currentSearchParams = useMemo(
+/**
+ * Wires the discover search/sort/filter/refresh actions to the fetch layer.
+ * Kept out of the screen component so the screen stays a thin composition.
+ */
+function useDiscoverSearch({
+  doFetch,
+  doFetchCreators,
+  discoveryMode,
+  setDiscoveryMode,
+  creatorsLength,
+  sortMode,
+  setSortMode,
+  searchText,
+  setSearchText,
+  filters,
+  setFilters,
+  selectedTagIds,
+}: {
+  doFetch: (
+    page: number,
+    params: DiscoverSearchParams,
+    isRefresh?: boolean,
+  ) => Promise<void>;
+  doFetchCreators: (page: number, isRefresh?: boolean) => Promise<void>;
+  discoveryMode: DiscoveryMode;
+  setDiscoveryMode: (mode: DiscoveryMode) => void;
+  creatorsLength: number;
+  sortMode: string;
+  setSortMode: (value: string) => void;
+  searchText: string;
+  setSearchText: (value: string) => void;
+  filters: FilterState;
+  setFilters: (filters: FilterState) => void;
+  selectedTagIds: Set<string>;
+}) {
+  const currentSearchParams = useMemo<DiscoverSearchParams>(
     () => ({
       sort: sortMode,
       search: searchText,
@@ -144,6 +113,10 @@ export default function CharacterSearchScreen() {
   useEffect(() => {
     paramsRef.current = currentSearchParams;
   }, [currentSearchParams]);
+
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const handleSearchChange = useCallback(
     (text: string) => {
@@ -162,10 +135,10 @@ export default function CharacterSearchScreen() {
   const handleToggleMode = useCallback(() => {
     const next = discoveryMode === "characters" ? "creators" : "characters";
     setDiscoveryMode(next);
-    if (next === "creators" && creators.length === 0) {
+    if (next === "creators" && creatorsLength === 0) {
       doFetchCreators(1);
     }
-  }, [discoveryMode, creators.length, doFetchCreators]);
+  }, [discoveryMode, setDiscoveryMode, creatorsLength, doFetchCreators]);
 
   const handleRefresh = useCallback(() => {
     if (discoveryMode === "characters") {
@@ -195,6 +168,106 @@ export default function CharacterSearchScreen() {
     [setFilters, doFetch, currentSearchParams],
   );
 
+  return {
+    currentSearchParams,
+    handleSearchChange,
+    handleToggleMode,
+    handleRefresh,
+    handleSortSelect,
+    handleApplyTags,
+    handleApplyFilters,
+  };
+}
+
+export default function CharacterSearchScreen() {
+  const { navigate } = useNavigation<Nav>();
+  const route = useRoute<SearchRoute>();
+  const isTablet = useIsTablet();
+  const [discoveryMode, setDiscoveryMode] =
+    useState<DiscoveryMode>("characters");
+  const [allTags, setAllTags] = useState<TagEntry[]>([]);
+  const { hiddenIds, handleToggleHidden } = useHiddenCharacters();
+  const {
+    filters,
+    setFilters,
+    searchText,
+    setSearchText,
+    sortMode,
+    setSortMode,
+    selectedTagIds,
+    setSelectedTagIds,
+    toggleTag,
+  } = useDiscoverState(route.params);
+  const {
+    advancedKeywords,
+    setAdvancedKeywords,
+    advancedBlacklist,
+    setAdvancedBlacklist,
+    keywordMatchMode,
+    setKeywordMatchMode,
+    hideDarkened,
+    setHideDarkened,
+  } = useAdvancedSearch();
+  const { alert, showAlert, dismissAlert } = useAlert();
+  const showBlockAlert = useBlockAlert(showAlert, dismissAlert);
+  const {
+    creators,
+    creatorsTotal,
+    creatorsLoading,
+    creatorsRefreshing,
+    doFetchCreators,
+    handleLoadMoreCreators,
+  } = useCreators();
+  const {
+    longPressCharacter,
+    actionsVisible,
+    reportVisible,
+    handleLongPress,
+    handleViewCharacter,
+    handleViewCreator,
+    handleReportCharacter,
+    handleCloseReport,
+    handleActionsClose,
+  } = useLongPressActions(navigate);
+
+  const sortModalRef = useRef<SortModalHandle>(null);
+  const tagsModalRef = useRef<TagsModalHandle>(null);
+  const filterModalRef = useRef<FilterModalHandle>(null);
+  const advancedSearchModalRef = useRef<AdvancedSearchModalHandle>(null);
+  const openSort = useCallback(() => sortModalRef.current?.open(), []);
+  const openTags = useCallback(() => tagsModalRef.current?.open(), []);
+  const openFilters = useCallback(() => filterModalRef.current?.open(), []);
+  const openAdvancedSearch = useCallback(
+    () => advancedSearchModalRef.current?.open(),
+    [],
+  );
+
+  const { state, doFetch, handleLoadMore, topCustomTags } =
+    useCharactersList();
+
+  const {
+    currentSearchParams,
+    handleSearchChange,
+    handleToggleMode,
+    handleRefresh,
+    handleSortSelect,
+    handleApplyTags,
+    handleApplyFilters,
+  } = useDiscoverSearch({
+    doFetch,
+    doFetchCreators,
+    discoveryMode,
+    setDiscoveryMode,
+    creatorsLength: creators.length,
+    sortMode,
+    setSortMode,
+    searchText,
+    setSearchText,
+    filters,
+    setFilters,
+    selectedTagIds,
+  });
+
   const handleBlockCharacter = useCallback(() => {
     if (!longPressCharacter) return;
     showBlockAlert(longPressCharacter);
@@ -204,9 +277,7 @@ export default function CharacterSearchScreen() {
     const fetchTags = async () => {
       try {
         const tags = await getTags();
-        setAllTags(
-          tags.map((t) => ({ id: String(t.id), name: t.name, slug: t.slug })),
-        );
+        setAllTags(tagsToTagEntries(tags));
       } catch {}
     };
     fetchTags();
@@ -318,29 +389,24 @@ export default function CharacterSearchScreen() {
           />
         </>
       )}
-      {discoveryMode === "characters" ? (
-        <CharacterList
-          data={displayCharacters}
-          renderItem={renderItem}
-          isTablet={isTablet}
-          refreshing={state.refreshing}
-          onRefresh={handleRefresh}
-          onEndReached={handleLoadMoreWrap}
-          loading={state.loading}
-          error={state.error}
-          hasMore={state.loading && state.characters.length > 0}
-        />
-      ) : (
-        <CreatorList
-          data={creators}
-          renderItem={renderCreatorItem}
-          refreshing={creatorsRefreshing}
-          onRefresh={handleRefresh}
-          onEndReached={handleLoadMoreCreators}
-          loading={creatorsLoading}
-          hasMore={creatorsLoading && creators.length > 0}
-        />
-      )}
+      <ResultsList
+        discoveryMode={discoveryMode}
+        characters={displayCharacters}
+        renderItem={renderItem}
+        isTablet={isTablet}
+        refreshing={state.refreshing}
+        onRefresh={handleRefresh}
+        onEndReached={handleLoadMoreWrap}
+        loading={state.loading}
+        error={state.error}
+        hasMore={state.loading && state.characters.length > 0}
+        creators={creators}
+        renderCreatorItem={renderCreatorItem}
+        refreshingCreators={creatorsRefreshing}
+        onEndReachedCreators={handleLoadMoreCreators}
+        loadingCreators={creatorsLoading}
+        hasMoreCreators={creatorsLoading && creators.length > 0}
+      />
       <DiscoverModals
         sortModalRef={sortModalRef}
         currentSort={sortMode}
@@ -355,7 +421,7 @@ export default function CharacterSearchScreen() {
         onApplyFilters={handleApplyFilters}
       />
       <ActionOverlays
-        advancedSearchVisible={advancedSearchVisible}
+        advancedSearchModalRef={advancedSearchModalRef}
         advancedKeywords={advancedKeywords}
         onKeywordsChange={setAdvancedKeywords}
         advancedBlacklist={advancedBlacklist}
@@ -364,7 +430,6 @@ export default function CharacterSearchScreen() {
         onMatchModeChange={setKeywordMatchMode}
         hideDarkened={hideDarkened}
         onHideDarkenedChange={setHideDarkened}
-        onCloseAdvancedSearch={closeAdvancedSearch}
         actionsVisible={actionsVisible}
         characterName={longPressCharacter?.name || ""}
         hasCreator={!!longPressCharacter?.creator_id}

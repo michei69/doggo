@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { StyleSheet } from "react-native";
-import type { CharacterSearchParams } from "../../../api/characters";
 import { getCharacters, searchProfiles } from "../../../api/characters";
-import type { ProfileSearchResult } from "../../../api/characters";
 import { getBlockedContent, updateBlockedContent } from "../../../api/profile";
 import CharacterCard from "../../../components/character/CharacterCard";
 import type { AlertButton } from "../../../components/common/CustomAlert";
-import type { TagEntry } from "../../../components/discover/TagsModal";
 import type { SwipeDiscoverParams } from "../../../navigation/types";
-import type { TrendingCharacter, TrendingResponse } from "../../../types/api";
+import type {
+    ProfileSearchResponse,
+    ProfileSearchResult,
+    TagEntry,
+    TrendingCharacter,
+    TrendingResponse,
+} from "../../../types/api";
 import {
     INITIAL_FILTERS,
     type FilterState,
@@ -18,10 +21,10 @@ import { CreatorCard } from "./cards";
 import {
     buildParams,
     filterDisplayCharacters,
+    genericListReducer,
     hasFilterOverrides,
     initialFiltersFromParams,
     initialTagsFromParams,
-    listReducer,
     parseSwipeParams,
     type Nav,
     type SearchRoute,
@@ -179,80 +182,158 @@ export function useBlockAlert(
     );
 }
 
-export function useCreators() {
-    const [creators, setCreators] = useState<ProfileSearchResult[]>([]);
-    const [creatorsTotal, setCreatorsTotal] = useState(0);
-    const [creatorsLoading, setCreatorsLoading] = useState(false);
-    const [creatorsRefreshing, setCreatorsRefreshing] = useState(false);
-    const creatorsPageRef = useRef(1);
-    const loadingMoreCreatorsRef = useRef(false);
-    const creatorsEmptyPagesRef = useRef(0);
-    const creatorsReachedEndRef = useRef(false);
+interface ListCurrentParams {
+    sort: string;
+    search: string;
+    tags: Set<string>;
+    filters: FilterState;
+}
 
-    const doFetchCreators = useCallback(
-        async (pageNum: number, isRefresh = false) => {
+export function usePaginatedFetch<
+    T extends { id: string },
+    R extends { data: T[]; total: number },
+    P = undefined,
+>({
+    fetchFn,
+    dedupeAppend = true,
+    autoInit = false,
+    initialLoading = true,
+    initParams,
+    onLoaded,
+}: {
+    fetchFn: (pageNum: number, params: P) => Promise<R>;
+    dedupeAppend?: boolean;
+    autoInit?: boolean;
+    initialLoading?: boolean;
+    initParams?: P;
+    onLoaded?: (result: R, pageNum: number) => void;
+}) {
+    const [state, dispatch] = useReducer(genericListReducer<T>, {
+        characters: [],
+        page: 1,
+        loading: initialLoading,
+        refreshing: false,
+        total: 0,
+        error: null,
+    });
+    const pageRef = useRef(1);
+    const initialLoadRef = useRef(false);
+    const loadingMoreRef = useRef(false);
+    // Server `total` can overcount; 3 consecutive empty pages = real end.
+    const emptyPagesRef = useRef(0);
+    const reachedEndRef = useRef(false);
+
+    const doFetch = useCallback(
+        async (pageNum: number, params: P, isRefresh = false) => {
             if (pageNum === 1) {
-                creatorsEmptyPagesRef.current = 0;
-                creatorsReachedEndRef.current = false;
+                emptyPagesRef.current = 0;
+                reachedEndRef.current = false;
             }
             if (isRefresh) {
-                setCreatorsRefreshing(true);
+                dispatch({ type: "REFRESHING" });
             } else if (pageNum === 1) {
-                setCreators([]);
-                setCreatorsLoading(true);
+                dispatch({ type: "RESET" });
             } else {
-                setCreatorsLoading(true);
+                dispatch({ type: "LOADING" });
             }
 
             try {
-                const response = await searchProfiles({ page: pageNum, mode: "foryou" });
-                if (pageNum === 1) {
-                    setCreators(response.data);
-                } else {
-                    setCreators((prev) => [...prev, ...response.data]);
-                }
-                setCreatorsTotal(response.total);
-                creatorsPageRef.current = pageNum;
-                if (response.data.length === 0) {
-                    creatorsEmptyPagesRef.current += 1;
-                    if (creatorsEmptyPagesRef.current >= 3) {
-                        creatorsReachedEndRef.current = true;
+                const result = await fetchFn(pageNum, params);
+                const data = result.data;
+                dispatch({
+                    type: "LOADED",
+                    payload: {
+                        data,
+                        total: result.total,
+                        page: pageNum,
+                        ...(dedupeAppend ? {} : { dedupe: false }),
+                    },
+                });
+                pageRef.current = pageNum;
+
+                if (data.length === 0) {
+                    emptyPagesRef.current += 1;
+                    if (emptyPagesRef.current >= 3) {
+                        reachedEndRef.current = true;
                     }
                 } else {
-                    creatorsEmptyPagesRef.current = 0;
+                    emptyPagesRef.current = 0;
                 }
-                setCreatorsLoading(false);
-                setCreatorsRefreshing(false);
-                loadingMoreCreatorsRef.current = false;
-            } catch {
-                setCreatorsLoading(false);
-                setCreatorsRefreshing(false);
-                loadingMoreCreatorsRef.current = false;
+
+                loadingMoreRef.current = false;
+                onLoaded?.(result, pageNum);
+            } catch (err: any) {
+                loadingMoreRef.current = false;
+                dispatch({ type: "ERROR", payload: err.message });
             }
         },
+        [fetchFn, dedupeAppend, onLoaded],
+    );
+
+    useEffect(() => {
+        if (!autoInit) return;
+        if (initialLoadRef.current) return;
+        initialLoadRef.current = true;
+        doFetch(1, initParams as P);
+    }, [autoInit, doFetch, initParams]);
+
+    const handleLoadMore = useCallback(
+        (params: P) => {
+            if (loadingMoreRef.current || reachedEndRef.current) return;
+            if (!state.loading && state.characters.length < state.total) {
+                loadingMoreRef.current = true;
+                const nextPage = pageRef.current + 1;
+                doFetch(nextPage, params);
+            }
+        },
+        [state.loading, state.characters.length, state.total, doFetch],
+    );
+
+    return { state, doFetch, handleLoadMore };
+}
+
+export function useCreators() {
+    const fetchCreators = useCallback(
+        async (pageNum: number) =>
+            searchProfiles({ page: pageNum, mode: "foryou" }),
         [],
     );
 
-    const handleLoadMoreCreators = useCallback(() => {
-        if (loadingMoreCreatorsRef.current || creatorsReachedEndRef.current) return;
-        if (!creatorsLoading && creators.length < creatorsTotal) {
-            loadingMoreCreatorsRef.current = true;
-            const nextPage = creatorsPageRef.current + 1;
-            doFetchCreators(nextPage);
-        }
-    }, [creatorsLoading, creators.length, creatorsTotal, doFetchCreators]);
+    const { state, doFetch, handleLoadMore } = usePaginatedFetch<
+        ProfileSearchResult,
+        ProfileSearchResponse,
+        undefined
+    >({
+        fetchFn: fetchCreators,
+        dedupeAppend: false,
+        autoInit: false,
+        initialLoading: false,
+    });
+
+    const doFetchCreators = useCallback(
+        (pageNum: number, isRefresh = false) => doFetch(pageNum, undefined, isRefresh),
+        [doFetch],
+    );
+
+    const handleLoadMoreCreators = useCallback(
+        () => handleLoadMore(undefined),
+        [handleLoadMore],
+    );
 
     return {
-        creators,
-        creatorsTotal,
-        creatorsLoading,
-        creatorsRefreshing,
+        creators: state.characters,
+        creatorsTotal: state.total,
+        creatorsLoading: state.loading,
+        creatorsRefreshing: state.refreshing,
         doFetchCreators,
         handleLoadMoreCreators,
     };
 }
 
-export function useLongPressActions(navigate: Nav["navigate"]) {
+export function useLongPressActions(
+    navigate: (name: string, params?: object) => void,
+    characterScreenName = "CharacterScreen",
+) {
     const [longPressCharacter, setLongPressCharacter] =
         useState<TrendingCharacter | null>(null);
     const [actionsVisible, setActionsVisible] = useState(false);
@@ -265,11 +346,11 @@ export function useLongPressActions(navigate: Nav["navigate"]) {
 
     const handleViewCharacter = useCallback(() => {
         if (!longPressCharacter) return;
-        navigate("CharacterScreen", {
+        navigate(characterScreenName, {
             characterId: longPressCharacter.id,
             characterName: longPressCharacter.name,
         });
-    }, [longPressCharacter, navigate]);
+    }, [longPressCharacter, navigate, characterScreenName]);
 
     const handleViewCreator = useCallback(() => {
         if (!longPressCharacter?.creator_id) return;
@@ -306,119 +387,60 @@ export function useLongPressActions(navigate: Nav["navigate"]) {
 }
 
 export function useCharactersList() {
-    const [state, dispatch] = useReducer(listReducer, {
-        characters: [],
-        page: 1,
-        loading: true,
-        refreshing: false,
-        total: 0,
-        error: null,
-    });
     const [topCustomTags, setTopCustomTags] = useState<TagEntry[]>([]);
-    const pageRef = useRef(1);
-    const initialLoadRef = useRef(false);
-    const loadingMoreRef = useRef(false);
-    // Server `total` can overcount; 3 consecutive empty pages = real end.
-    const emptyPagesRef = useRef(0);
-    const reachedEndRef = useRef(false);
 
-    const doFetch = useCallback(
-        async (
-            pageNum: number,
-            current: {
-                sort: string;
-                search: string;
-                tags: Set<string>;
-                filters: FilterState;
-            },
-            isRefresh = false,
-        ) => {
-            if (pageNum === 1) {
-                emptyPagesRef.current = 0;
-                reachedEndRef.current = false;
-            }
-            if (isRefresh) {
-                dispatch({ type: "REFRESHING" });
-            } else if (pageNum === 1) {
-                dispatch({ type: "RESET" });
-            } else {
-                dispatch({ type: "LOADING" });
-            }
-
-            try {
-                const params = buildParams(
-                    current.sort,
-                    current.search,
-                    current.tags,
-                    current.filters,
-                    pageNum,
+    const fetchCharacters = useCallback(
+        async (pageNum: number, current: ListCurrentParams) => {
+            const params = buildParams(
+                current.sort,
+                current.search,
+                current.tags,
+                current.filters,
+                pageNum,
+            );
+            const response: TrendingResponse = await getCharacters(params);
+            let filteredData = response.data;
+            if (current.filters.customAvatar) {
+                filteredData = filteredData.filter(
+                    (c) =>
+                        c.avatar !== "placeholder-nsfw.webp" &&
+                        c.avatar !== "countdown.webp",
                 );
-                const response: TrendingResponse = await getCharacters(params);
-                let filteredData = response.data;
-                if (current.filters.customAvatar) {
-                    filteredData = filteredData.filter(
-                        (c) =>
-                            c.avatar !== "placeholder-nsfw.webp" &&
-                            c.avatar !== "countdown.webp",
-                    );
-                }
-                dispatch({
-                    type: "LOADED",
-                    payload: { data: filteredData, total: response.total, page: pageNum },
-                });
-                pageRef.current = pageNum;
-
-                if (filteredData.length === 0) {
-                    emptyPagesRef.current += 1;
-                    if (emptyPagesRef.current >= 3) {
-                        reachedEndRef.current = true;
-                    }
-                } else {
-                    emptyPagesRef.current = 0;
-                }
-
-                if (response.top_custom_tags && response.top_custom_tags.length > 0) {
-                    const custom: TagEntry[] = response.top_custom_tags.map((slug) => ({
-                        id: `top_${slug}`,
-                        name: slug,
-                        slug,
-                    }));
-                    setTopCustomTags(custom);
-                }
-
-                loadingMoreRef.current = false;
-            } catch (err: any) {
-                loadingMoreRef.current = false;
-                dispatch({ type: "ERROR", payload: err.message });
             }
+            return { ...response, data: filteredData };
         },
-        [setTopCustomTags],
+        [],
     );
 
-    useEffect(() => {
-        if (initialLoadRef.current) return;
-        initialLoadRef.current = true;
-        doFetch(1, { sort: "", search: "", tags: new Set(), filters: INITIAL_FILTERS });
-    }, [doFetch]);
+    const handleTopCustomTags = useCallback((response: TrendingResponse) => {
+        if (response.top_custom_tags && response.top_custom_tags.length > 0) {
+            const custom: TagEntry[] = response.top_custom_tags.map(
+                (slug, index) => ({
+                    id: -(index + 1),
+                    name: slug,
+                    slug,
+                }),
+            );
+            setTopCustomTags(custom);
+        }
+    }, []);
 
-    const handleLoadMore = useCallback(
-        (
-            current: {
-                sort: string;
-                search: string;
-                tags: Set<string>;
-                filters: FilterState;
-            },
-        ) => {
-            if (loadingMoreRef.current || reachedEndRef.current) return;
-            if (!state.loading && state.characters.length < state.total) {
-                loadingMoreRef.current = true;
-                const nextPage = pageRef.current + 1;
-                doFetch(nextPage, current);
-            }
+    const { state, doFetch, handleLoadMore } = usePaginatedFetch<
+        TrendingCharacter,
+        TrendingResponse,
+        ListCurrentParams
+    >({
+        fetchFn: fetchCharacters,
+        dedupeAppend: true,
+        autoInit: true,
+        initParams: {
+            sort: "",
+            search: "",
+            tags: new Set(),
+            filters: INITIAL_FILTERS,
         },
-        [state.loading, state.characters.length, state.total, doFetch],
-    );
+        onLoaded: handleTopCustomTags,
+    });
 
     return { state, doFetch, handleLoadMore, topCustomTags };
 }
@@ -436,19 +458,6 @@ export function useSwipeDeck(
         advancedBlacklist,
         keywordMatchMode,
     } = parseSwipeParams(params);
-    const [state, dispatch] = useReducer(listReducer, {
-        characters: [],
-        page: 1,
-        loading: true,
-        refreshing: false,
-        total: 0,
-        error: null,
-    });
-    const pageRef = useRef(1);
-    const initialLoadRef = useRef(false);
-    const loadingMoreRef = useRef(false);
-    const emptyPagesRef = useRef(0);
-    const reachedEndRef = useRef(false);
     const firstRenderRef = useRef(true);
 
     const current = useMemo(
@@ -456,70 +465,37 @@ export function useSwipeDeck(
         [sort, search, tags, filters],
     );
 
-    const doFetch = useCallback(
-        async (pageNum: number, isRefresh = false) => {
-            if (pageNum === 1) {
-                emptyPagesRef.current = 0;
-                reachedEndRef.current = false;
-            }
-            if (isRefresh) {
-                dispatch({ type: "REFRESHING" });
-            } else if (pageNum === 1) {
-                dispatch({ type: "RESET" });
-            } else {
-                dispatch({ type: "LOADING" });
-            }
-
-            try {
-                const apiParams = buildParams(
-                    current.sort,
-                    current.search,
-                    current.tags,
-                    current.filters,
-                    pageNum,
+    const fetchDeck = useCallback(
+        async (pageNum: number) => {
+            const apiParams = buildParams(
+                current.sort,
+                current.search,
+                current.tags,
+                current.filters,
+                pageNum,
+            );
+            const response: TrendingResponse = await getCharacters(apiParams);
+            let filteredData = response.data;
+            if (current.filters.customAvatar) {
+                filteredData = filteredData.filter(
+                    (c) =>
+                        c.avatar !== "placeholder-nsfw.webp" &&
+                        c.avatar !== "countdown.webp",
                 );
-                const response: TrendingResponse = await getCharacters(apiParams);
-                let filteredData = response.data;
-                if (current.filters.customAvatar) {
-                    filteredData = filteredData.filter(
-                        (c) =>
-                            c.avatar !== "placeholder-nsfw.webp" &&
-                            c.avatar !== "countdown.webp",
-                    );
-                }
-                dispatch({
-                    type: "LOADED",
-                    payload: {
-                        data: filteredData,
-                        total: response.total,
-                        page: pageNum,
-                    },
-                });
-                pageRef.current = pageNum;
-
-                if (filteredData.length === 0) {
-                    emptyPagesRef.current += 1;
-                    if (emptyPagesRef.current >= 3) {
-                        reachedEndRef.current = true;
-                    }
-                } else {
-                    emptyPagesRef.current = 0;
-                }
-
-                loadingMoreRef.current = false;
-            } catch (err: any) {
-                loadingMoreRef.current = false;
-                dispatch({ type: "ERROR", payload: err.message });
             }
+            return { ...response, data: filteredData };
         },
         [current],
     );
 
-    useEffect(() => {
-        if (initialLoadRef.current) return;
-        initialLoadRef.current = true;
-        doFetch(1);
-    }, [doFetch]);
+    const { state, doFetch, handleLoadMore } = usePaginatedFetch<
+        TrendingCharacter,
+        TrendingResponse
+    >({
+        fetchFn: fetchDeck,
+        dedupeAppend: true,
+        autoInit: true,
+    });
 
     const deck = useMemo(
         () =>
@@ -535,17 +511,12 @@ export function useSwipeDeck(
     );
 
     const refresh = useCallback(() => {
-        doFetch(1, true);
+        doFetch(1, undefined, true);
     }, [doFetch]);
 
     const loadMore = useCallback(() => {
-        if (loadingMoreRef.current || reachedEndRef.current) return;
-        if (!state.loading && state.characters.length < state.total) {
-            loadingMoreRef.current = true;
-            const nextPage = pageRef.current + 1;
-            doFetch(nextPage);
-        }
-    }, [state.loading, state.characters.length, state.total, doFetch]);
+        handleLoadMore(undefined);
+    }, [handleLoadMore]);
 
     useEffect(() => {
         if (firstRenderRef.current) {

@@ -7,12 +7,15 @@ import {
     View,
 } from "react-native";
 import { SlidersHorizontal, Filter, Globe } from "lucide-react-native";
+import type { ProfileSearchResult } from "../../../types/api";
 import CharacterDiscoverActionsSheet from "../../../components/character/CharacterDiscoverActionsSheet";
 import CharacterReportModal from "../../../components/character/CharacterReportModal";
 import CustomAlert, {
     type AlertButton,
 } from "../../../components/common/CustomAlert";
-import AdvancedSearchModal from "../../../components/discover/AdvancedSearchModal";
+import AdvancedSearchModal, {
+    type AdvancedSearchModalHandle,
+} from "../../../components/discover/AdvancedSearchModal";
 import FilterModal, {
     type FilterModalHandle,
 } from "../../../components/discover/FilterModal";
@@ -20,11 +23,13 @@ import SortModal, {
     type SortModalHandle,
 } from "../../../components/discover/SortModal";
 import TagsModal, {
-    type TagEntry,
     type TagsModalHandle,
 } from "../../../components/discover/TagsModal";
+import type { TagEntry, TrendingCharacter } from "../../../types/api";
 import type { FilterState } from "../../../utils/discover";
 import { colors } from "../../../utils/colors";
+import type { DiscoveryMode } from "./searchUtils";
+import { CharacterList, CreatorList } from "./cards";
 
 export const SearchHeader = React.memo(function SearchHeader({
     discoveryMode,
@@ -36,7 +41,7 @@ export const SearchHeader = React.memo(function SearchHeader({
     onOpenSwipe,
     onOpenBrowser,
 }: {
-    discoveryMode: "characters" | "creators";
+    discoveryMode: DiscoveryMode;
     hasAdvancedFilters: boolean;
     displayCount: number;
     totalCount: number;
@@ -135,6 +140,77 @@ export const ControlsRow = React.memo(function ControlsRow({
     );
 });
 
+export const ResultsList = React.memo(function ResultsList({
+    discoveryMode,
+    characters,
+    renderItem,
+    isTablet,
+    refreshing,
+    onRefresh,
+    onEndReached,
+    loading,
+    error,
+    hasMore,
+    creators,
+    renderCreatorItem,
+    refreshingCreators,
+    onEndReachedCreators,
+    loadingCreators,
+    hasMoreCreators,
+}: {
+    discoveryMode: DiscoveryMode;
+    characters: TrendingCharacter[];
+    renderItem: ({
+        item,
+    }: {
+        item: TrendingCharacter;
+    }) => React.ReactElement;
+    isTablet: boolean;
+    refreshing: boolean;
+    onRefresh: () => void;
+    onEndReached: () => void;
+    loading: boolean;
+    error: string | null;
+    hasMore: boolean;
+    creators: ProfileSearchResult[];
+    renderCreatorItem: ({
+        item,
+    }: {
+        item: ProfileSearchResult;
+    }) => React.ReactElement;
+    refreshingCreators: boolean;
+    onEndReachedCreators: () => void;
+    loadingCreators: boolean;
+    hasMoreCreators: boolean;
+}) {
+    if (discoveryMode === "characters") {
+        return (
+            <CharacterList
+                data={characters}
+                renderItem={renderItem}
+                isTablet={isTablet}
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                onEndReached={onEndReached}
+                loading={loading}
+                error={error}
+                hasMore={hasMore}
+            />
+        );
+    }
+    return (
+        <CreatorList
+            data={creators}
+            renderItem={renderCreatorItem}
+            refreshing={refreshingCreators}
+            onRefresh={onRefresh}
+            onEndReached={onEndReachedCreators}
+            loading={loadingCreators}
+            hasMore={hasMoreCreators}
+        />
+    );
+});
+
 export const DiscoverModals = React.memo(function DiscoverModals({
     sortModalRef,
     currentSort,
@@ -184,7 +260,7 @@ export const DiscoverModals = React.memo(function DiscoverModals({
 });
 
 export const ActionOverlays = React.memo(function ActionOverlays({
-    advancedSearchVisible,
+    advancedSearchModalRef,
     advancedKeywords,
     onKeywordsChange,
     advancedBlacklist,
@@ -193,7 +269,6 @@ export const ActionOverlays = React.memo(function ActionOverlays({
     onMatchModeChange,
     hideDarkened,
     onHideDarkenedChange,
-    onCloseAdvancedSearch,
     actionsVisible,
     characterName,
     hasCreator,
@@ -211,7 +286,7 @@ export const ActionOverlays = React.memo(function ActionOverlays({
     alertButtons,
     onAlertDismiss,
 }: {
-    advancedSearchVisible: boolean;
+    advancedSearchModalRef: React.RefObject<AdvancedSearchModalHandle | null>;
     advancedKeywords: string[];
     onKeywordsChange: (value: string[]) => void;
     advancedBlacklist: string[];
@@ -220,7 +295,6 @@ export const ActionOverlays = React.memo(function ActionOverlays({
     onMatchModeChange: (value: "any" | "all") => void;
     hideDarkened: boolean;
     onHideDarkenedChange: (value: boolean) => void;
-    onCloseAdvancedSearch: () => void;
     actionsVisible: boolean;
     characterName: string;
     hasCreator: boolean;
@@ -241,8 +315,7 @@ export const ActionOverlays = React.memo(function ActionOverlays({
     return (
         <>
             <AdvancedSearchModal
-                key={advancedSearchVisible ? "open" : "closed"}
-                visible={advancedSearchVisible}
+                ref={advancedSearchModalRef}
                 keywords={advancedKeywords}
                 blacklisted={advancedBlacklist}
                 matchMode={keywordMatchMode}
@@ -251,7 +324,6 @@ export const ActionOverlays = React.memo(function ActionOverlays({
                 onBlacklistedChange={onBlacklistedChange}
                 onMatchModeChange={onMatchModeChange}
                 onHideDarkenedChange={onHideDarkenedChange}
-                onClose={onCloseAdvancedSearch}
             />
 
             <CharacterDiscoverActionsSheet
