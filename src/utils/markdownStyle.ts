@@ -125,7 +125,7 @@ export const userMarkdownStyle: MarkdownStyle = {
         color: colors.textMuted,
     },
     link: {
-        color: "#82b1ff",
+        color: "#ffffff",
         underline: true,
     },
     code: {
