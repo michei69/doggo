@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -41,22 +41,9 @@ export default function LoginScreen() {
 
     try {
       const captchaToken = await showTurnstile(TURNSTILE_LOGIN_SITE_KEY);
-      console.log(
-        "[LOGIN] captcha token obtained, length:",
-        captchaToken.length,
-      );
       useAuthStore.getState().setTurnstileToken(captchaToken);
       await login(email.trim(), password, captchaToken);
     } catch (err: any) {
-      console.log(
-        "[LOGIN] error:",
-        JSON.stringify({
-          message: err.message,
-          status: err.response?.status,
-          data: err.response?.data,
-          code: err.code,
-        }),
-      );
       if (err.message !== "User cancelled") {
         if (
           err.response?.status === 401 ||
