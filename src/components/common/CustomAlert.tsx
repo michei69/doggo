@@ -8,6 +8,12 @@ export interface AlertButton {
   onPress?: () => void;
 }
 
+export type ShowAlert = (
+  title: string,
+  message: string,
+  buttons: AlertButton[],
+) => void;
+
 export default function CustomAlert({
   visible,
   title,

@@ -1,4 +1,3 @@
-import React from "react";
 import { Pressable, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { colors } from "../../utils/colors";
 

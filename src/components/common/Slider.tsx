@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   valueChip: {
-    backgroundColor: "rgba(124, 92, 231, 0.15)",
+    backgroundColor: colors.accentSoft,
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 2,

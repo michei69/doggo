@@ -1,15 +1,10 @@
-import React, { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, withSpring } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
-import { MessageCircle, MessageSquare, BadgeCheck, CirclePlus } from "lucide-react-native";
-import Avatar from "../common/Avatar";
-import AvatarPreview from "../common/AvatarPreview";
-import Tag from "../common/Tag";
-import Badge from "../common/Badge";
+import CharacterIdentity from "./CharacterIdentity";
 import { colors } from "../../utils/colors";
-import { botAvatarUrl } from "../../utils/assets";
 import type { TrendingCharacter } from "../../types/api";
 
 export default function CharacterCard({
@@ -27,10 +22,6 @@ export default function CharacterCard({
   onToggleHidden?: () => void;
   style?: object;
 }) {
-  const [preview, setPreview] = useState<{ uri: string; name: string } | null>(
-    null,
-  );
-
   const handleSwipe = useCallback(() => {
     onToggleHidden?.();
   }, [onToggleHidden]);
@@ -49,115 +40,33 @@ export default function CharacterCard({
   }));
 
   return (
-    <>
-      <GestureDetector gesture={panGesture}>
-        <Animated.View style={[styles.card, style, animatedCardStyle]}>
-          <Pressable
-            style={({ pressed }) => pressed && styles.pressed}
-            onPress={onPress}
-            onLongPress={onLongPress}
-          >
-            <View style={styles.inner}>
-              <View style={styles.infoTop}>
-                <Avatar
-                  uri={botAvatarUrl(character.avatar)}
-                  onPress={() =>
-                    setPreview({
-                      uri: botAvatarUrl(character.avatar),
-                      name: character.name,
-                    })
-                  }
-                  name={character.name}
-                  size={76}
-                />
-                <View style={styles.info}>
-                  <Text
-                    style={[styles.name, hidden && styles.textHidden]}
-                    numberOfLines={1}
-                  >
-                    {character.name}
-                  </Text>
-                  <View
-                    style={[
-                      styles.creatorRow,
-                      hidden ? styles.creatorRowHidden : null,
-                    ]}
-                  >
-                    <Text
-                      style={styles.creator}
-                      numberOfLines={1}
-                    >
-                      by {character.creator_name}
-                    </Text>
-                    {character.creator_verified ? (
-                      <BadgeCheck size={14} color={colors.accent} />
-                    ) : null}
-                    {character.creator_subscriber_badge ? (
-                      <View style={styles.subscriberRow}>
-                        <CirclePlus size={14} color={colors.accent} />
-                        <Text style={styles.subscriberBadge}> Subscriber</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <View style={styles.statsRow}>
-                    <View style={styles.statItem}>
-                      <MessageCircle
-                        size={12}
-                        color={hidden ? colors.textFaint : colors.textDim}
-                      />
-                      <Text style={[styles.stat, hidden && styles.textHidden]}>
-                        {character.stats.chat.toLocaleString()}
-                      </Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <MessageSquare
-                        size={12}
-                        color={hidden ? colors.textFaint : colors.textDim}
-                      />
-                      <Text style={[styles.stat, hidden && styles.textHidden]}>
-                        {character.stats.message.toLocaleString()}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-              <View style={[styles.info, { alignSelf: "stretch" }]}>
-                {(character.tags.length > 0 ||
-                  character.custom_tags.length > 0) && (
-                  <View style={styles.tagsRow}>
-                    <Badge
-                      label={character.is_nsfw ? "NSFW" : "Safe"}
-                      variant={character.is_nsfw ? "nsfw" : "safe"}
-                    />
-                    {character.is_proxy_enabled && <Badge label="Proxy" />}
-                    {!character.is_public && (
-                      <Badge label="Private" variant="private" />
-                    )}
-                    {character.tags.map((tag) => (
-                      <Tag key={tag.id} label={tag.name} compact />
-                    ))}
-                    {character.custom_tags.map((tag, _) => (
-                      <Tag
-                        key={`custom-${tag}`}
-                        label={tag}
-                        variant="custom"
-                        compact
-                      />
-                    ))}
-                  </View>
-                )}
-              </View>
-            </View>
-          </Pressable>
-          {hidden && <View style={styles.greyOverlay} />}
-        </Animated.View>
-      </GestureDetector>
-      <AvatarPreview
-        visible={preview !== null}
-        uri={preview?.uri ?? ""}
-        onClose={() => setPreview(null)}
-      />
-    </>
+    <GestureDetector gesture={panGesture}>
+      <Animated.View style={[styles.card, style, animatedCardStyle]}>
+        <Pressable
+          style={({ pressed }) => pressed && styles.pressed}
+          onPress={onPress}
+          onLongPress={onLongPress}
+        >
+          <View style={styles.inner}>
+            <CharacterIdentity
+              character={character}
+              variant="compact"
+              avatarSize={76}
+              hidden={hidden}
+              name={
+                <Text
+                  style={[styles.name, hidden && styles.textHidden]}
+                  numberOfLines={1}
+                >
+                  {character.name}
+                </Text>
+              }
+            />
+          </View>
+        </Pressable>
+        {hidden && <View style={styles.greyOverlay} />}
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
@@ -182,66 +91,14 @@ const styles = StyleSheet.create({
   },
   greyOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(30, 30, 40, 0.4)",
-  },
-  info: {
-    flex: 1,
-  },
-  infoTop: {
-    flex: 1,
-    flexDirection: "row",
-    gap: 12,
-    alignItems: "center",
+    backgroundColor: colors.scrim,
   },
   name: {
     color: colors.text,
     fontSize: 16,
     fontWeight: "700",
   },
-  creatorRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 6,
-  },
-  creatorRowHidden: {
-    opacity: 0.5,
-  },
-  creator: {
-    color: colors.textFaint,
-    fontSize: 13,
-  },
-  subscriberBadge: {
-    color: colors.accent,
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  subscriberRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-  },
   textHidden: {
     color: colors.textDimAlt,
-  },
-  statsRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 8,
-  },
-  statItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-  },
-  stat: {
-    color: colors.textDim,
-    fontSize: 12,
-  },
-  tagsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 4,
-    marginTop: 6,
   },
 });

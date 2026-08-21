@@ -17,11 +17,11 @@ import {
   pinReview,
   unpinReview,
 } from "../../api/reviews";
-import type { ReviewSort } from "../../api/reviews";
-import type { Review, ReviewCounts, ReviewSettings } from "../../types/api";
+import type { Review, ReviewCounts, ReviewSettings, ReviewSort } from "../../types/api";
 import { useAuthStore } from "../../stores/authStore";
 import { colors } from "../../utils/colors";
 import ReviewCard from "./ReviewCard";
+import { makeReviewUserProfile } from "./reviewFactories";
 
 interface ReviewsListState {
   reviews: Review[];
@@ -225,13 +225,7 @@ export default function ReviewsSection({
         moderator: false,
         pinned_at: null,
         user_id: newReview.user_id,
-        user_profiles: {
-          avatar: user?.user_metadata?.sub ?? "",
-          is_verified: false,
-          name: user?.user_metadata?.email ?? "",
-          plusbadge: false,
-          user_name: user?.user_metadata?.email ?? "",
-        },
+        user_profiles: makeReviewUserProfile(user),
       };
       dispatchList({ type: "ADD", review: optimistic });
       setReviewContent("");

@@ -1,6 +1,6 @@
-import React, { useState, useCallback } from "react";
+import { useState, useCallback } from "react";
+import type React from "react";
 import {
-  Modal,
   Pressable,
   Text,
   TextInput,
@@ -9,8 +9,14 @@ import {
   View,
   StyleSheet,
 } from "react-native";
-import { X } from "lucide-react-native";
 import { colors } from "../../utils/colors";
+import CenteredModal from "../../components/common/CenteredModal";
+import { centeredModalStyles } from "../../components/common/centeredModalStyles";
+import { useModalHandle } from "../../hooks/useModalHandle";
+
+export interface AdvancedSearchModalHandle {
+  open: () => void;
+}
 
 export default function AdvancedSearchModal({
   visible,
@@ -23,8 +29,9 @@ export default function AdvancedSearchModal({
   onMatchModeChange,
   onHideDarkenedChange,
   onClose,
+  ref,
 }: {
-  visible: boolean;
+  visible?: boolean;
   keywords: string[];
   blacklisted: string[];
   matchMode: "any" | "all";
@@ -33,10 +40,27 @@ export default function AdvancedSearchModal({
   onBlacklistedChange: (keywords: string[]) => void;
   onMatchModeChange: (mode: "any" | "all") => void;
   onHideDarkenedChange: (hide: boolean) => void;
-  onClose: () => void;
+  onClose?: () => void;
+  ref?: React.Ref<AdvancedSearchModalHandle>;
 }) {
   const [keywordInput, setKeywordInput] = useState("");
   const [blacklistInput, setBlacklistInput] = useState("");
+
+  // When the parent passes a `visible` prop (controlled mode) the handle is
+  // ignored; otherwise the modal is driven through the ref handle.
+  const { visible: handleVisible, close } = useModalHandle(ref, () => {
+    setKeywordInput("");
+    setBlacklistInput("");
+  });
+  const isVisible = visible ?? handleVisible;
+
+  const handleClose = useCallback(() => {
+    if (visible === undefined) {
+      close();
+    } else {
+      onClose?.();
+    }
+  }, [visible, onClose, close]);
 
   const handleAddKeyword = useCallback(() => {
     const trimmed = keywordInput.trim();
@@ -71,191 +95,156 @@ export default function AdvancedSearchModal({
   const hasAnyFilter = keywords.length > 0 || blacklisted.length > 0;
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
+    <CenteredModal
+      visible={isVisible}
+      onClose={handleClose}
+      title="Advanced Search"
+      contentStyle={styles.content}
     >
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.content} onPress={() => {}}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Advanced Search</Text>
-            <Pressable onPress={onClose} hitSlop={8}>
-              <X size={20} color={colors.text} />
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Text style={styles.sectionLabel}>Search keywords</Text>
+        <View style={styles.inputRow}>
+          <TextInput
+            style={centeredModalStyles.input}
+            placeholder="Type a keyword..."
+            placeholderTextColor={colors.textDim}
+            value={keywordInput}
+            onChangeText={setKeywordInput}
+            onSubmitEditing={handleAddKeyword}
+            returnKeyType="done"
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          <Pressable
+            style={[
+              centeredModalStyles.addBtn,
+              !keywordInput.trim() && centeredModalStyles.addBtnDisabled,
+            ]}
+            onPress={handleAddKeyword}
+          >
+            <Text style={centeredModalStyles.addBtnText}>Add</Text>
+          </Pressable>
+        </View>
+        {keywords.length > 0 && (
+          <View style={styles.pillsRow}>
+            {keywords.map((kw) => (
+              <Pressable
+                key={kw}
+                style={styles.pill}
+                onPress={() => handleRemoveKeyword(kw)}
+              >
+                <Text style={styles.pillText}>{kw}</Text>
+                <Text style={styles.pillRemove}>{"✕"}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        <Text style={styles.sectionLabel}>Blacklisted keywords</Text>
+        <View style={styles.inputRow}>
+          <TextInput
+            style={centeredModalStyles.input}
+            placeholder="Type a keyword..."
+            placeholderTextColor={colors.textDim}
+            value={blacklistInput}
+            onChangeText={setBlacklistInput}
+            onSubmitEditing={handleAddBlacklisted}
+            returnKeyType="done"
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          <Pressable
+            style={[
+              centeredModalStyles.addBtn,
+              !blacklistInput.trim() && centeredModalStyles.addBtnDisabled,
+            ]}
+            onPress={handleAddBlacklisted}
+          >
+            <Text style={centeredModalStyles.addBtnText}>Add</Text>
+          </Pressable>
+        </View>
+        {blacklisted.length > 0 && (
+          <View style={styles.pillsRow}>
+            {blacklisted.map((kw) => (
+              <Pressable
+                key={kw}
+                style={[styles.pill, styles.pillBlacklisted]}
+                onPress={() => handleRemoveBlacklisted(kw)}
+              >
+                <Text style={styles.pillText}>{kw}</Text>
+                <Text style={styles.pillRemove}>{"✕"}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        <View style={styles.matchRow}>
+          <Text style={styles.matchLabel}>
+            Match: {matchMode === "any" ? "Any" : "All"}
+          </Text>
+          <View style={styles.matchToggle}>
+            <Pressable
+              style={[
+                styles.matchBtn,
+                styles.matchBtnLeft,
+                matchMode === "any" && styles.matchBtnActive,
+              ]}
+              onPress={() => onMatchModeChange("any")}
+            >
+              <Text
+                style={[
+                  styles.matchBtnText,
+                  matchMode === "any" && styles.matchBtnTextActive,
+                ]}
+              >
+                Any
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.matchBtn,
+                styles.matchBtnRight,
+                matchMode === "all" && styles.matchBtnActive,
+              ]}
+              onPress={() => onMatchModeChange("all")}
+            >
+              <Text
+                style={[
+                  styles.matchBtnText,
+                  matchMode === "all" && styles.matchBtnTextActive,
+                ]}
+              >
+                All
+              </Text>
             </Pressable>
           </View>
+        </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.sectionLabel}>Search keywords</Text>
-            <View style={styles.inputRow}>
-              <TextInput
-                style={styles.input}
-                placeholder="Type a keyword..."
-                placeholderTextColor={colors.textDim}
-                value={keywordInput}
-                onChangeText={setKeywordInput}
-                onSubmitEditing={handleAddKeyword}
-                returnKeyType="done"
-                autoCorrect={false}
-                autoCapitalize="none"
-              />
-              <Pressable
-                style={[
-                  styles.addBtn,
-                  !keywordInput.trim() && styles.addBtnDisabled,
-                ]}
-                onPress={handleAddKeyword}
-              >
-                <Text style={styles.addBtnText}>Add</Text>
-              </Pressable>
-            </View>
-            {keywords.length > 0 && (
-              <View style={styles.pillsRow}>
-                {keywords.map((kw) => (
-                  <Pressable
-                    key={kw}
-                    style={styles.pill}
-                    onPress={() => handleRemoveKeyword(kw)}
-                  >
-                    <Text style={styles.pillText}>{kw}</Text>
-                    <Text style={styles.pillRemove}>{"✕"}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
+        <View style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>
+            Hide darkened: {hideDarkened ? "On" : "Off"}
+          </Text>
+          <Switch
+            value={hideDarkened}
+            onValueChange={onHideDarkenedChange}
+            trackColor={{ false: colors.border, true: colors.accent }}
+            thumbColor={colors.text}
+          />
+        </View>
 
-            <Text style={styles.sectionLabel}>Blacklisted keywords</Text>
-            <View style={styles.inputRow}>
-              <TextInput
-                style={styles.input}
-                placeholder="Type a keyword..."
-                placeholderTextColor={colors.textDim}
-                value={blacklistInput}
-                onChangeText={setBlacklistInput}
-                onSubmitEditing={handleAddBlacklisted}
-                returnKeyType="done"
-                autoCorrect={false}
-                autoCapitalize="none"
-              />
-              <Pressable
-                style={[
-                  styles.addBtn,
-                  !blacklistInput.trim() && styles.addBtnDisabled,
-                ]}
-                onPress={handleAddBlacklisted}
-              >
-                <Text style={styles.addBtnText}>Add</Text>
-              </Pressable>
-            </View>
-            {blacklisted.length > 0 && (
-              <View style={styles.pillsRow}>
-                {blacklisted.map((kw) => (
-                  <Pressable
-                    key={kw}
-                    style={[styles.pill, styles.pillBlacklisted]}
-                    onPress={() => handleRemoveBlacklisted(kw)}
-                  >
-                    <Text style={styles.pillText}>{kw}</Text>
-                    <Text style={styles.pillRemove}>{"✕"}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-
-            <View style={styles.matchRow}>
-              <Text style={styles.matchLabel}>
-                Match: {matchMode === "any" ? "Any" : "All"}
-              </Text>
-              <View style={styles.matchToggle}>
-                <Pressable
-                  style={[
-                    styles.matchBtn,
-                    styles.matchBtnLeft,
-                    matchMode === "any" && styles.matchBtnActive,
-                  ]}
-                  onPress={() => onMatchModeChange("any")}
-                >
-                  <Text
-                    style={[
-                      styles.matchBtnText,
-                      matchMode === "any" && styles.matchBtnTextActive,
-                    ]}
-                  >
-                    Any
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.matchBtn,
-                    styles.matchBtnRight,
-                    matchMode === "all" && styles.matchBtnActive,
-                  ]}
-                  onPress={() => onMatchModeChange("all")}
-                >
-                  <Text
-                    style={[
-                      styles.matchBtnText,
-                      matchMode === "all" && styles.matchBtnTextActive,
-                    ]}
-                  >
-                    All
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-
-            <View style={styles.toggleRow}>
-              <Text style={styles.toggleLabel}>
-                Hide darkened: {hideDarkened ? "On" : "Off"}
-              </Text>
-              <Switch
-                value={hideDarkened}
-                onValueChange={onHideDarkenedChange}
-                trackColor={{ false: colors.border, true: colors.accent }}
-                thumbColor={colors.text}
-              />
-            </View>
-
-            {hasAnyFilter && (
-              <Pressable style={styles.clearRow} onPress={handleClearAll}>
-                <Text style={styles.clearText}>Clear all</Text>
-              </Pressable>
-            )}
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
+        {hasAnyFilter && (
+          <Pressable style={styles.clearRow} onPress={handleClearAll}>
+            <Text style={styles.clearText}>Clear all</Text>
+          </Pressable>
+        )}
+      </ScrollView>
+    </CenteredModal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
   content: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 20,
-    width: "85%",
-    maxWidth: 480,
     maxHeight: "80%",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  title: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: "700",
   },
   sectionLabel: {
     color: colors.textFaint,
@@ -270,32 +259,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 8,
   },
-  input: {
-    flex: 1,
-    backgroundColor: colors.background,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 8,
-    color: colors.text,
-    fontSize: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  addBtn: {
-    backgroundColor: colors.accent,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  addBtnDisabled: {
-    opacity: 0.4,
-  },
-  addBtnText: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: "600",
-  },
   pillsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -305,7 +268,7 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(124, 92, 231, 0.15)",
+    backgroundColor: colors.accentSoft,
     borderColor: colors.accent,
     borderWidth: 1,
     borderRadius: 16,
@@ -314,7 +277,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   pillBlacklisted: {
-    backgroundColor: "rgba(231, 76, 60, 0.15)",
+    backgroundColor: colors.dangerSoft,
     borderColor: colors.danger,
   },
   pillText: {
@@ -359,7 +322,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 8,
   },
   matchBtnActive: {
-    backgroundColor: "rgba(124, 92, 231, 0.3)",
+    backgroundColor: colors.accentStrong,
     borderColor: colors.accent,
   },
   matchBtnText: {

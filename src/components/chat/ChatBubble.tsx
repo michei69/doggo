@@ -10,7 +10,7 @@ import { StreamdownText } from "react-native-streamdown";
 import TypingDots from "./TypingDots";
 import Avatar from "../common/Avatar";
 import AvatarPreview from "../common/AvatarPreview";
-import type { ChatMessage } from "../../types/api";
+import type { ChatMessage, AvatarPreviewState } from "../../types/api";
 import type { Pronouns } from "../../types/api";
 import { replaceTags } from "../../utils/markdown";
 import { markdownStyle, userMarkdownStyle } from "../../utils/markdownStyle";
@@ -73,7 +73,7 @@ export default React.memo(function ChatBubble({
     null,
   );
   const [thinkingExpanded, setThinkingExpanded] = useState(false);
-  const [preview, setPreview] = useState<{ uri: string; name: string } | null>(
+  const [preview, setPreview] = useState<AvatarPreviewState | null>(
     null,
   );
   const inputRef = useRef<TextInput>(null);

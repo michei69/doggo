@@ -1,4 +1,3 @@
-import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { colors } from "../../utils/colors";
 
@@ -24,7 +23,7 @@ export default function Badge({
         ? "rgba(46, 204, 113, 0.3)"
         : variant === "private"
           ? "rgba(170, 170, 170, 0.25)"
-          : "rgba(124, 92, 231, 0.3)";
+          : colors.accentStrong;
   const color =
     variant === "nsfw"
       ? colors.danger

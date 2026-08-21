@@ -1,4 +1,4 @@
-import React, { memo, useCallback } from "react";
+import { memo, useCallback } from "react";
 import {
   View,
   Text,
@@ -85,7 +85,7 @@ export default memo(CharacterSettingsModal);
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.8)",
+    backgroundColor: colors.overlayStrong,
     justifyContent: "center",
     alignItems: "center",
   },

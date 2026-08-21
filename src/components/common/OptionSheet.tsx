@@ -1,4 +1,4 @@
-import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import CustomBottomSheet from "./CustomBottomSheet";
 import { colors } from "../../utils/colors";
 
@@ -27,7 +27,7 @@ export default function OptionSheet({
   return (
     <CustomBottomSheet visible={visible} onClose={onClose}>
       {isMenu ? (
-        <ScrollView>
+        <View>
           {actions.map((action) => (
             <Pressable
               key={action.label}
@@ -44,7 +44,7 @@ export default function OptionSheet({
               </Text>
             </Pressable>
           ))}
-        </ScrollView>
+        </View>
       ) : (
         <View style={styles.content}>
           {title ? <Text style={styles.title}>{title}</Text> : null}

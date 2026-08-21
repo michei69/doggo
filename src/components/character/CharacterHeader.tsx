@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, memo } from "react";
+import { useState, useMemo, useCallback, memo } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { EnrichedMarkdownText } from "react-native-enriched-markdown";
@@ -10,7 +10,7 @@ import Tag from "../common/Tag";
 import Badge from "../common/Badge";
 import CollapsibleSection from "../common/CollapsibleSection";
 import ReviewsSection from "../reviews/ReviewsSection";
-import type { CharacterDetail } from "../../types/api";
+import type { CharacterDetail, AvatarPreviewState } from "../../types/api";
 import { htmlToMarkdown } from "../../utils/markdown";
 import { markdownStyle } from "../../utils/markdownStyle";
 import { useNavigateToJanitorLink } from "../../utils/janitorLinks";
@@ -450,7 +450,7 @@ export default function CharacterHeader({
 }) {
   const [descExpanded, setDescExpanded] = useState(false);
   const [descTruncated, setDescTruncated] = useState(false);
-  const [preview, setPreview] = useState<{ uri: string; name: string } | null>(
+  const [preview, setPreview] = useState<AvatarPreviewState | null>(
     null,
   );
   const [altIndex, setAltIndex] = useState(0);

@@ -41,6 +41,7 @@ import { avatarUrl } from "../../utils/assets";
 import { formatRelativeTime } from "../../utils/time";
 import CommentItem from "./CommentItem";
 import EmojiPickerModal from "./EmojiPickerModal";
+import { makeReviewUserProfile } from "./reviewFactories";
 
 const iconSize = 14;
 const iconColor = colors.textDim;
@@ -354,13 +355,7 @@ export default function ReviewCard({
         moderator: false,
         review_id: newComment.review_id,
         user_id: newComment.user_id,
-        user_profiles: {
-          avatar: user?.user_metadata?.sub ?? "",
-          is_verified: false,
-          name: user?.user_metadata?.email ?? "",
-          plusbadge: false,
-          user_name: user?.user_metadata?.email ?? "",
-        },
+        user_profiles: makeReviewUserProfile(user),
       };
       setComments((prev) => [...prev, optimistic]);
       setCommentText("");

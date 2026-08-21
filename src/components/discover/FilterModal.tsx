@@ -1,10 +1,6 @@
-import React, {
-  useState,
-  useCallback,
-  useImperativeHandle,
-} from "react";
+import { useState, useCallback } from "react";
+import type React from "react";
 import {
-  Modal,
   Pressable,
   Text,
   TextInput,
@@ -19,6 +15,8 @@ import {
   type FilterOperator,
   type FilterState,
 } from "../../utils/discover";
+import CenteredModal from "../../components/common/CenteredModal";
+import { useModalHandle } from "../../hooks/useModalHandle";
 
 export interface FilterModalHandle {
   open: () => void;
@@ -78,167 +76,132 @@ export default function FilterModal({
 }: { filters: FilterState; onApply: (filters: FilterState) => void } & {
   ref?: React.Ref<FilterModalHandle>;
 }) {
-  const [visible, setVisible] = useState(false);
   const [pending, setPending] = useState<FilterState>(INITIAL_FILTERS);
 
-  useImperativeHandle(ref, () => ({
-    open: () => {
-      setPending({ ...filters });
-      setVisible(true);
-    },
-  }));
-
-  const handleClose = useCallback(() => setVisible(false), []);
+  const { visible, close } = useModalHandle(ref, () => {
+    setPending({ ...filters });
+  });
 
   const handleApply = useCallback(() => {
-    setVisible(false);
+    close();
     onApply(pending);
-  }, [onApply, pending]);
+  }, [close, onApply, pending]);
 
   const handleReset = useCallback(() => {
     setPending({ ...INITIAL_FILTERS });
   }, []);
 
   return (
-    <Modal
+    <CenteredModal
       visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={handleClose}
+      onClose={close}
+      title="Filters"
+      hideCloseButton
+      contentStyle={styles.filterContent}
     >
-      <Pressable style={styles.overlay} onPress={handleClose}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Text style={styles.sectionLabel}>Messages Count</Text>
+        <View style={styles.filterRow}>
+          <TextInput
+            style={styles.filterInput}
+            placeholder="Count"
+            placeholderTextColor={colors.textDim}
+            keyboardType="numeric"
+            value={pending.messages}
+            onChangeText={(v) => setPending((p) => ({ ...p, messages: v }))}
+          />
+          <OperatorToggle
+            value={pending.messagesMode}
+            onChange={(v) => setPending((p) => ({ ...p, messagesMode: v }))}
+          />
+        </View>
         <Pressable
-          style={[styles.content, styles.filterContent]}
-          onPress={() => {}}
+          style={styles.clearRow}
+          onPress={() => setPending((p) => ({ ...p, messages: "" }))}
         >
-          <Text style={styles.title}>Filters</Text>
-
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.sectionLabel}>Messages Count</Text>
-            <View style={styles.filterRow}>
-              <TextInput
-                style={styles.filterInput}
-                placeholder="Count"
-                placeholderTextColor={colors.textDim}
-                keyboardType="numeric"
-                value={pending.messages}
-                onChangeText={(v) => setPending((p) => ({ ...p, messages: v }))}
-              />
-              <OperatorToggle
-                value={pending.messagesMode}
-                onChange={(v) => setPending((p) => ({ ...p, messagesMode: v }))}
-              />
-            </View>
-            <Pressable
-              style={styles.clearRow}
-              onPress={() => setPending((p) => ({ ...p, messages: "" }))}
-            >
-              <Text style={styles.clearText}>Clear</Text>
-            </Pressable>
-
-            <Text style={styles.sectionLabel}>Tokens Count</Text>
-            <View style={styles.filterRow}>
-              <TextInput
-                style={styles.filterInput}
-                placeholder="Count"
-                placeholderTextColor={colors.textDim}
-                keyboardType="numeric"
-                value={pending.tokens}
-                onChangeText={(v) => setPending((p) => ({ ...p, tokens: v }))}
-              />
-              <OperatorToggle
-                value={pending.tokensMode}
-                onChange={(v) => setPending((p) => ({ ...p, tokensMode: v }))}
-              />
-            </View>
-            <Pressable
-              style={styles.clearRow}
-              onPress={() => setPending((p) => ({ ...p, tokens: "" }))}
-            >
-              <Text style={styles.clearText}>Clear</Text>
-            </Pressable>
-
-            <View style={styles.toggleRow}>
-              <Text style={styles.toggleLabel}>
-                Proxy: {pending.proxyOnly ? "Only" : "Any"}
-              </Text>
-              <Switch
-                value={pending.proxyOnly}
-                onValueChange={(v) =>
-                  setPending((p) => ({ ...p, proxyOnly: v }))
-                }
-                trackColor={{ false: colors.border, true: colors.accent }}
-                thumbColor={colors.text}
-              />
-            </View>
-
-            <View style={styles.toggleRow}>
-              <Text style={styles.toggleLabel}>
-                {pending.limitlessMode ? "Limited & Limitless" : "Limited Only"}
-              </Text>
-              <Switch
-                value={pending.limitlessMode}
-                onValueChange={(v) =>
-                  setPending((p) => ({ ...p, limitlessMode: v }))
-                }
-                trackColor={{ false: colors.border, true: colors.accent }}
-                thumbColor={colors.text}
-              />
-            </View>
-
-            <View style={styles.toggleRow}>
-              <Text style={styles.toggleLabel}>
-                Profile Picture: {pending.customAvatar ? "Custom" : "Any"}
-              </Text>
-              <Switch
-                value={pending.customAvatar}
-                onValueChange={(v) =>
-                  setPending((p) => ({ ...p, customAvatar: v }))
-                }
-                trackColor={{ false: colors.border, true: colors.accent }}
-                thumbColor={colors.text}
-              />
-            </View>
-          </ScrollView>
-
-          <View style={styles.actions}>
-            <Pressable style={styles.resetButton} onPress={handleReset}>
-              <Text style={styles.resetText}>Reset</Text>
-            </Pressable>
-            <Pressable style={styles.applyButton} onPress={handleApply}>
-              <Text style={styles.applyText}>Apply</Text>
-            </Pressable>
-          </View>
+          <Text style={styles.clearText}>Clear</Text>
         </Pressable>
-      </Pressable>
-    </Modal>
+
+        <Text style={styles.sectionLabel}>Tokens Count</Text>
+        <View style={styles.filterRow}>
+          <TextInput
+            style={styles.filterInput}
+            placeholder="Count"
+            placeholderTextColor={colors.textDim}
+            keyboardType="numeric"
+            value={pending.tokens}
+            onChangeText={(v) => setPending((p) => ({ ...p, tokens: v }))}
+          />
+          <OperatorToggle
+            value={pending.tokensMode}
+            onChange={(v) => setPending((p) => ({ ...p, tokensMode: v }))}
+          />
+        </View>
+        <Pressable
+          style={styles.clearRow}
+          onPress={() => setPending((p) => ({ ...p, tokens: "" }))}
+        >
+          <Text style={styles.clearText}>Clear</Text>
+        </Pressable>
+
+        <View style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>
+            Proxy: {pending.proxyOnly ? "Only" : "Any"}
+          </Text>
+          <Switch
+            value={pending.proxyOnly}
+            onValueChange={(v) =>
+              setPending((p) => ({ ...p, proxyOnly: v }))
+            }
+            trackColor={{ false: colors.border, true: colors.accent }}
+            thumbColor={colors.text}
+          />
+        </View>
+
+        <View style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>
+            {pending.limitlessMode ? "Limited & Limitless" : "Limited Only"}
+          </Text>
+          <Switch
+            value={pending.limitlessMode}
+            onValueChange={(v) =>
+              setPending((p) => ({ ...p, limitlessMode: v }))
+            }
+            trackColor={{ false: colors.border, true: colors.accent }}
+            thumbColor={colors.text}
+          />
+        </View>
+
+        <View style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>
+            Profile Picture: {pending.customAvatar ? "Custom" : "Any"}
+          </Text>
+          <Switch
+            value={pending.customAvatar}
+            onValueChange={(v) =>
+              setPending((p) => ({ ...p, customAvatar: v }))
+            }
+            trackColor={{ false: colors.border, true: colors.accent }}
+            thumbColor={colors.text}
+          />
+        </View>
+      </ScrollView>
+
+      <View style={styles.actions}>
+        <Pressable style={styles.resetButton} onPress={handleReset}>
+          <Text style={styles.resetText}>Reset</Text>
+        </Pressable>
+        <Pressable style={styles.applyButton} onPress={handleApply}>
+          <Text style={styles.applyText}>Apply</Text>
+        </Pressable>
+      </View>
+    </CenteredModal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  content: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 20,
-    width: "85%",
-    maxWidth: 480,
-  },
   filterContent: {
     maxHeight: "85%",
-  },
-  title: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 16,
   },
   sectionLabel: {
     color: colors.textFaint,
@@ -287,7 +250,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 8,
   },
   operatorBtnActive: {
-    backgroundColor: "rgba(124, 92, 231, 0.3)",
+    backgroundColor: colors.accentStrong,
     borderColor: colors.accent,
   },
   operatorText: {

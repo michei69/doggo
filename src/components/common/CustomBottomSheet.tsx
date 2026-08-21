@@ -1,22 +1,15 @@
 import type React from "react";
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import { StyleSheet, Pressable, View, useWindowDimensions } from "react-native";
 import { colors } from "../../utils/colors";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  interpolate,
-  cancelAnimation,
-} from "react-native-reanimated";
-import { scheduleOnRN } from "react-native-worklets";
+import { GestureDetector } from "react-native-gesture-handler";
+import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import {
   registerSheet,
   updateSheet,
   unregisterSheet,
 } from "../../stores/sheetStore";
+import { useSheetAnimation } from "../../hooks/useSheetAnimation";
 
 function Proxy({
   visible,
@@ -59,35 +52,15 @@ function SheetRenderer({
   const isTablet = Math.min(windowWidth, windowHeight) >= 600;
   const sheetMaxWidth = 500;
   const sheetInset = Math.max(0, (windowWidth - sheetMaxWidth) / 2);
-  const translateY = useSharedValue(windowHeight);
-  const backdropOpacity = useSharedValue(0);
-  const dragOffset = useSharedValue(0);
-  const isClosing = useSharedValue(false);
+  const {
+    translateY,
+    backdropOpacity,
+    isClosing,
+    animateIn,
+    animateOut,
+    panGesture,
+  } = useSheetAnimation(onClose);
   const wasVisible = useRef(false);
-
-  const animateIn = useCallback(() => {
-    "worklet";
-    cancelAnimation(translateY);
-    cancelAnimation(backdropOpacity);
-    translateY.value = withSpring(0, {
-      damping: 24,
-      stiffness: 200,
-      mass: 0.8,
-    });
-    backdropOpacity.value = withTiming(1, { duration: 200 });
-  }, [translateY, backdropOpacity]);
-
-  const animateOut = useCallback(() => {
-    "worklet";
-    if (isClosing.value) return;
-    isClosing.value = true;
-    cancelAnimation(translateY);
-    cancelAnimation(backdropOpacity);
-    translateY.value = withTiming(windowHeight, { duration: 250 });
-    backdropOpacity.value = withTiming(0, { duration: 250 }, () => {
-      scheduleOnRN(onClose);
-    });
-  }, [isClosing, translateY, backdropOpacity, windowHeight, onClose]);
 
   useEffect(() => {
     if (visible) {
@@ -100,35 +73,6 @@ function SheetRenderer({
       animateOut();
     }
   }, [visible, isClosing, translateY, backdropOpacity, windowHeight, animateIn, animateOut]);
-
-  const panGesture = Gesture.Pan()
-    .onStart(() => {
-      dragOffset.value = translateY.value;
-    })
-    .onUpdate((e) => {
-      if (e.translationY > 0) {
-        translateY.value = dragOffset.value + e.translationY;
-        backdropOpacity.value = interpolate(
-          translateY.value,
-          [0, windowHeight * 0.4],
-          [1, 0],
-        );
-      }
-    })
-    .onEnd((e) => {
-      if (e.translationY > 120 || e.velocityY > 600) {
-        animateOut();
-      } else {
-        cancelAnimation(translateY);
-        cancelAnimation(backdropOpacity);
-        translateY.value = withSpring(0, {
-          damping: 24,
-          stiffness: 200,
-          mass: 0.8,
-        });
-        backdropOpacity.value = withTiming(1, { duration: 200 });
-      }
-    });
 
   const rContainerStyle = useAnimatedStyle(() => ({
     pointerEvents:
@@ -145,7 +89,7 @@ function SheetRenderer({
 
   return (
     <Animated.View style={[styles.container, rContainerStyle]}>
-      <Pressable style={styles.backdropTouchable} onPress={animateOut}>
+      <Pressable style={styles.backdropTouchable} onPress={() => animateOut()}>
         <Animated.View style={[styles.backdrop, rBackdropStyle]} />
       </Pressable>
 
@@ -209,7 +153,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: colors.overlayMedium,
   },
   sheet: {
     position: "absolute",

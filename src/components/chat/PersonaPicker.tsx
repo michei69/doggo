@@ -5,22 +5,19 @@ import {
   Pressable,
   Modal,
   ActivityIndicator,
-  ScrollView,
   StyleSheet,
 } from "react-native";
 import { getMyProfile, getMyPersonas } from "../../api/profile";
 import Avatar from "../common/Avatar";
 import { avatarUrl } from "../../utils/assets";
 import { colors } from "../../utils/colors";
-import type { UserProfile, Persona } from "../../types/api";
-
-export interface PersonaEntry {
-  id: string;
-  name: string;
-  avatar: string;
-  appearance: string;
-  order: number;
-}
+import { FlashList } from "@shopify/flash-list";
+import type {
+  UserProfile,
+  Persona,
+  PersonaRef,
+  PersonaEntry,
+} from "../../types/api";
 
 export default function PersonaPicker({
   visible,
@@ -33,7 +30,7 @@ export default function PersonaPicker({
   visible: boolean;
   onClose: () => void;
   onSelect: (
-    persona: { id: string; name: string; avatar: string } | null,
+    persona: PersonaRef | null,
   ) => void;
   characterName: string;
   title?: string;
@@ -93,39 +90,14 @@ export default function PersonaPicker({
     return [...main, ...others].sort((a, b) => a.order - b.order);
   }, [profile, personas]);
 
-  const renderPersona = useCallback(
-    (item: PersonaEntry) => (
-      <Pressable
-        style={({ pressed }) => [
-          styles.persona,
-          pressed && { opacity: 0.7 },
-        ]}
-        onPress={() => {
-          onClose();
-          onSelect(
-            item.id === "__main__"
-              ? null
-              : { id: item.id, name: item.name, avatar: item.avatar },
-          );
-        }}
-      >
-        <Avatar
-          uri={item.avatar ? avatarUrl(item.avatar) : undefined}
-          name={item.name}
-          size={44}
-        />
-        <View style={styles.personaInfo}>
-          <Text style={styles.personaName}>{item.name}</Text>
-          {item.id === "__main__" ? (
-            <Text style={styles.personaMeta}>Main persona</Text>
-          ) : (
-            <Text style={styles.personaMeta}>Persona</Text>
-          )}
-        </View>
-      </Pressable>
+  const renderPersonaItem = useCallback(
+    ({ item }: { item: PersonaEntry }) => (
+      <PersonaRow item={item} onClose={onClose} onSelect={onSelect} />
     ),
     [onClose, onSelect],
   );
+
+  const personaKeyExtractor = useCallback((item: PersonaEntry) => item.id, []);
 
   return (
     <Modal
@@ -160,14 +132,13 @@ export default function PersonaPicker({
           ) : entries.length === 0 ? (
             <Text style={styles.empty}>No personas available</Text>
           ) : (
-            <ScrollView
+            <FlashList
+              data={entries}
+              renderItem={renderPersonaItem}
+              keyExtractor={personaKeyExtractor}
               style={styles.list}
               showsVerticalScrollIndicator={false}
-            >
-              {entries.map((item) => (
-                <View key={item.id}>{renderPersona(item)}</View>
-              ))}
-            </ScrollView>
+            />
           )}
 
           <Pressable
@@ -184,6 +155,47 @@ export default function PersonaPicker({
     </Modal>
   );
 }
+
+const PersonaRow = React.memo(function PersonaRow({
+  item,
+  onClose,
+  onSelect,
+}: {
+  item: PersonaEntry;
+  onClose: () => void;
+  onSelect: (persona: PersonaRef | null) => void;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.persona,
+        pressed && { opacity: 0.7 },
+      ]}
+      onPress={() => {
+        onClose();
+        onSelect(
+          item.id === "__main__"
+            ? null
+            : { id: item.id, name: item.name, avatar: item.avatar },
+        );
+      }}
+    >
+      <Avatar
+        uri={item.avatar ? avatarUrl(item.avatar) : undefined}
+        name={item.name}
+        size={44}
+      />
+      <View style={styles.personaInfo}>
+        <Text style={styles.personaName}>{item.name}</Text>
+        {item.id === "__main__" ? (
+          <Text style={styles.personaMeta}>Main persona</Text>
+        ) : (
+          <Text style={styles.personaMeta}>Persona</Text>
+        )}
+      </View>
+    </Pressable>
+  );
+});
 
 const styles = StyleSheet.create({
   overlay: {
@@ -216,6 +228,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   list: {
+    flexGrow: 1,
     maxHeight: 300,
   },
   persona: {
