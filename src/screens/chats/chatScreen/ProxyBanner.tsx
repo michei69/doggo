@@ -6,7 +6,8 @@ const ProxyBanner = React.memo(function ProxyBanner() {
   return (
     <View style={styles.proxyWarningBanner}>
       <Text style={styles.proxyWarningText}>
-        This character does not support proxies.
+        This character doesn't support proxies. Open chat settings to switch
+        models, or start a chat without a proxy.
       </Text>
     </View>
   );

@@ -31,6 +31,7 @@ import { cleanTags, generify } from "../../../utils/markdown";
 import { storage } from "../../../utils/storage";
 import { validateMessagesImport } from "./importUtils";
 import { useSheetStore } from "../../../stores/sheetStore";
+import * as Haptics from "expo-haptics";
 
 type Route = RouteProp<ChatsStackParamList, "ChatScreen">;
 type Nav = NativeStackNavigationProp<ChatsStackParamList, "ChatScreen">;
@@ -184,8 +185,14 @@ export function useChatScreen() {
                     personaName,
                     personaAvatar,
                 );
-                await generateBotResponse(chatId, characterId, persona?.id ?? null);
+            } catch {
+                toast("Failed to send message", "error");
+                return;
+            }
+            try {
+                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             } catch {}
+            await generateBotResponse(chatId, characterId, persona?.id ?? null);
         },
         [
             sendMessage,
@@ -754,10 +761,13 @@ export function useChatScreen() {
 
     const handleCopyMessage = useCallback(() => {
         if (!actionsTarget) return;
-        try {
-            const Clipboard = require("expo-clipboard");
-            Clipboard.setStringAsync(actionsTarget.message.message);
-        } catch {}
+        const Clipboard = require("expo-clipboard");
+        void (async () => {
+            try {
+                await Clipboard.setStringAsync(actionsTarget.message.message);
+                toast("Message copied");
+            } catch {}
+        })();
         setActionsTarget(null);
     }, [actionsTarget]);
 

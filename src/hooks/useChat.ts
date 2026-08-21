@@ -186,7 +186,9 @@ function makeStreamCallbacks({
                             };
                         });
                     }
-                } catch {}
+                } catch {
+                    toast("Failed to send message", "error");
+                }
             }
         },
         onError: (err: Error) => {
@@ -194,8 +196,12 @@ function makeStreamCallbacks({
             storeSetGenerating(false);
             storeSetActiveThinking("");
             genAbortRef.current = null;
+            const aborted =
+                err.name === "AbortError" || err.message?.includes("cancel");
             storeUpdateOptimistically(tempMessage.id, {
-                message: `Error: ${err.message}`,
+                message: aborted
+                    ? "Generation stopped."
+                    : "Couldn't reach the model. Check your connection or proxy settings and try again.",
             });
         },
     };
@@ -380,6 +386,7 @@ export function useChat() {
             personaId: string | null,
             generateMode: string = "NEW",
         ) => {
+            if (useChatStore.getState().isGenerating) return;
             const detail = useChatStore.getState().activeChatDetail;
             if (!detail) return;
 
@@ -771,7 +778,7 @@ export function useChat() {
                     storeSetActiveThinking("");
                     storeUpdateOptimistically(tempMessage.id, {
                         message:
-                            "Error: " + (err.message || "Generation failed"),
+                            "Couldn't reach the model. Check your connection or proxy settings and try again.",
                     });
                 } else {
                     storeRemoveMessages([tempMessage.id]);

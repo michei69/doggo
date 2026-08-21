@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import MessageList from "../../../components/chat/MessageList";
 import ChatInput from "../../../components/chat/ChatInput";
+import EmptyState from "../../../components/common/EmptyState";
 import type { ChatMessage, Pronouns } from "../../../types/api";
 import { colors } from "../../../utils/colors";
 
@@ -90,6 +91,13 @@ const ChatBodyArea = React.memo(
               <Text style={styles.retryText}>Retry</Text>
             </Pressable>
           </View>
+        ) : !isLoading && messages.length === 0 ? (
+          <EmptyState
+            title={characterChatName}
+            text={`Say hello to ${characterChatName}`}
+            containerStyle={styles.emptyContainer}
+            titleStyle={styles.emptyTitle}
+          />
         ) : (
           <MessageList
             messages={messages}
@@ -156,6 +164,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 16,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  emptyTitle: {
+    color: colors.textDim,
   },
   errorText: {
     color: colors.danger,
