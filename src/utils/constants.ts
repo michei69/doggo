@@ -1,5 +1,12 @@
 export const API_BASE_URL = "https://janitorai.com/hampter";
 export const AUTH_BASE_URL = "https://auth.janitorai.com";
+export const GENERATE_ALPHA_URL = "https://janitorai.com/generateAlpha";
+export const GENERATE_ALPHA_CANCEL_URL =
+    "https://janitorai.com/generateAlpha/cancel";
+
+export type LayoutOption = "messaging" | "janitor" | "edgeToEdge";
+
+export type OptionRow = { key: string; label: string; desc?: string };
 
 export const STORAGE_KEYS = {
     ACCESS_TOKEN: "access_token",

@@ -1,4 +1,4 @@
-export interface ProcessTextOptions {
+interface ProcessTextOptions {
     /** Narration wrapper style: "" (none), "*" (italic), "**" (bold), "***" (italic+bold) */
     wrapper: string;
     /** Remove <thought>, <think>, <system>, <response> tags */

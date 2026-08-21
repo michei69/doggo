@@ -1,6 +1,8 @@
-export function formatRelativeTime(dateStr: string): string {
-    const date = new Date(dateStr);
-    const now = new Date();
+function formatShortRelative(
+    date: Date,
+    now: Date,
+    dayThreshold: number,
+): string | null {
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffHrs = Math.floor(diffMs / 3600000);
@@ -9,22 +11,21 @@ export function formatRelativeTime(dateStr: string): string {
     if (diffMins < 1) return "now";
     if (diffMins < 60) return `${diffMins}m`;
     if (diffHrs < 24) return `${diffHrs}h`;
-    if (diffDays < 7) return `${diffDays}d`;
-    return date.toLocaleDateString();
+    if (diffDays < dayThreshold) return `${diffDays}d`;
+    return null;
+}
+
+export function formatRelativeTime(dateStr: string): string {
+    const date = new Date(dateStr);
+    const now = new Date();
+    return formatShortRelative(date, now, 7) ?? date.toLocaleDateString();
 }
 
 function formatRelativeExtended(dateStr: string): string {
     const date = new Date(dateStr);
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHrs = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return "now";
-    if (diffMins < 60) return `${diffMins}m`;
-    if (diffHrs < 24) return `${diffHrs}h`;
-    if (diffDays < 30) return `${diffDays}d`;
+    const short = formatShortRelative(date, now, 30);
+    if (short !== null) return short;
 
     const months =
         (now.getFullYear() - date.getFullYear()) * 12 +

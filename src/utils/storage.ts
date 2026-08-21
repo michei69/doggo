@@ -2,11 +2,89 @@ import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { STORAGE_KEYS } from "./constants";
 
-export interface ChatLocalData {
+interface ChatLocalData {
     local_mode: boolean;
     personality: string;
     scenario: string;
 }
+
+export function createBooleanPref(key: string, defaultValue: boolean) {
+    return {
+        async set(value: boolean): Promise<void> {
+            await AsyncStorage.setItem(key, String(value));
+        },
+        async get(): Promise<boolean> {
+            const v = await AsyncStorage.getItem(key);
+            return v === null ? defaultValue : v === "true";
+        },
+    };
+}
+
+export function createStringPref(key: string, defaultValue: string | null) {
+    return {
+        async set(value: string): Promise<void> {
+            await AsyncStorage.setItem(key, value);
+        },
+        async get(): Promise<string | null> {
+            const v = await AsyncStorage.getItem(key);
+            return v ?? defaultValue;
+        },
+    };
+}
+
+export function createJsonPref<T>(key: string, defaultValue: T | null) {
+    return {
+        async set(value: T): Promise<void> {
+            await AsyncStorage.setItem(key, JSON.stringify(value));
+        },
+        async get<U = T>(): Promise<U | null> {
+            const data = await AsyncStorage.getItem(key);
+            return data ? (JSON.parse(data) as U) : (defaultValue as U | null);
+        },
+    };
+}
+
+export const chatLayoutPref = createStringPref(STORAGE_KEYS.CHAT_LAYOUT, null);
+export const showTimestampsPref = createBooleanPref(
+    STORAGE_KEYS.SHOW_TIMESTAMPS,
+    false,
+);
+export const autoFormatEnabledPref = createBooleanPref(
+    STORAGE_KEYS.AUTO_FORMAT_ENABLED,
+    false,
+);
+export const narrationWrapperPref = createStringPref(
+    STORAGE_KEYS.NARRATION_WRAPPER,
+    "*",
+);
+export const chatCenteredPref = createBooleanPref(
+    STORAGE_KEYS.CHAT_CENTERED,
+    false,
+);
+export const reviewReactionsPref = createBooleanPref(
+    STORAGE_KEYS.REVIEW_REACTIONS_ENABLED,
+    false,
+);
+export const fullResImagesPref = createBooleanPref(
+    STORAGE_KEYS.FULL_RES_IMAGES,
+    false,
+);
+export const privacyModePref = createBooleanPref(
+    STORAGE_KEYS.PRIVACY_MODE,
+    false,
+);
+export const discoverFiltersPref = createJsonPref<object>(
+    STORAGE_KEYS.DISCOVER_FILTERS,
+    null,
+);
+export const createBotStatePref = createJsonPref<object>(
+    STORAGE_KEYS.CREATE_BOT_STATE,
+    null,
+);
+export const editBotStatePref = createJsonPref<object>(
+    STORAGE_KEYS.EDIT_BOT_STATE,
+    null,
+);
 
 export const storage = {
     async setAccessToken(token: string): Promise<void> {
@@ -67,92 +145,33 @@ export const storage = {
         return AsyncStorage.getItem(STORAGE_KEYS.USER_AGENT);
     },
 
-    async setDiscoverFilters(filters: object): Promise<void> {
-        await AsyncStorage.setItem(
-            STORAGE_KEYS.DISCOVER_FILTERS,
-            JSON.stringify(filters),
-        );
-    },
+    setDiscoverFilters: discoverFiltersPref.set,
+    getDiscoverFilters: discoverFiltersPref.get,
 
-    async getDiscoverFilters<T>(): Promise<T | null> {
-        const data = await AsyncStorage.getItem(STORAGE_KEYS.DISCOVER_FILTERS);
-        return data ? JSON.parse(data) : null;
-    },
+    setChatLayout: chatLayoutPref.set,
+    getChatLayout: chatLayoutPref.get,
 
-    async setChatLayout(layout: string): Promise<void> {
-        await AsyncStorage.setItem(STORAGE_KEYS.CHAT_LAYOUT, layout);
-    },
+    setShowTimestamps: showTimestampsPref.set,
+    getShowTimestamps: showTimestampsPref.get,
 
-    async getChatLayout(): Promise<string | null> {
-        return AsyncStorage.getItem(STORAGE_KEYS.CHAT_LAYOUT);
-    },
+    setAutoFormatEnabled: autoFormatEnabledPref.set,
+    getAutoFormatEnabled: autoFormatEnabledPref.get,
 
-    async setShowTimestamps(show: boolean): Promise<void> {
-        await AsyncStorage.setItem(STORAGE_KEYS.SHOW_TIMESTAMPS, String(show));
-    },
-
-    async getShowTimestamps(): Promise<boolean> {
-        const v = await AsyncStorage.getItem(STORAGE_KEYS.SHOW_TIMESTAMPS);
-        return v === "true";
-    },
-
-    async setAutoFormatEnabled(enabled: boolean): Promise<void> {
-        await AsyncStorage.setItem(
-            STORAGE_KEYS.AUTO_FORMAT_ENABLED,
-            String(enabled),
-        );
-    },
-
-    async getAutoFormatEnabled(): Promise<boolean> {
-        const v = await AsyncStorage.getItem(STORAGE_KEYS.AUTO_FORMAT_ENABLED);
-        return v === "true";
-    },
-
-    async setNarrationWrapper(wrapper: string): Promise<void> {
-        await AsyncStorage.setItem(STORAGE_KEYS.NARRATION_WRAPPER, wrapper);
-    },
-
-    async getNarrationWrapper(): Promise<string> {
-        const v = await AsyncStorage.getItem(STORAGE_KEYS.NARRATION_WRAPPER);
-        return v ?? "*";
-    },
-
-    async setCreateBotState(state: object): Promise<void> {
-        await AsyncStorage.setItem(
-            STORAGE_KEYS.CREATE_BOT_STATE,
-            JSON.stringify(state),
-        );
-    },
-
-    async getCreateBotState<T>(): Promise<T | null> {
-        const data = await AsyncStorage.getItem(STORAGE_KEYS.CREATE_BOT_STATE);
-        return data ? JSON.parse(data) : null;
-    },
+    setNarrationWrapper: narrationWrapperPref.set,
+    getNarrationWrapper: async (): Promise<string> =>
+        (await narrationWrapperPref.get()) ?? "*",
+    setCreateBotState: createBotStatePref.set,
+    getCreateBotState: createBotStatePref.get,
 
     async removeCreateBotState(): Promise<void> {
         await AsyncStorage.removeItem(STORAGE_KEYS.CREATE_BOT_STATE);
     },
 
-    async setChatCentered(centered: boolean): Promise<void> {
-    await AsyncStorage.setItem(STORAGE_KEYS.CHAT_CENTERED, String(centered));
-  },
+    setChatCentered: chatCenteredPref.set,
+    getChatCentered: chatCenteredPref.get,
 
-  async getChatCentered(): Promise<boolean> {
-    const v = await AsyncStorage.getItem(STORAGE_KEYS.CHAT_CENTERED);
-    return v === "true";
-  },
-
-  async setEditBotState(state: object): Promise<void> {
-        await AsyncStorage.setItem(
-            STORAGE_KEYS.EDIT_BOT_STATE,
-            JSON.stringify(state),
-        );
-    },
-
-    async getEditBotState<T>(): Promise<T | null> {
-        const data = await AsyncStorage.getItem(STORAGE_KEYS.EDIT_BOT_STATE);
-        return data ? JSON.parse(data) : null;
-    },
+    setEditBotState: editBotStatePref.set,
+    getEditBotState: editBotStatePref.get,
 
     async removeEditBotState(): Promise<void> {
         await AsyncStorage.removeItem(STORAGE_KEYS.EDIT_BOT_STATE);
@@ -195,33 +214,14 @@ export const storage = {
         );
     },
 
-    async setReviewReactionsEnabled(enabled: boolean): Promise<void> {
-        await AsyncStorage.setItem(
-            STORAGE_KEYS.REVIEW_REACTIONS_ENABLED,
-            String(enabled),
-        );
-    },
+    setReviewReactionsEnabled: reviewReactionsPref.set,
+    getReviewReactionsEnabled: reviewReactionsPref.get,
 
-    async getReviewReactionsEnabled(): Promise<boolean> {
-        const v = await AsyncStorage.getItem(STORAGE_KEYS.REVIEW_REACTIONS_ENABLED);
-        return v === "true";
-    },
+    setFullResImages: fullResImagesPref.set,
+    getFullResImages: fullResImagesPref.get,
 
-    async setFullResImages(enabled: boolean): Promise<void> {
-        await AsyncStorage.setItem(STORAGE_KEYS.FULL_RES_IMAGES, String(enabled));
-    },
-    async getFullResImages(): Promise<boolean> {
-        const v = await AsyncStorage.getItem(STORAGE_KEYS.FULL_RES_IMAGES);
-        return v === "true";
-    },
-
-    async setPrivacyMode(enabled: boolean): Promise<void> {
-        await AsyncStorage.setItem(STORAGE_KEYS.PRIVACY_MODE, String(enabled));
-    },
-    async getPrivacyMode(): Promise<boolean> {
-        const v = await AsyncStorage.getItem(STORAGE_KEYS.PRIVACY_MODE);
-        return v === "true";
-    },
+    setPrivacyMode: privacyModePref.set,
+    getPrivacyMode: privacyModePref.get,
 
     async clearAll(): Promise<void> {
         await Promise.all([
