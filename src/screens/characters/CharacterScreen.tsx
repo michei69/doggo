@@ -23,7 +23,8 @@ import { useAlert } from "../../hooks/useAlert";
 import type { CharactersStackParamList } from "../../navigation/types";
 import { useAuthStore } from "../../stores/authStore";
 import { useChatStore } from "../../stores/chatStore";
-import { Heart, Ellipsis } from "lucide-react-native";
+import { Heart, Ellipsis, ArrowLeft } from "lucide-react-native";
+import * as Haptics from "expo-haptics";
 import {
   getCharacterDetail,
   deleteCharacter,
@@ -108,7 +109,7 @@ const FavoriteButton = React.memo(function FavoriteButton({
   onToggle: () => void;
 }) {
   return (
-    <Pressable onPress={onToggle} style={styles.favBtn}>
+    <Pressable onPress={onToggle} style={styles.favBtn} hitSlop={8} accessibilityRole="button" accessibilityLabel={isFavorited ? "Remove from favorites" : "Add to favorites"}>
       <Text
         style={[
           styles.favCount,
@@ -141,8 +142,13 @@ const ScreenHeader = React.memo(function ScreenHeader({
 }) {
   return (
     <View style={styles.header}>
-      <Pressable onPress={onBack} style={styles.headerBack}>
-        <Text style={styles.arrow}>{"\u2190"} Back</Text>
+      <Pressable
+        onPress={onBack}
+        style={styles.headerBack}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+      >
+        <ArrowLeft size={24} color={colors.accent} />
       </Pressable>
       <View style={styles.headerActions}>
         <FavoriteButton
@@ -150,7 +156,13 @@ const ScreenHeader = React.memo(function ScreenHeader({
           favoriteCount={favoriteCount}
           onToggle={onToggleFavorite}
         />
-        <Pressable onPress={onOpenMenu} style={styles.menuBtn}>
+        <Pressable
+          onPress={onOpenMenu}
+          style={styles.menuBtn}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="More options"
+        >
           <Ellipsis size={26} color={colors.textSecondary} />
         </Pressable>
       </View>
@@ -503,6 +515,11 @@ export default function CharacterScreen() {
           onPress: async () => {
             dismissAlert();
             try {
+              try {
+                await Haptics.notificationAsync(
+                  Haptics.NotificationFeedbackType.Success,
+                );
+              } catch {}
               await deleteCharacter(character.id);
               goBack();
             } catch (err: any) {
@@ -559,6 +576,9 @@ export default function CharacterScreen() {
     const wasFavorited = isFavorited;
     setIsFavorited(!wasFavorited);
     setFavoriteCount((c) => c + (wasFavorited ? -1 : 1));
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
     favLoadingRef.current = true;
     try {
       if (wasFavorited) {
@@ -615,6 +635,9 @@ export default function CharacterScreen() {
         isOwner={isOwner}
         dateFormat={dateFormat}
       />
+      {!latestChat && (
+        <Text style={styles.noChats}>No chats yet — start one above</Text>
+      )}
       <PersonaPicker
         visible={pickerVisible}
         onClose={() => setPickerVisible(false)}
@@ -680,12 +703,16 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   headerBack: {
-    paddingVertical: 4,
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  arrow: {
-    color: colors.accent,
-    fontSize: 16,
-    fontWeight: "600",
+  noChats: {
+    color: colors.textDim,
+    fontSize: 13,
+    textAlign: "center",
+    paddingVertical: 12,
   },
   headerActions: {
     flexDirection: "row",

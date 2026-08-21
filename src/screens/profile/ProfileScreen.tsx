@@ -92,24 +92,30 @@ export default function ProfileScreen() {
   const { navigate } = useNavigation<Nav>();
   const isTablet = useIsTablet();
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadProfile = useCallback(async () => {
+    try {
+      const data = await getMyProfile();
+      setProfile(data);
+      setError(null);
+    } catch (err: any) {
+      setError(err?.message || "Failed to load profile");
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      const fetchProfile = async () => {
-        try {
-          const data = await getMyProfile();
-          if (!cancelled) setProfile(data);
-        } catch {}
-      };
-      fetchProfile();
-      return () => {
-        cancelled = true;
-      };
-    }, []),
+      loadProfile();
+    }, [loadProfile]),
   );
 
-  const isLoading = profile === null;
+  const handleRetry = useCallback(() => {
+    setError(null);
+    loadProfile();
+  }, [loadProfile]);
+
+  const isLoading = profile === null && error === null;
   const displayName =
     profile?.name || user?.user_metadata?.email || user?.email || "User";
   const username = profile?.user_name || "";
@@ -235,6 +241,29 @@ export default function ProfileScreen() {
     </View>
   );
 
+  if (error) {
+    return (
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.errorContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.errorWrap}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Pressable
+            onPress={handleRetry}
+            style={({ pressed }) => [
+              styles.retryBtn,
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <Text style={styles.retryText}>Retry</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView
       style={styles.container}
@@ -273,6 +302,33 @@ const styles = StyleSheet.create({
   contentTablet: {
     paddingTop: 40,
     paddingHorizontal: 24,
+  },
+  errorContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    padding: 20,
+  },
+  errorWrap: {
+    alignItems: "center",
+    gap: 16,
+  },
+  errorText: {
+    color: colors.danger,
+    fontSize: 16,
+    textAlign: "center",
+  },
+  retryBtn: {
+    backgroundColor: colors.card,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  retryText: {
+    color: colors.accent,
+    fontSize: 14,
+    fontWeight: "600",
   },
   tabletRow: {
     flexDirection: "row",

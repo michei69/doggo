@@ -332,7 +332,7 @@ const AboutSection = React.memo(function AboutSection() {
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>About</Text>
       <View style={styles.placeholder}>
-        <Text style={styles.placeholderText}>Janitor AI</Text>
+        <Text style={styles.placeholderText}>Janitor AI Companion</Text>
         <Text style={styles.versionText}>Version 1.0.0</Text>
       </View>
     </View>

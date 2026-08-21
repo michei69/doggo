@@ -5,7 +5,9 @@ import {
 } from "react";
 import {
   View,
+  Text,
   ActivityIndicator,
+  Pressable,
   StyleSheet,
   useWindowDimensions,
   BackHandler,
@@ -57,6 +59,7 @@ export default function MyPersonasScreen() {
   const [personaGroups, setPersonaGroups] = useState<PersonaGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { width: screenWidth } = useWindowDimensions();
 
   const [alertVisible, setAlertVisible] = useState(false);
@@ -169,7 +172,10 @@ export default function MyPersonasScreen() {
       setProfile(p);
       setPersonas(ps);
       setPersonaGroups(gs);
-    } catch {}
+      setError(null);
+    } catch (err: any) {
+      setError(err?.message || "Failed to load personas");
+    }
   }, []);
 
   useFocusEffect(
@@ -190,6 +196,13 @@ export default function MyPersonasScreen() {
     setRefreshing(true);
     await loadData();
     setRefreshing(false);
+  }, [loadData]);
+
+  const handleRetry = useCallback(async () => {
+    setError(null);
+    setLoading(true);
+    await loadData();
+    setLoading(false);
   }, [loadData]);
 
   const closePersonaDeleteAlert = useCallback(() => {
@@ -222,6 +235,26 @@ export default function MyPersonasScreen() {
       <View style={styles.container}>
         <ScreenHeader goBack={goBack} />
         <ActivityIndicator color={colors.accent} style={styles.loader} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <ScreenHeader goBack={goBack} />
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Pressable
+            onPress={handleRetry}
+            style={({ pressed }) => [
+              styles.retryBtn,
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <Text style={styles.retryText}>Retry</Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
@@ -323,6 +356,31 @@ export default function MyPersonasScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   loader: { flex: 1, justifyContent: "center", alignItems: "center" },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 16,
+    padding: 20,
+  },
+  errorText: {
+    color: colors.danger,
+    fontSize: 16,
+    textAlign: "center",
+  },
+  retryBtn: {
+    backgroundColor: colors.card,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  retryText: {
+    color: colors.accent,
+    fontSize: 14,
+    fontWeight: "600",
+  },
   content: { flex: 1 },
   contentSliding: { flex: 1, flexDirection: "row" },
 });

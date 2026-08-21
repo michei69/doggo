@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Eye, EyeOff } from "lucide-react-native";
 import Button from "../../components/common/Button";
 import TextInput from "../../components/common/TextInput";
 import { useAuthStore } from "../../stores/authStore";
@@ -97,10 +98,14 @@ export default function LoginScreen() {
           <Pressable
             onPress={() => setShowPassword(!showPassword)}
             style={styles.eyeBtn}
+            accessibilityRole="button"
+            accessibilityLabel={showPassword ? "Hide password" : "Show password"}
           >
-            <Text style={styles.eyeIcon}>
-              {showPassword ? "\u25C9" : "\u25CE"}
-            </Text>
+            {showPassword ? (
+              <EyeOff size={20} color={colors.textFaint} />
+            ) : (
+              <Eye size={20} color={colors.textFaint} />
+            )}
           </Pressable>
         </View>
 
@@ -182,9 +187,5 @@ const styles = StyleSheet.create({
     right: 12,
     top: 30,
     padding: 8,
-  },
-  eyeIcon: {
-    color: colors.textFaint,
-    fontSize: 18,
   },
 });
