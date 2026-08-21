@@ -83,7 +83,7 @@ const EdgeToEdgeSkeleton = React.memo(function EdgeToEdgeSkeleton() {
             <View style={styles.skelAvatarXs} />
             <View style={styles.skelNameBar} />
           </View>
-          <View style={[styles.skelMsgCardFull, { height: h }]} />
+          <View style={[styles.skelMsgCardFull, { height: h, marginHorizontal: 12 }]} />
         </View>
       ))}
     </View>
@@ -529,11 +529,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   skelGroup: {
-    alignSelf: "flex-start",
+    width: "100%",
+    alignItems: "flex-start",
     marginBottom: 12,
   },
   skelAlignEnd: {
-    alignSelf: "flex-end",
+    alignItems: "flex-end",
   },
   skelAvatarRow: {
     flexDirection: "row",

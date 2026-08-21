@@ -347,13 +347,19 @@ const ChatListLoading = React.memo(function ChatListLoading() {
   return (
     <View style={styles.container}>
       <ChatListHeader />
+      <View style={styles.skelSearchBar} />
       <Skeleton>
-        {[0, 1, 2, 3, 4, 5].map((i) => (
-          <View key={i} style={styles.skeletonRow}>
+        {[0, 1, 2, 3, 4].map((i) => (
+          <View key={i} style={styles.chatItem}>
             <View style={styles.skeletonAvatar} />
-            <View style={styles.skeletonInfo}>
-              <View style={styles.skeletonName} />
-              <View style={styles.skeletonSummary} />
+            <View style={styles.chatInfo}>
+              <View style={styles.chatTopRow}>
+                <View style={styles.skeletonName} />
+                <View style={styles.skelTimeStub} />
+              </View>
+              <View style={[styles.skeletonSummary, { marginTop: 8 }]} />
+              <View style={[styles.skeletonSummary, { width: "70%", marginTop: 6 }]} />
+              <View style={styles.skelCountBar} />
             </View>
           </View>
         ))}
@@ -570,15 +576,33 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 12,
   },
+  skelSearchBar: {
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: colors.overlayLight,
+    marginHorizontal: 16,
+    marginBottom: 8,
+  },
+  skelTimeStub: {
+    width: 28,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.border,
+    marginLeft: 8,
+  },
+  skelCountBar: {
+    width: 80,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.accent,
+    opacity: 0.6,
+    marginTop: 8,
+  },
   skeletonAvatar: {
     width: 52,
     height: 52,
     borderRadius: 26,
     backgroundColor: colors.border,
-  },
-  skeletonInfo: {
-    flex: 1,
-    gap: 8,
   },
   skeletonName: {
     height: 14,
