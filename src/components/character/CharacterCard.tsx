@@ -3,6 +3,8 @@ import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, withSpring } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import * as Haptics from "expo-haptics";
+import Toast from "react-native-toast-message";
 import CharacterIdentity from "./CharacterIdentity";
 import { colors } from "../../utils/colors";
 import type { TrendingCharacter } from "../../types/api";
@@ -24,14 +26,30 @@ export default function CharacterCard({
 }) {
   const handleSwipe = useCallback(() => {
     onToggleHidden?.();
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    Toast.show({
+      type: "success",
+      text1: "Hidden",
+      position: "top",
+      visibilityTime: 4000,
+      autoHide: true,
+      topOffset: 45,
+      onPress: () => onToggleHidden?.(),
+    });
   }, [onToggleHidden]);
 
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
-        .activeOffsetX([-20, 20])
+        .activeOffsetX([-30, 30])
         .failOffsetY([-10, 10])
-        .onEnd(() => scheduleOnRN(handleSwipe)),
+        .onEnd((e) => {
+          if (Math.abs(e.translationX) > 60) {
+            scheduleOnRN(handleSwipe);
+          }
+        }),
     [handleSwipe],
   );
 

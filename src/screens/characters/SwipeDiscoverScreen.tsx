@@ -42,6 +42,7 @@ export default function SwipeDiscoverScreen() {
     const [pickerVisible, setPickerVisible] = useState(false);
     const [pendingCharacter, setPendingCharacter] =
         useState<TrendingCharacter | null>(null);
+    const [cardGeneration, setCardGeneration] = useState(0);
     const createChat = useChatStore((s) => s.createChat);
     const { alert, showAlert, dismissAlert } = useAlert();
 
@@ -66,7 +67,6 @@ export default function SwipeDiscoverScreen() {
             if (direction === "right") {
                 setPendingCharacter(character);
                 setPickerVisible(true);
-                setDeckIndex((i) => Math.min(i + 1, deck.length));
             } else if (direction === "down") {
                 setDeckIndex((i) => Math.min(i + 1, deck.length));
             } else {
@@ -84,6 +84,7 @@ export default function SwipeDiscoverScreen() {
             setPendingCharacter(null);
             try {
                 const chatId = await createChat(character.id, persona?.id);
+                setDeckIndex((i) => Math.min(i + 1, deck.length));
                 navigate("ChatsTab", {
                     screen: "ChatScreen",
                     params: {
@@ -93,6 +94,7 @@ export default function SwipeDiscoverScreen() {
                     },
                 });
             } catch {
+                setCardGeneration((g) => g + 1);
                 showAlert(
                     "Failed to start chat",
                     "Something went wrong. Please try again.",
@@ -100,7 +102,7 @@ export default function SwipeDiscoverScreen() {
                 );
             }
         },
-        [pendingCharacter, createChat, navigate, showAlert, dismissAlert],
+        [pendingCharacter, createChat, navigate, showAlert, dismissAlert, deck.length],
     );
 
     const handleRestart = useCallback(() => {
@@ -156,7 +158,7 @@ export default function SwipeDiscoverScreen() {
                     )}
                     {current ? (
                         <SwipeCard
-                            key={current.id}
+                            key={`${current.id}-${cardGeneration}`}
                             character={current}
                             onSwiped={handleSwiped}
                         />
@@ -202,6 +204,7 @@ export default function SwipeDiscoverScreen() {
                 onClose={() => {
                     setPickerVisible(false);
                     setPendingCharacter(null);
+                    setCardGeneration((g) => g + 1);
                 }}
                 onSelect={handlePersonaSelect}
                 characterName={pendingCharacter?.name ?? ""}

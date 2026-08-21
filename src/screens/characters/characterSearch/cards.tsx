@@ -52,6 +52,15 @@ export const CharacterList = React.memo(function CharacterList({
         return (
             <View style={styles.listLoader}>
                 <Text style={styles.errorText}>{error}</Text>
+                <Pressable
+                    onPress={onRefresh}
+                    style={({ pressed }) => [
+                        styles.retryBtn,
+                        pressed && { opacity: 0.7 },
+                    ]}
+                >
+                    <Text style={styles.retryText}>Retry</Text>
+                </Pressable>
             </View>
         );
     }
@@ -236,6 +245,18 @@ const styles = StyleSheet.create({
     errorText: {
         color: colors.danger,
         fontSize: 16,
+    },
+    retryBtn: {
+        marginTop: 16,
+        backgroundColor: colors.border,
+        borderRadius: 10,
+        paddingHorizontal: 24,
+        paddingVertical: 10,
+    },
+    retryText: {
+        color: colors.textSecondary,
+        fontSize: 14,
+        fontWeight: "600",
     },
     creatorCard: {
         backgroundColor: colors.card,

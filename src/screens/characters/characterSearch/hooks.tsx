@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { StyleSheet } from "react-native";
+import * as Haptics from "expo-haptics";
 import { getCharacters, searchProfiles } from "../../../api/characters";
 import { getBlockedContent, updateBlockedContent } from "../../../api/profile";
 import CharacterCard from "../../../components/character/CharacterCard";
 import type { AlertButton } from "../../../components/common/CustomAlert";
 import type { SwipeDiscoverParams } from "../../../navigation/types";
+import { toast } from "../../../utils/toast";
 import type {
     ProfileSearchResponse,
     ProfileSearchResult,
@@ -167,6 +169,12 @@ export function useBlockAlert(
                                     blocked.bots.push(character.id);
                                 }
                                 await updateBlockedContent(blocked);
+                                try {
+                                    await Haptics.notificationAsync(
+                                        Haptics.NotificationFeedbackType.Success,
+                                    );
+                                } catch {}
+                                toast("Character blocked");
                             } catch {}
                         },
                     },
