@@ -465,6 +465,7 @@ function useCreatorCharacterList(userId: string) {
     total: 0,
     error: null,
   });
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const pageRef = useRef(1);
   const emptyPagesRef = useRef(0);
   const reachedEndRef = useRef(false);
@@ -550,12 +551,23 @@ function useCreatorCharacterList(userId: string) {
     [doFetch],
   );
 
+  const removeCharacter = useCallback((id: string) => {
+    setRemovedIds((prev) => new Set(prev).add(id));
+  }, []);
+
+  const characters = useMemo(
+    () => list.characters.filter((c) => !removedIds.has(c.id)),
+    [list.characters, removedIds],
+  );
+
   return {
     list,
+    characters,
     filters,
     handleLoadMore,
     handleRefresh,
     handleApplyFilters,
+    removeCharacter,
   };
 }
 export default function CreatorScreen() {
@@ -607,11 +619,22 @@ export default function CreatorScreen() {
 
   const filterModalRef = useRef<FilterModalHandle>(null);
 
-  const { list, filters, handleLoadMore, handleRefresh, handleApplyFilters } =
-    useCreatorCharacterList(userId);
+  const {
+    list,
+    characters,
+    filters,
+    handleLoadMore,
+    handleRefresh,
+    handleApplyFilters,
+    removeCharacter,
+  } = useCreatorCharacterList(userId);
 
   const { alert, showAlert, dismissAlert } = useAlert();
-  const showBlockAlert = useBlockAlert(showAlert, dismissAlert);
+  const showBlockAlert = useBlockAlert(
+    showAlert,
+    dismissAlert,
+    removeCharacter,
+  );
   const {
     longPressCharacter,
     actionsVisible,
@@ -686,7 +709,7 @@ export default function CreatorScreen() {
 
   const characterList = (
     <CharacterList
-      characters={list.characters}
+      characters={characters}
       loading={list.loading}
       refreshing={list.refreshing}
       onRefresh={handleRefresh}

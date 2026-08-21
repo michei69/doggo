@@ -14,19 +14,13 @@ import {
 } from "react-native";
 import Animated from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import CustomAlert, {
   type AlertButton,
 } from "../../components/common/CustomAlert";
 import { useAuthStore } from "../../stores/authStore";
-import {
-  getMyProfile,
-  getMyPersonas,
-  getPersonaGroups,
-} from "../../api/profile";
 import type {
-  UserProfile,
   Persona,
   PersonaGroup,
 } from "../../types/api";
@@ -38,6 +32,7 @@ import {
   usePersonaSheet,
   useGroupSheet,
   useDragReorder,
+  useMyPersonasData,
 } from "./myPersonas/hooks";
 import {
   ScreenHeader,
@@ -54,12 +49,19 @@ export default function MyPersonasScreen() {
   const { goBack } = useNavigation<Nav>();
   const user = useAuthStore((s) => s.user);
 
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [personas, setPersonas] = useState<Persona[]>([]);
-  const [personaGroups, setPersonaGroups] = useState<PersonaGroup[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    profile,
+    setProfile,
+    personas,
+    setPersonas,
+    personaGroups,
+    setPersonaGroups,
+    loading,
+    refreshing,
+    error,
+    handleRefresh,
+    handleRetry,
+  } = useMyPersonasData();
   const { width: screenWidth } = useWindowDimensions();
 
   const [alertVisible, setAlertVisible] = useState(false);
@@ -161,49 +163,6 @@ export default function MyPersonasScreen() {
     setDeleteAlertVisible,
     setDeleteGroupAlert,
   ]);
-
-  const loadData = useCallback(async () => {
-    try {
-      const [p, ps, gs] = await Promise.all([
-        getMyProfile(),
-        getMyPersonas(),
-        getPersonaGroups().catch(() => [] as PersonaGroup[]),
-      ]);
-      setProfile(p);
-      setPersonas(ps);
-      setPersonaGroups(gs);
-      setError(null);
-    } catch (err: any) {
-      setError(err?.message || "Failed to load personas");
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-      const load = async () => {
-        await loadData();
-        if (!cancelled) setLoading(false);
-      };
-      load();
-      return () => {
-        cancelled = true;
-      };
-    }, [loadData]),
-  );
-
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  }, [loadData]);
-
-  const handleRetry = useCallback(async () => {
-    setError(null);
-    setLoading(true);
-    await loadData();
-    setLoading(false);
-  }, [loadData]);
 
   const closePersonaDeleteAlert = useCallback(() => {
     setDeleteAlertVisible(false);

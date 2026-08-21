@@ -186,6 +186,7 @@ export const ResultsList = React.memo(function ResultsList({
     refreshingCreators,
     onEndReachedCreators,
     loadingCreators,
+    creatorsError,
     hasMoreCreators,
 }: {
     discoveryMode: DiscoveryMode;
@@ -211,6 +212,7 @@ export const ResultsList = React.memo(function ResultsList({
     refreshingCreators: boolean;
     onEndReachedCreators: () => void;
     loadingCreators: boolean;
+    creatorsError: string | null;
     hasMoreCreators: boolean;
 }) {
     if (discoveryMode === "characters") {
@@ -236,6 +238,7 @@ export const ResultsList = React.memo(function ResultsList({
             onRefresh={onRefresh}
             onEndReached={onEndReachedCreators}
             loading={loadingCreators}
+            error={creatorsError}
             hasMore={hasMoreCreators}
         />
     );

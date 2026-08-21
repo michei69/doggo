@@ -101,6 +101,7 @@ export const CreatorList = React.memo(function CreatorList({
     onRefresh,
     onEndReached,
     loading,
+    error,
     hasMore,
 }: {
     data: ProfileSearchResult[];
@@ -113,9 +114,26 @@ export const CreatorList = React.memo(function CreatorList({
     onRefresh: () => void;
     onEndReached: () => void;
     loading: boolean;
+    error: string | null;
     hasMore: boolean;
 }) {
     const refreshControl = useRefreshControl(refreshing, onRefresh);
+    if (error && data.length === 0) {
+        return (
+            <View style={styles.listLoader}>
+                <Text style={styles.errorText}>{error}</Text>
+                <Pressable
+                    onPress={onRefresh}
+                    style={({ pressed }) => [
+                        styles.retryBtn,
+                        pressed && { opacity: 0.7 },
+                    ]}
+                >
+                    <Text style={styles.retryText}>Retry</Text>
+                </Pressable>
+            </View>
+        );
+    }
     if (loading && data.length === 0) {
         return (
             <View style={styles.listLoader}>
@@ -135,7 +153,7 @@ export const CreatorList = React.memo(function CreatorList({
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
-                !loading ? (
+                !loading && !error ? (
                     <EmptyState
                         text="No creators found"
                         containerStyle={styles.listLoader}

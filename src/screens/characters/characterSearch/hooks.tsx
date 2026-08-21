@@ -56,11 +56,19 @@ export function useHiddenCharacters() {
         });
     }, []);
 
+    const handleHideCharacter = useCallback((characterId: string) => {
+        setHiddenIds((prev) => {
+            const next = new Set(prev);
+            next.add(characterId);
+            return next;
+        });
+    }, []);
+
     useEffect(() => {
         storage.setHiddenCharacters([...hiddenIds]);
     }, [hiddenIds]);
 
-    return { hiddenIds, handleToggleHidden };
+    return { hiddenIds, handleToggleHidden, handleHideCharacter };
 }
 
 export function useDiscoverState(params: SearchRoute["params"]) {
@@ -151,6 +159,7 @@ export function useAdvancedSearch() {
 export function useBlockAlert(
     showAlert: (title: string, message: string, buttons: AlertButton[]) => void,
     dismissAlert: () => void,
+    onBlocked?: (characterId: string) => void,
 ) {
     return useCallback(
         (character: TrendingCharacter) => {
@@ -175,6 +184,7 @@ export function useBlockAlert(
                                     );
                                 } catch {}
                                 toast("Character blocked");
+                                onBlocked?.(character.id);
                             } catch {}
                         },
                     },
@@ -186,7 +196,7 @@ export function useBlockAlert(
                 ],
             );
         },
-        [showAlert, dismissAlert],
+        [showAlert, dismissAlert, onBlocked],
     );
 }
 
@@ -328,13 +338,29 @@ export function useCreators() {
         [handleLoadMore],
     );
 
+    const [removedCreatorIds, setRemovedCreatorIds] = useState<Set<string>>(
+        new Set(),
+    );
+
+    const removeCreator = useCallback((id: string) => {
+        setRemovedCreatorIds((prev) => new Set(prev).add(id));
+    }, []);
+
+    const creators = useMemo(
+        () =>
+            state.characters.filter((c) => !removedCreatorIds.has(c.id)),
+        [state.characters, removedCreatorIds],
+    );
+
     return {
-        creators: state.characters,
+        creators,
         creatorsTotal: state.total,
         creatorsLoading: state.loading,
         creatorsRefreshing: state.refreshing,
+        creatorsError: state.error,
         doFetchCreators,
         handleLoadMoreCreators,
+        removeCreator,
     };
 }
 

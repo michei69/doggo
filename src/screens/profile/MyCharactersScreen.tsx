@@ -51,7 +51,9 @@ export default function MyCharactersScreen() {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const { alert, showAlert, dismissAlert } = useAlert();
-  const showBlockAlert = useBlockAlert(showAlert, dismissAlert);
+  const showBlockAlert = useBlockAlert(showAlert, dismissAlert, (id) =>
+    setCharacters((prev) => prev.filter((c) => c.id !== id)),
+  );
   const {
     longPressCharacter,
     actionsVisible,

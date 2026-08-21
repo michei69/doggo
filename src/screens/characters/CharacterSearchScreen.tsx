@@ -186,7 +186,8 @@ export default function CharacterSearchScreen() {
   const [discoveryMode, setDiscoveryMode] =
     useState<DiscoveryMode>("characters");
   const [allTags, setAllTags] = useState<TagEntry[]>([]);
-  const { hiddenIds, handleToggleHidden } = useHiddenCharacters();
+  const { hiddenIds, handleToggleHidden, handleHideCharacter } =
+    useHiddenCharacters();
   const {
     filters,
     setFilters,
@@ -209,12 +210,17 @@ export default function CharacterSearchScreen() {
     setHideDarkened,
   } = useAdvancedSearch();
   const { alert, showAlert, dismissAlert } = useAlert();
-  const showBlockAlert = useBlockAlert(showAlert, dismissAlert);
+  const showBlockAlert = useBlockAlert(
+    showAlert,
+    dismissAlert,
+    handleHideCharacter,
+  );
   const {
     creators,
     creatorsTotal,
     creatorsLoading,
     creatorsRefreshing,
+    creatorsError,
     doFetchCreators,
     handleLoadMoreCreators,
   } = useCreators();
@@ -405,6 +411,7 @@ export default function CharacterSearchScreen() {
         refreshingCreators={creatorsRefreshing}
         onEndReachedCreators={handleLoadMoreCreators}
         loadingCreators={creatorsLoading}
+        creatorsError={creatorsError}
         hasMoreCreators={creatorsLoading && creators.length > 0}
       />
       <DiscoverModals
