@@ -1,4 +1,5 @@
 import type { NavigatorScreenParams } from "@react-navigation/native";
+import type { CharacterSearchParams } from "../types/api";
 
 export type AuthStackParamList = {
     Login: undefined;
@@ -13,25 +14,26 @@ export type ChatsStackParamList = {
     CreatorScreen: { userId: string; userName: string };
 };
 
-export interface SwipeDiscoverParams {
-    search?: string;
+export type DiscoverParamsLike = Pick<
+    CharacterSearchParams,
+    "search" | "sort" | "mode" | "messages_mode" | "tokens_mode"
+> & {
     tag_id?: string;
     custom_tags?: string;
-    mode?: string;
-    sort?: string;
     messages?: string;
-    messages_mode?: string;
     tokens?: string;
-    tokens_mode?: string;
     proxyenabled?: string;
     tag?: string;
+};
+
+export interface SwipeDiscoverParams extends DiscoverParamsLike {
     advancedKeywords?: string;
     advancedBlacklist?: string;
     keywordMatchMode?: "any" | "all";
 }
 
 export type CharactersStackParamList = {
-    CharacterSearch: { search?: string; tag_id?: string; custom_tags?: string; mode?: string; sort?: string; messages?: string; messages_mode?: string; tokens?: string; tokens_mode?: string; proxyenabled?: string; tag?: string } | undefined;
+    CharacterSearch: DiscoverParamsLike | undefined;
     CharacterScreen: { characterId: string; characterName: string };
     CreatorScreen: { userId: string; userName: string };
     SwipeDiscover: SwipeDiscoverParams;
