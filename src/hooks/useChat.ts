@@ -48,16 +48,10 @@ export async function withChallengeRetry<T>(
         return await call();
     } catch (err: any) {
         if (err.challengeHtml && err.needsCloudflareChallenge) {
-            console.log(
-                "[API] showing Cloudflare challenge, retrying after solve",
-            );
             await showChallenge(err.challengeHtml);
             return await call();
         }
         if (err.response?.status === 401) {
-            console.log(
-                "[API] 401 detected, showing Turnstile for new clearance",
-            );
             const token = await showTurnstile(TURNSTILE_LOGIN_SITE_KEY);
             useAuthStore.getState().setCfClearance(token);
             return await call();
@@ -165,7 +159,7 @@ function makeStreamCallbacks({
                         showChallenge,
                         showTurnstile,
                     );
-                    const savedMsg = rawResponse?.data ?? rawResponse;
+                    const savedMsg = rawResponse;
                     if (Array.isArray(savedMsg)) {
                         onMessageSaved?.();
                         useChatStore.setState((s) => {
@@ -300,7 +294,7 @@ export function useChat() {
                     showChallenge,
                     showTurnstile,
                 );
-                const message = rawResponse?.data ?? rawResponse;
+                const message = rawResponse;
                 storeAddMessage(message[0]);
                 storeSetSending(false);
                 return message[0];
@@ -826,7 +820,7 @@ export function useChat() {
                         showChallenge,
                         showTurnstile,
                     );
-                    const savedMsg = rawResponse?.data ?? rawResponse;
+                    const savedMsg = rawResponse;
                     storeRemoveMessages([last.id]);
                     if (Array.isArray(savedMsg)) {
                         storeAddMessage(savedMsg[0]);
