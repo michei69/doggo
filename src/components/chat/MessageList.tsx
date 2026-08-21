@@ -11,6 +11,7 @@ import {
   Text,
   Pressable,
 } from "react-native";
+import type { DimensionValue } from "react-native";
 import { FlashList, type FlashListRef } from "@shopify/flash-list";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Skeleton from "../common/Skeleton";
@@ -23,6 +24,71 @@ import { scheduleOnRN } from "react-native-worklets";
 import { setMessageMainState } from "../../api/chats";
 
 import { groupMessages, type MessageGroup } from "../../utils/messages";
+
+const SKELETON_BUBBLE_HEIGHTS = [64, 96, 56, 120, 72, 88];
+const SKELETON_BUBBLE_WIDTHS: DimensionValue[] = ["70%", "55%", "80%", "45%", "65%", "75%"];
+
+const MessagingSkeleton = React.memo(function MessagingSkeleton() {
+  return (
+    <View style={styles.flashlist}>
+      {SKELETON_BUBBLE_HEIGHTS.map((h, i) => {
+        const right = i % 2 === 1;
+        return (
+          <View
+            key={i}
+            style={[styles.skelGroup, right && styles.skelAlignEnd]}
+          >
+            <View style={[styles.skelAvatarRow, right && styles.skelAlignEnd]}>
+              <View style={styles.skelAvatarXs} />
+              <View style={styles.skelNameBar} />
+            </View>
+            <View
+              style={[
+                styles.skelMsgCard,
+                {
+                  width: SKELETON_BUBBLE_WIDTHS[i % SKELETON_BUBBLE_WIDTHS.length],
+                  height: h,
+                },
+              ]}
+            />
+          </View>
+        );
+      })}
+    </View>
+  );
+});
+
+const JanitorSkeleton = React.memo(function JanitorSkeleton() {
+  return (
+    <View style={styles.flashlist}>
+      {SKELETON_BUBBLE_HEIGHTS.map((h, i) => (
+        <View key={i} style={styles.skelJanitorRow}>
+          <View style={styles.skelAvatarMd} />
+          <View style={styles.skelJanitorContent}>
+            <View style={styles.skelNameBold} />
+            <View style={[styles.skelMsgCardFull, { height: h }]} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+});
+
+const EdgeToEdgeSkeleton = React.memo(function EdgeToEdgeSkeleton() {
+  return (
+    <View style={styles.flashlist}>
+      {SKELETON_BUBBLE_HEIGHTS.map((h, i) => (
+        <View key={i} style={styles.skelEdgeGroup}>
+          <View style={styles.skelAvatarRow}>
+            <View style={styles.skelAvatarXs} />
+            <View style={styles.skelNameBar} />
+          </View>
+          <View style={[styles.skelMsgCardFull, { height: h }]} />
+        </View>
+      ))}
+    </View>
+  );
+});
 
 const MessageGroupRenderer = React.memo(
   function MessageGroupRenderer({
@@ -328,6 +394,7 @@ export default function MessageList({
   onReroll?: () => void;
 }) {
   const listRef = useRef<FlashListRef<MessageGroup>>(null);
+  const chatLayout = useChatStore((s) => s.chatLayout);
   const didInitialScrollRef = useRef(false);
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isNearBottomRef = useRef(true);
@@ -420,14 +487,13 @@ export default function MessageList({
   if (isLoading) {
     return (
       <Skeleton style={{ flex: 1 }}>
-        <View style={styles.flashlist}>
-          {[0, 1, 2, 3, 4].map((i) => (
-            <View key={i} style={styles.skeletonRow}>
-              <View style={[styles.skeletonAvatar, i % 2 === 0 && styles.skeletonAvatarRight]} />
-              <View style={[styles.skeletonBubble, i % 2 === 0 && styles.skeletonBubbleRight]} />
-            </View>
-          ))}
-        </View>
+        {chatLayout === "janitor" ? (
+          <JanitorSkeleton />
+        ) : chatLayout === "edgeToEdge" ? (
+          <EdgeToEdgeSkeleton />
+        ) : (
+          <MessagingSkeleton />
+        )}
       </Skeleton>
     );
   }
@@ -462,31 +528,67 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  skeletonRow: {
+  skelGroup: {
+    alignSelf: "flex-start",
+    marginBottom: 12,
+  },
+  skelAlignEnd: {
+    alignSelf: "flex-end",
+  },
+  skelAvatarRow: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
+    gap: 6,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 2,
+  },
+  skelAvatarXs: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.border,
+  },
+  skelNameBar: {
+    width: 64,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.border,
+  },
+  skelMsgCard: {
+    marginHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: colors.border,
+  },
+  skelJanitorRow: {
+    flexDirection: "row",
     paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 8,
   },
-  skeletonAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  skelAvatarMd: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.border,
   },
-  skeletonAvatarRight: {
-    marginLeft: "auto",
-  },
-  skeletonBubble: {
+  skelJanitorContent: {
     flex: 1,
-    height: 56,
+  },
+  skelNameBold: {
+    width: 90,
+    height: 14,
+    borderRadius: 7,
+    marginBottom: 4,
+    backgroundColor: colors.border,
+  },
+  skelMsgCardFull: {
+    alignSelf: "stretch",
     borderRadius: 12,
     backgroundColor: colors.border,
-    maxWidth: "70%",
   },
-  skeletonBubbleRight: {
-    marginLeft: "auto",
+  skelEdgeGroup: {
+    marginBottom: 10,
   },
   variantNav: {
     flexDirection: "row",
