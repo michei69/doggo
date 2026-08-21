@@ -6,7 +6,7 @@ import {
   StyleSheet,
   Pressable,
 } from "react-native";
-import { Skeleton } from "boneyard-js/native";
+import Skeleton from "../../components/common/Skeleton";
 import {
   type RouteProp,
   useRoute,
@@ -55,30 +55,23 @@ type Route = RouteProp<CharactersStackParamList, "CharacterScreen">;
 
 const LoadingState = React.memo(function LoadingState() {
   return (
-    <Skeleton
-      name="character-screen"
-      loading
-      animate="shimmer"
-      fallback={
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.accent} />
+    <View style={styles.centered}>
+      <Skeleton>
+        <View style={styles.skeletonContainer}>
+          <View style={styles.skeletonAvatar} />
+          <View style={styles.skeletonNameRow}>
+            <View style={styles.skeletonLine} />
+            <View style={[styles.skeletonLine, { width: "50%", marginTop: 8 }]} />
+          </View>
+          <View style={styles.skeletonStatsRow}>
+            {[0, 1, 2].map((i) => (
+              <View key={i} style={styles.skeletonStatChip} />
+            ))}
+          </View>
+          <View style={[styles.skeletonLine, { width: "100%", height: 80, marginTop: 16 }]} />
         </View>
-      }
-    >
-      <View style={styles.skeletonContainer}>
-        <View style={styles.skeletonAvatar} />
-        <View style={styles.skeletonNameRow}>
-          <View style={styles.skeletonLine} />
-          <View style={[styles.skeletonLine, { width: "50%", marginTop: 8 }]} />
-        </View>
-        <View style={styles.skeletonStatsRow}>
-          {[0, 1, 2].map((i) => (
-            <View key={i} style={styles.skeletonStatChip} />
-          ))}
-        </View>
-        <View style={[styles.skeletonLine, { width: "100%", height: 80, marginTop: 16 }]} />
-      </View>
-    </Skeleton>
+      </Skeleton>
+    </View>
   );
 });
 

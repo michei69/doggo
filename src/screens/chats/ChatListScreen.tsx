@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import type { ListRenderItem } from "@shopify/flash-list";
-import { Skeleton } from "boneyard-js/native";
+import Skeleton from "../../components/common/Skeleton";
 import { Search } from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -345,21 +345,9 @@ const ChatListHeader = React.memo(function ChatListHeader() {
 
 const ChatListLoading = React.memo(function ChatListLoading() {
   return (
-    <Skeleton
-      name="chat-list"
-      loading
-      animate="shimmer"
-      fallback={
-        <View style={styles.container}>
-          <ChatListHeader />
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color={colors.accent} />
-          </View>
-        </View>
-      }
-    >
-      <View style={styles.container}>
-        <ChatListHeader />
+    <View style={styles.container}>
+      <ChatListHeader />
+      <Skeleton>
         {[0, 1, 2, 3, 4, 5].map((i) => (
           <View key={i} style={styles.skeletonRow}>
             <View style={styles.skeletonAvatar} />
@@ -369,8 +357,8 @@ const ChatListLoading = React.memo(function ChatListLoading() {
             </View>
           </View>
         ))}
-      </View>
-    </Skeleton>
+      </Skeleton>
+    </View>
   );
 });
 

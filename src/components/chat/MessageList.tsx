@@ -6,7 +6,6 @@ import React, {
   useState,
 } from "react";
 import {
-  ActivityIndicator,
   View,
   StyleSheet,
   Text,
@@ -14,7 +13,7 @@ import {
 } from "react-native";
 import { FlashList, type FlashListRef } from "@shopify/flash-list";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { Skeleton } from "boneyard-js/native";
+import Skeleton from "../common/Skeleton";
 import ChatBubble from "./ChatBubble";
 import type { ChatMessage } from "../../types/api";
 import type { Pronouns } from "../../types/api";
@@ -420,16 +419,7 @@ export default function MessageList({
 
   if (isLoading) {
     return (
-      <Skeleton
-        name="message-list"
-        loading
-        animate="shimmer"
-        fallback={
-          <View style={styles.loading}>
-            <ActivityIndicator size="large" color={colors.accent} />
-          </View>
-        }
-      >
+      <Skeleton>
         <View style={styles.flashlist}>
           {[0, 1, 2, 3, 4].map((i) => (
             <View key={i} style={styles.skeletonRow}>
