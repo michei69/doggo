@@ -97,7 +97,7 @@ export interface ChatListItem {
     id: number;
     is_public: boolean;
     persona_id: string | null;
-    personas: unknown[];
+    personas: Persona[];
     summary: string;
     updated_at: string;
     user_id: string;
@@ -296,7 +296,7 @@ export interface CharacterDetail {
     };
 }
 
-export interface ProxyConfiguration {
+interface ProxyConfiguration {
     apiKey: string;
     apiUrl: string;
     id: string;
@@ -377,24 +377,6 @@ export interface ApiSettingsResponse {
     proxy_configs: ApiProxyConfig[];
     settings: ApiSettingsSettings;
 }
-
-export interface GenerationSettings {
-    context_length: number;
-    max_new_token: number;
-    temperature: number;
-    frequency_penalty: number;
-    prefill_enabled: boolean;
-    prefill_text: string;
-    repetition_penalty: number;
-    top_k: number;
-    top_p: number;
-    enable_thinking: boolean;
-    enable_reasoning: boolean;
-    enable_reasoning_chat: boolean;
-    privacy_mode: boolean;
-    local_mode: boolean;
-}
-
 export interface UserProfile {
     id: string;
     avatar: string;
@@ -407,7 +389,7 @@ export interface UserProfile {
         allow_mobile_nsfw: boolean;
         api: string;
         bad_words: string[];
-        generation_settings: GenerationSettings;
+        generation_settings: ApiSettingsGeneration;
         llm_prompt: string;
         open_ai_jailbreak_prompt: string;
         open_ai_mode: string;
@@ -631,4 +613,214 @@ export interface CreateCommentResponse {
     dislike_count: number;
     is_deleted: boolean;
     is_liked_by_user: boolean;
+}
+
+// Consolidated shared types (previously duplicated across screens/components)
+
+export interface TagEntry {
+    id: number;
+    name: string;
+    slug: string;
+}
+
+export type PersonaRef = Pick<Persona, "id" | "name" | "avatar">;
+
+export type PersonaEntry = Pick<
+    Persona,
+    "id" | "name" | "avatar" | "appearance"
+> & {
+    order: number;
+};
+
+export interface AvatarPreviewState {
+    uri: string;
+    name: string;
+}
+
+export type MessageBatchBody = Omit<
+    CreateMessageRequest,
+    "metadata" | "rating"
+> & {
+    metadata: unknown;
+};
+
+// Character search & profile search
+
+export interface CharacterSearchParams {
+    page?: number;
+    special_mode?: string;
+    sort?: string;
+    mode?: string;
+    search?: string;
+    messages?: number;
+    messages_mode?: string;
+    tokens?: number;
+    tokens_mode?: string;
+    is_proxy_enabled?: boolean;
+    tag_id?: string[];
+    custom_tags?: string[];
+    user_id?: string[];
+}
+
+export interface CharacterSettingsPatch {
+    showdefinition?: boolean;
+    allow_proxy?: boolean;
+    allow_published_chats?: boolean;
+}
+
+export interface MyCharactersParams {
+    page?: number;
+    is_public?: boolean;
+}
+
+export interface TagSuggestionsResponse {
+    suggestions: string[];
+}
+
+export interface FavoriteCountResponse {
+    characterId: string;
+    favoritesCount: number;
+}
+
+export interface CharacterAvatarPreview {
+    avatar: string;
+    id: string;
+    message_count: number;
+    name: string;
+    public_chat_count: number;
+}
+
+export interface ProfileSearchResult {
+    avatar: string;
+    character_avatar_previews: CharacterAvatarPreview[];
+    character_count: number;
+    display_prefs: null;
+    followers_count: number;
+    id: string;
+    is_verified: boolean;
+    plusbadge: boolean;
+    user_name: string;
+}
+
+export interface ProfileSearchResponse {
+    data: ProfileSearchResult[];
+    page: number;
+    size: number;
+    total: number;
+}
+
+// Profile & persona management
+
+export interface FollowingEntry {
+    user_id: string;
+    user_name: string;
+    avatar: string;
+}
+
+export interface UpdateMainPersonaBody {
+    avatar: string;
+    name: string;
+    profile: string;
+}
+
+export interface ReorderPersonasBody {
+    id: string;
+    order: number;
+}
+
+export interface PersonaGroupBody {
+    color: string;
+    description: string;
+    name: string;
+}
+
+export interface ReorderGroupsBody {
+    id: string;
+    order: number;
+}
+
+// Proxy & prompt settings
+
+export interface CreateProxyConfigBody {
+    api_key: string;
+    api_url: string;
+    client_id: string;
+    model: string;
+    name: string;
+    prompt_id: string | null;
+}
+
+export interface UpdateProxyConfigBody {
+    api_key: string;
+    api_url: string;
+    model: string;
+    name: string;
+    prompt_id: string | null;
+}
+
+export interface PromptBody {
+    content: string;
+    name: string;
+}
+
+export interface DeletePromptResponse {
+    cleared_live_slot: boolean;
+    cleared_preset_ids: unknown[];
+    deleted: boolean;
+}
+
+export type ReviewSort = "likes" | "latest" | "oldest";
+
+export interface GetReviewsParams {
+    page?: number;
+    size?: number;
+    sortBy?: ReviewSort;
+}
+
+export interface TranslateCommentResponse {
+    translated: string;
+}
+
+export interface ReportCommentBody {
+    comment_id?: string;
+    review_id?: string;
+    character_id?: string;
+    reason: string;
+    details: string;
+    url?: string;
+    originalBotLink?: string;
+}
+
+// Chats
+
+export interface EditMessageBody {
+    message: string;
+}
+
+export interface ClearResetMessagesBody {
+    chat_id: number;
+    is_bot: boolean;
+    is_main: boolean;
+    message: string;
+}
+
+export interface SystemPromptRequestBody {
+    chat: { character_id: string };
+    chatMessages: Array<{ is_bot: boolean; is_main: boolean; message: string }>;
+    generateMode: "NEW";
+    generateType: "CHAT";
+    profile: Record<string, never>;
+    profiles: unknown[];
+    userConfig: {
+        api: string;
+        generation_settings: Record<string, unknown>;
+        open_ai_mode?: string;
+    };
+    forcedPromptGenerationCacheRefetch?: {
+        character: boolean;
+        chat: boolean;
+        profile: boolean;
+        script: boolean;
+    };
+    clientPlatform?: string;
 }

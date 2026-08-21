@@ -1,191 +1,138 @@
-import { apiClient } from "./client";
+import { cleanParams, request } from "./request";
 import type {
     TrendingResponse,
     CharacterTag,
     CharacterDetail,
     CreateCharacterRequest,
     CharacterResponse,
+    CharacterSearchParams,
+    CharacterSettingsPatch,
+    MyCharactersParams,
+    TagSuggestionsResponse,
+    FavoriteCountResponse,
+    CharacterAvatarPreview,
+    ProfileSearchResult,
+    ProfileSearchResponse,
 } from "../types/api";
-
-export interface CharacterSearchParams {
-    page?: number;
-    special_mode?: string;
-    sort?: string;
-    mode?: string;
-    search?: string;
-    messages?: number;
-    messages_mode?: string;
-    tokens?: number;
-    tokens_mode?: string;
-    is_proxy_enabled?: boolean;
-    tag_id?: string[];
-    custom_tags?: string[];
-    user_id?: string[];
-}
 
 export async function getCharacters(
     params: CharacterSearchParams = {},
 ): Promise<TrendingResponse> {
-    const filteredParams: Record<string, string | number | boolean | string[]> =
-        {};
-    for (const [key, value] of Object.entries(params)) {
-        if (value !== undefined && value !== "" && value !== null) {
-            filteredParams[key] = value;
-        }
-    }
-    const response = await apiClient.get<TrendingResponse>("/characters", {
-        params: filteredParams,
+    return request<TrendingResponse>({
+        method: "GET",
+        url: "/characters",
+        params: cleanParams(params),
     });
-    return response.data;
 }
 
 export async function getTags(): Promise<CharacterTag[]> {
-    const response = await apiClient.get<CharacterTag[]>("/tags");
-    return response.data;
+    return request<CharacterTag[]>({ method: "GET", url: "/tags" });
 }
 
 export async function getCharacterDetail(
     characterId: string,
 ): Promise<CharacterDetail> {
-    const response = await apiClient.get<CharacterDetail>(
-        `/characters/${characterId}`,
-    );
-    return response.data;
+    return request<CharacterDetail>({
+        method: "GET",
+        url: `/characters/${characterId}`,
+    });
 }
 
 export async function createCharacter(
     data: CreateCharacterRequest,
 ): Promise<CharacterResponse> {
-    const response = await apiClient.post<CharacterResponse>(
-        "/characters",
+    return request<CharacterResponse>({
+        method: "POST",
+        url: "/characters",
         data,
-    );
-    return response.data;
+    });
 }
 
 export async function updateCharacter(
     characterId: string,
     data: Partial<CreateCharacterRequest>,
 ): Promise<CharacterResponse> {
-    const response = await apiClient.patch<CharacterResponse>(
-        `/characters/${characterId}`,
+    return request<CharacterResponse>({
+        method: "PATCH",
+        url: `/characters/${characterId}`,
         data,
-    );
-    return response.data;
+    });
 }
 
 export async function deleteCharacter(characterId: string): Promise<void> {
-    await apiClient.delete(`/characters/${characterId}`);
-}
-
-export interface CharacterSettingsPatch {
-    showdefinition?: boolean;
-    allow_proxy?: boolean;
-    allow_published_chats?: boolean;
+    await request<void>({
+        method: "DELETE",
+        url: `/characters/${characterId}`,
+    });
 }
 
 export async function patchCharacterSettings(
     characterId: string,
     data: CharacterSettingsPatch,
 ): Promise<CharacterDetail> {
-    const response = await apiClient.patch<CharacterDetail>(
-        `/characters/${characterId}`,
+    return request<CharacterDetail>({
+        method: "PATCH",
+        url: `/characters/${characterId}`,
         data,
-    );
-    return response.data;
-}
-
-export interface MyCharactersParams {
-    page?: number;
-    is_public?: boolean;
-}
-
-export interface TagSuggestionsResponse {
-    suggestions: string[];
+    });
 }
 
 export async function getTagSuggestions(
     prefix: string,
 ): Promise<TagSuggestionsResponse> {
-    const response = await apiClient.get<TagSuggestionsResponse>(
-        "/characters/tags/suggest",
-        { params: { prefix } },
-    );
-    return response.data;
+    return request<TagSuggestionsResponse>({
+        method: "GET",
+        url: "/characters/tags/suggest",
+        params: cleanParams({ prefix }),
+    });
 }
 
 export async function checkFavorite(
     characterId: string,
 ): Promise<boolean> {
-    const response = await apiClient.get<boolean>(
-        `/favorites/myfavorites/${characterId}`,
-    );
-    return response.data;
+    return request<boolean>({
+        method: "GET",
+        url: `/favorites/myfavorites/${characterId}`,
+    });
 }
 
 export async function favoriteCharacter(
     characterId: string,
 ): Promise<void> {
-    await apiClient.post("/favorites/favorite", { characterId });
+    await request<void>({
+        method: "POST",
+        url: "/favorites/favorite",
+        data: { characterId },
+    });
 }
 
 export async function unfavoriteCharacter(
     characterId: string,
 ): Promise<void> {
-    await apiClient.post("/favorites/unfavorite", { characterId });
+    await request<void>({
+        method: "POST",
+        url: "/favorites/unfavorite",
+        data: { characterId },
+    });
 }
 
 export async function getFavoriteCount(
     characterId: string,
-): Promise<{ characterId: string; favoritesCount: number }> {
-    const response = await apiClient.get<{
-        characterId: string;
-        favoritesCount: number;
-    }>(`/favorites/character/${characterId}/count`);
-    return response.data;
-}
-
-export interface CharacterAvatarPreview {
-    avatar: string;
-    id: string;
-    message_count: number;
-    name: string;
-    public_chat_count: number;
-}
-
-export interface ProfileSearchResult {
-    avatar: string;
-    character_avatar_previews: CharacterAvatarPreview[];
-    character_count: number;
-    display_prefs: null;
-    followers_count: number;
-    id: string;
-    is_verified: boolean;
-    plusbadge: boolean;
-    user_name: string;
-}
-
-export interface ProfileSearchResponse {
-    data: ProfileSearchResult[];
-    page: number;
-    size: number;
-    total: number;
+): Promise<FavoriteCountResponse> {
+    return request<FavoriteCountResponse>({
+        method: "GET",
+        url: `/favorites/character/${characterId}/count`,
+    });
 }
 
 export async function searchProfiles(
     params: { page?: number; mode?: string } = {},
 ): Promise<ProfileSearchResponse> {
-    const filteredParams: Record<string, string | number> = {};
-    if (params.page !== undefined) {
-        filteredParams.page = params.page;
-    }
-    if (params.mode !== undefined) {
-        filteredParams.mode = params.mode;
-    }
-    const response = await apiClient.get<ProfileSearchResponse>("/profiles/search", {
-        params: filteredParams,
+    return request<ProfileSearchResponse>({
+        method: "GET",
+        url: "/profiles/search",
+        params: cleanParams(params),
     });
-    return response.data;
 }
 
 export async function getMyCharacters(
@@ -200,9 +147,9 @@ export async function getMyCharacters(
     if (params.is_public !== undefined) {
         queryParams.is_public = String(params.is_public);
     }
-    const response = await apiClient.get<TrendingResponse>(
-        "/characters/v2/mine",
-        { params: queryParams },
-    );
-    return response.data;
+    return request<TrendingResponse>({
+        method: "GET",
+        url: "/characters/v2/mine",
+        params: queryParams,
+    });
 }

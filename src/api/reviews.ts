@@ -1,4 +1,4 @@
-import { apiClient } from "./client";
+import { cleanParams, request } from "./request";
 import type {
     Review,
     ReviewComment,
@@ -9,151 +9,181 @@ import type {
     CreateCommentRequest,
     CreateCommentResponse,
     EmojiDefinitionsResponse,
+    ReviewSort,
+    GetReviewsParams,
+    TranslateCommentResponse,
+    ReportCommentBody,
 } from "../types/api";
-
-export type ReviewSort = "likes" | "latest" | "oldest";
-
-export interface GetReviewsParams {
-    page?: number;
-    size?: number;
-    sortBy?: ReviewSort;
-}
 
 export async function getReviewSettings(
     characterId: string,
 ): Promise<ReviewSettings> {
-    const response = await apiClient.get<ReviewSettings>(
-        `/reviews/settings/${characterId}`,
-    );
-    return response.data;
+    return request<ReviewSettings>({
+        method: "GET",
+        url: `/reviews/settings/${characterId}`,
+    });
 }
 
 export async function getReviews(
     characterId: string,
     params: GetReviewsParams = {},
 ): Promise<Review[]> {
-    const filteredParams: Record<string, string | number> = {};
-    if (params.page !== undefined) filteredParams.page = params.page;
-    if (params.size !== undefined) filteredParams.size = params.size;
-    if (params.sortBy !== undefined) filteredParams.sortBy = params.sortBy;
-    const response = await apiClient.get<Review[]>(`/reviews/${characterId}`, {
-        params: filteredParams,
+    return request<Review[]>({
+        method: "GET",
+        url: `/reviews/${characterId}`,
+        params: cleanParams(params),
     });
-    return response.data;
 }
 
 export async function getReviewCounts(
     characterId: string,
 ): Promise<ReviewCounts> {
-    const response = await apiClient.get<ReviewCounts>(
-        `/reviews/counts/${characterId}`,
-    );
-    return response.data;
+    return request<ReviewCounts>({
+        method: "GET",
+        url: `/reviews/counts/${characterId}`,
+    });
 }
 
 export async function getReviewComments(
     reviewId: string,
 ): Promise<ReviewComment[]> {
-    const response = await apiClient.get<ReviewComment[]>(
-        `/reviews/comments/${reviewId}`,
-    );
-    return response.data.reverse();
+    return request<ReviewComment[]>({
+        method: "GET",
+        url: `/reviews/comments/${reviewId}`,
+    });
 }
 
 export async function likeReview(reviewId: string): Promise<string> {
-    const response = await apiClient.post<string>(
-        `/reviews/like/review/${reviewId}`,
-    );
-    return response.data;
+    return request<string>({
+        method: "POST",
+        url: `/reviews/like/review/${reviewId}`,
+    });
 }
 
 export async function likeComment(commentId: string): Promise<string> {
-    const response = await apiClient.post<string>(
-        `/reviews/like/comment/${commentId}`,
-    );
-    return response.data;
+    return request<string>({
+        method: "POST",
+        url: `/reviews/like/comment/${commentId}`,
+    });
 }
 
 export async function createReview(
     data: CreateReviewRequest,
 ): Promise<CreateReviewResponse> {
-    const response = await apiClient.post<CreateReviewResponse>(
-        "/reviews",
+    return request<CreateReviewResponse>({
+        method: "POST",
+        url: "/reviews",
         data,
-    );
-    return response.data;
+    });
 }
 
 export async function pinReview(reviewId: string): Promise<void> {
-    await apiClient.post(`/reviews/${reviewId}/pin`);
+    await request<void>({
+        method: "POST",
+        url: `/reviews/${reviewId}/pin`,
+    });
 }
 
 export async function unpinReview(reviewId: string): Promise<void> {
-    await apiClient.delete(`/reviews/${reviewId}/pin`);
+    await request<void>({
+        method: "DELETE",
+        url: `/reviews/${reviewId}/pin`,
+    });
 }
 
 export async function createComment(
     data: CreateCommentRequest,
 ): Promise<CreateCommentResponse> {
-    const response = await apiClient.post<CreateCommentResponse>(
-        "/reviews/comment",
+    return request<CreateCommentResponse>({
+        method: "POST",
+        url: "/reviews/comment",
         data,
-    );
-    return response.data;
+    });
 }
 
 export async function deleteComment(commentId: string): Promise<void> {
-    await apiClient.delete(`/reviews/comment/${commentId}`);
+    await request<void>({
+        method: "DELETE",
+        url: `/reviews/comment/${commentId}`,
+    });
 }
 
 export async function translateComment(
     commentId: string,
     content: string,
 ): Promise<string> {
-    const response = await apiClient.post<{ translated: string }>(
-        "/reviews/translate",
-        { comment_id: commentId, content },
-    );
-    return response.data.translated;
+    const response = await request<TranslateCommentResponse>({
+        method: "POST",
+        url: "/reviews/translate",
+        data: { comment_id: commentId, content },
+    });
+    return response.translated;
 }
 
-export async function reportComment(data: {
-    comment_id: string;
-    review_id: string;
-    reason: string;
-    details: string;
-}): Promise<void> {
-    await apiClient.post("/moderation/report", {
-        comment_id: data.comment_id,
-        review_id: data.review_id,
-        reason: data.reason,
-        other: data.details,
+export async function reportComment(data: ReportCommentBody): Promise<void> {
+    await request<void>({
+        method: "POST",
+        url: "/moderation/report",
+        data: {
+            comment_id: data.comment_id,
+            review_id: data.review_id,
+            character_id: data.character_id,
+            reason: data.reason,
+            other: data.details,
+            url: data.url,
+            originalBotLink: data.originalBotLink,
+        },
     });
 }
 
 export async function deleteReview(reviewId: string): Promise<void> {
-    await apiClient.delete(`/reviews/${reviewId}`);
+    await request<void>({
+        method: "DELETE",
+        url: `/reviews/${reviewId}`,
+    });
 }
 
 export async function fetchEmojiDefinitions(): Promise<EmojiDefinitionsResponse> {
-    const response = await apiClient.get<EmojiDefinitionsResponse>(
-        "/reviews/emoji-definitions",
-    );
-    return response.data;
+    return request<EmojiDefinitionsResponse>({
+        method: "GET",
+        url: "/reviews/emoji-definitions",
+    });
 }
 
-export async function reactToReview(reviewId: string, emojiId: string): Promise<void> {
-    await apiClient.post(`/reviews/react/review/${reviewId}`, { emoji: emojiId });
+export async function reactToReview(
+    reviewId: string,
+    emojiId: string,
+): Promise<void> {
+    await request<void>({
+        method: "POST",
+        url: `/reviews/react/review/${reviewId}`,
+        data: { emoji: emojiId },
+    });
 }
 
 export async function removeReviewReaction(reviewId: string): Promise<void> {
-    await apiClient.delete(`/reviews/react/review/${reviewId}`);
+    await request<void>({
+        method: "DELETE",
+        url: `/reviews/react/review/${reviewId}`,
+    });
 }
 
-export async function reactToComment(commentId: string, emojiId: string): Promise<void> {
-    await apiClient.post(`/reviews/react/comment/${commentId}`, { emoji: emojiId });
+export async function reactToComment(
+    commentId: string,
+    emojiId: string,
+): Promise<void> {
+    await request<void>({
+        method: "POST",
+        url: `/reviews/react/comment/${commentId}`,
+        data: { emoji: emojiId },
+    });
 }
 
-export async function removeCommentReaction(commentId: string): Promise<void> {
-    await apiClient.delete(`/reviews/react/comment/${commentId}`);
+export async function removeCommentReaction(
+    commentId: string,
+): Promise<void> {
+    await request<void>({
+        method: "DELETE",
+        url: `/reviews/react/comment/${commentId}`,
+    });
 }

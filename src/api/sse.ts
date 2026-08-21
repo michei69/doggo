@@ -88,6 +88,113 @@ export async function readSSEStream(
     }
 }
 
+export function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
+}
+
+async function extractErrorMessage(response: Response): Promise<string> {
+    const fallback = `HTTP ${response.status}`;
+    try {
+        const body: unknown = await response.json();
+        if (typeof body === "object" && body !== null) {
+            if (
+                "message" in body &&
+                typeof body.message === "string" &&
+                body.message
+            ) {
+                return body.message;
+            }
+            if ("error" in body) {
+                const error = body.error;
+                if (typeof error === "string" && error) {
+                    return error;
+                }
+                if (
+                    typeof error === "object" &&
+                    error !== null &&
+                    "message" in error &&
+                    typeof error.message === "string" &&
+                    error.message
+                ) {
+                    return error.message;
+                }
+            }
+        }
+    } catch {
+        // non-JSON error body, keep status message
+    }
+    return fallback;
+}
+
+function extractStreamContent(value: unknown): string {
+    if (!isRecord(value)) return "";
+    const choices = value.choices;
+    if (!Array.isArray(choices)) return "";
+    const first = choices[0];
+    if (!isRecord(first)) return "";
+    const message = first.message;
+    if (!isRecord(message)) return "";
+    const content = message.content;
+    return typeof content === "string" ? content : "";
+}
+
+interface StreamRequestOptions {
+    url: string;
+    body: unknown;
+    signal?: AbortSignal;
+    headers: Record<string, string>;
+    callbacks: SSECallbacks;
+    onJson: (json: unknown) => Promise<void>;
+    onStream?: (response: Response) => Promise<void>;
+}
+
+export async function streamRequest({
+    url,
+    body,
+    signal,
+    headers,
+    callbacks,
+    onJson,
+    onStream,
+}: StreamRequestOptions): Promise<void> {
+    let response: Response;
+    try {
+        response = await fetch(url, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(body),
+            signal,
+        });
+    } catch (err: unknown) {
+        if (signal?.aborted) return;
+        callbacks.onError(err instanceof Error ? err : new Error(String(err)));
+        return;
+    }
+
+    if (!response.ok) {
+        const message = await extractErrorMessage(response);
+        if (signal?.aborted) return;
+        callbacks.onError(new Error(message));
+        return;
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+
+    if (contentType.includes("application/json") || !response.body) {
+        const json: unknown = await response.json();
+        await onJson(json);
+        return;
+    }
+
+    if (onStream) {
+        await onStream(response);
+        return;
+    }
+
+    const reader = response.body.getReader();
+    await readSSEStream(reader, signal ?? new AbortController().signal, callbacks);
+}
+
 class SSEClient {
     private abortController: AbortController | null = null;
 
@@ -102,11 +209,16 @@ class SSEClient {
     ): Promise<void> {
         this.abort();
         this.abortController = new AbortController();
+        const signal = this.abortController.signal;
 
         const baseUrl = apiUrl.replace(/\/+$/, "");
-        const url = baseUrl.endsWith("/chat/completions") ? baseUrl : `${baseUrl}/chat/completions`;
+        const url = baseUrl.endsWith("/chat/completions")
+            ? baseUrl
+            : `${baseUrl}/chat/completions`;
 
-        const thinkingParam = { type: enableReasoning ? "enabled" as const : "disabled" as const };
+        const thinkingParam = {
+            type: enableReasoning ? ("enabled" as const) : ("disabled" as const),
+        };
 
         const body: Record<string, unknown> = {
             model,
@@ -120,42 +232,24 @@ class SSEClient {
         }
 
         try {
-            const response = await fetch(url, {
-                method: "POST",
+            await streamRequest({
+                url,
+                body,
+                signal,
                 headers: {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${apiKey}`,
                 },
-                body: JSON.stringify(body),
-                signal: this.abortController.signal,
+                callbacks,
+                onJson: async (json: unknown) => {
+                    callbacks.onComplete(extractStreamContent(json));
+                },
             });
-
-            if (!response.ok) {
-                const bodyText = await response.text().catch(() => "");
-                let errorDetail = response.statusText || "";
-                if (bodyText) {
-                    try {
-                        const json = JSON.parse(bodyText);
-                        errorDetail =
-                            (typeof json.error === "string" ? json.error : json.error?.message) ||
-                            json.message ||
-                            bodyText;
-                    } catch {
-                        errorDetail = bodyText;
-                    }
-                }
-                throw new Error(
-                    `HTTP ${response.status}: ${errorDetail || "Unknown error"}`,
+        } catch (error: unknown) {
+            if (!(error instanceof Error) || error.name !== "AbortError") {
+                callbacks.onError(
+                    error instanceof Error ? error : new Error(String(error)),
                 );
-            }
-
-            const reader = response.body?.getReader();
-            if (!reader) throw new Error("No response body");
-
-            await readSSEStream(reader, this.abortController.signal, callbacks);
-        } catch (error: any) {
-            if (error.name !== "AbortError") {
-                callbacks.onError(error);
             }
         } finally {
             this.abortController = null;

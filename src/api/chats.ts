@@ -1,4 +1,3 @@
-import { apiClient } from "./client";
 import type {
     ChatListItem,
     ChatDetail,
@@ -7,41 +6,44 @@ import type {
     SuccessResponse,
     CreateChatRequest,
     CreateChatResponse,
+    MessageBatchBody,
+    EditMessageBody,
+    ClearResetMessagesBody,
+    SystemPromptRequestBody,
 } from "../types/api";
 import { buildAuthHeaders } from "../utils/authHeaders";
-import { readSSEStream, type SSECallbacks } from "./sse";
+import {
+    GENERATE_ALPHA_CANCEL_URL,
+    GENERATE_ALPHA_URL,
+} from "../utils/constants";
+import { request } from "./request";
+import {
+    isRecord,
+    readSSEStream,
+    streamRequest,
+    type SSECallbacks,
+} from "./sse";
 
 export async function getChats(page: number = 1): Promise<ChatListItem[]> {
-    const response = await apiClient.get<ChatListItem[]>("/chats/homepage", {
+    return request<ChatListItem[]>({
+        method: "GET",
+        url: "/chats/homepage",
         params: { page },
     });
-    return response.data;
 }
 
 export async function getChatDetail(chatId: number): Promise<ChatDetail> {
-    const response = await apiClient.get<ChatDetail>(`/chats/${chatId}`);
-    return response.data;
+    return request<ChatDetail>({ method: "GET", url: `/chats/${chatId}` });
 }
 
 export async function createMessage(
     data: CreateMessageRequest,
 ): Promise<CreateMessageResponse> {
-    const response = await apiClient.post<CreateMessageResponse>(
-        `/chats/${data.chat_id}/messages`,
+    return request<CreateMessageResponse>({
+        method: "POST",
+        url: `/chats/${data.chat_id}/messages`,
         data,
-    );
-    return response.data;
-}
-
-export async function setMessageMain(
-    chatId: number,
-    messageId: number,
-): Promise<SuccessResponse> {
-    const response = await apiClient.patch<SuccessResponse>(
-        `/chats/${chatId}/messages/${messageId}`,
-        { is_main: true },
-    );
-    return response.data;
+    });
 }
 
 export async function setMessageMainState(
@@ -49,47 +51,57 @@ export async function setMessageMainState(
     messageId: number,
     isMain: boolean,
 ): Promise<SuccessResponse> {
-    const response = await apiClient.patch<SuccessResponse>(
-        `/chats/${chatId}/messages/${messageId}`,
-        { is_main: isMain },
-    );
-    return response.data;
+    return request<SuccessResponse>({
+        method: "PATCH",
+        url: `/chats/${chatId}/messages/${messageId}`,
+        data: { is_main: isMain },
+    });
+}
+
+export async function setMessageMain(
+    chatId: number,
+    messageId: number,
+): Promise<SuccessResponse> {
+    return setMessageMainState(chatId, messageId, true);
 }
 
 export async function editMessage(
     chatId: number,
     messageId: number,
-    data: { message: string },
+    data: EditMessageBody,
 ): Promise<SuccessResponse> {
-    const response = await apiClient.patch<SuccessResponse>(
-        `/chats/${chatId}/messages/${messageId}`,
+    return request<SuccessResponse>({
+        method: "PATCH",
+        url: `/chats/${chatId}/messages/${messageId}`,
         data,
-    );
-    return response.data;
+    });
+}
+
+async function deleteMessagesChunked(
+    chatId: number,
+    messageIds: number[],
+    batchSize: number,
+): Promise<SuccessResponse | undefined> {
+    const requests: Promise<SuccessResponse>[] = [];
+    for (let i = 0; i < messageIds.length; i += batchSize) {
+        const batch = messageIds.slice(i, i + batchSize);
+        requests.push(
+            request<SuccessResponse>({
+                method: "DELETE",
+                url: `/chats/${chatId}/messages`,
+                data: { message_ids: batch },
+            }),
+        );
+    }
+    const batches = await Promise.all(requests);
+    return batches[batches.length - 1];
 }
 
 export async function deleteMessages(
     chatId: number,
     messageIds: number[],
 ): Promise<SuccessResponse> {
-    let lastResponse: SuccessResponse | undefined;
-    const batches: SuccessResponse[] = await Promise.all(
-        (() => {
-            const requests: Promise<SuccessResponse>[] = [];
-            for (let i = 0; i < messageIds.length; i += 100) {
-                const batch = messageIds.slice(i, i + 100);
-                requests.push(
-                    apiClient
-                        .delete<SuccessResponse>(`/chats/${chatId}/messages`, {
-                            data: { message_ids: batch },
-                        })
-                        .then((res) => res.data),
-                );
-            }
-            return requests;
-        })(),
-    );
-    if (batches.length > 0) lastResponse = batches[batches.length - 1];
+    const lastResponse = await deleteMessagesChunked(chatId, messageIds, 100);
     return lastResponse!;
 }
 
@@ -101,24 +113,27 @@ export async function createChat(
         character_id: characterId,
     };
     if (personaId) body.persona_id = personaId;
-    const response = await apiClient.post<CreateChatResponse>("/chats", body);
-    return response.data;
+    return request<CreateChatResponse>({
+        method: "POST",
+        url: "/chats",
+        data: body,
+    });
 }
 
 export async function deleteChat(chatId: number): Promise<SuccessResponse> {
-    const response = await apiClient.delete<SuccessResponse>(
-        `/chats/${chatId}`,
-    );
-    return response.data;
+    return request<SuccessResponse>({
+        method: "DELETE",
+        url: `/chats/${chatId}`,
+    });
 }
 
 export async function getCharacterChats(
     characterId: string,
 ): Promise<ChatListItem[]> {
-    const response = await apiClient.get<ChatListItem[]>(
-        `/chats/character/${characterId}`,
-    );
-    return response.data;
+    return request<ChatListItem[]>({
+        method: "GET",
+        url: `/chats/character/${characterId}`,
+    });
 }
 
 export async function deleteMessagesInBatches(
@@ -128,20 +143,7 @@ export async function deleteMessagesInBatches(
     const validIds = messageIds.filter(
         (id) => id > 0 && id <= 99000000000 && Number.isInteger(id),
     );
-    await Promise.all(
-        (() => {
-            const requests: Promise<unknown>[] = [];
-            for (let i = 0; i < validIds.length; i += 256) {
-                const batch = validIds.slice(i, i + 256);
-                requests.push(
-                    apiClient.delete(`/chats/${chatId}/messages`, {
-                        data: { message_ids: batch },
-                    }),
-                );
-            }
-            return requests;
-        })(),
-    );
+    await deleteMessagesChunked(chatId, validIds, 256);
 }
 
 export async function clearAndResetMessages(
@@ -151,27 +153,52 @@ export async function clearAndResetMessages(
 ): Promise<void> {
     await deleteMessagesInBatches(chatId, messageIds);
     if (firstMessages.length > 0) {
-        const body = [...firstMessages]
+        const body: ClearResetMessagesBody[] = [...firstMessages]
             .reverse()
             .map((msg, i) => ({
-            chat_id: chatId,
-            is_bot: true,
-            is_main: i === 0,
-            message: msg,
-        }));
-        await apiClient.post(`/chats/${chatId}/messages`, body);
+                chat_id: chatId,
+                is_bot: true,
+                is_main: i === 0,
+                message: msg,
+            }));
+        await request<void>({
+            method: "POST",
+            url: `/chats/${chatId}/messages`,
+            data: body,
+        });
     }
+}
+
+export async function postMessages(
+    chatId: number,
+    bodies: MessageBatchBody[],
+): Promise<void> {
+    const batches: MessageBatchBody[][] = [];
+    for (let i = 0; i < bodies.length; i += 10) {
+        batches.push(bodies.slice(i, i + 10).reverse());
+    }
+    await batches.reduce(
+        (chain, batch) =>
+            chain.then(() =>
+                request<void>({
+                    method: "POST",
+                    url: `/chats/${chatId}/messages`,
+                    data: batch,
+                }),
+            ),
+        Promise.resolve(),
+    );
 }
 
 export async function forkChat(
     chatId: number,
     fromMessageId: number,
 ): Promise<CreateChatResponse> {
-    const response = await apiClient.post<CreateChatResponse>(
-        `/chats/${chatId}/fork`,
-        { from_message_id: fromMessageId },
-    );
-    return response.data;
+    return request<CreateChatResponse>({
+        method: "POST",
+        url: `/chats/${chatId}/fork`,
+        data: { from_message_id: fromMessageId },
+    });
 }
 
 export async function generateAlpha(
@@ -182,99 +209,69 @@ export async function generateAlpha(
     apiKey?: string,
     realModel?: string,
 ): Promise<void> {
-    const headers = await buildAuthHeaders({ contentType: "application/json" });
+    await streamRequest({
+        url: GENERATE_ALPHA_URL,
+        body,
+        signal,
+        headers: await buildAuthHeaders({ contentType: "application/json" }),
+        callbacks,
+        onJson: async (json: unknown) => {
+            if (isRecord(json) && json.model === "doggy-privacy" && realModel) {
+                json.model = realModel;
+            }
 
-    let response: Response;
-    try {
-        response = await fetch("https://janitorai.com/generateAlpha", {
-            method: "POST",
-            headers,
-            body: JSON.stringify(body),
-            signal,
-        });
-    } catch (err: any) {
-        if (signal.aborted) return;
-        callbacks.onError(err);
-        return;
-    }
+            if (apiUrl && apiKey) {
+                try {
+                    const streamResp = await fetch(apiUrl, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${apiKey}`,
+                        },
+                        body: JSON.stringify(json),
+                        signal,
+                    });
 
-    const contentType = response.headers.get("content-type") || "";
+                    if (!streamResp.ok) {
+                        throw new Error(`HTTP ${streamResp.status}`);
+                    }
 
-    if (!response.ok) {
-        let message = `HTTP ${response.status}`;
-        try {
-            const errJson = await response.json();
-            message = errJson?.message || errJson?.error || message;
-        } catch {
-            // non-JSON error body, keep status message
-        }
-        if (signal.aborted) return;
-        callbacks.onError(new Error(message));
-        return;
-    }
+                    const streamType =
+                        streamResp.headers.get("content-type") || "";
+                    if (
+                        streamType.includes("application/json") ||
+                        !streamResp.body
+                    ) {
+                        const streamJson = await streamResp.json();
+                        const content =
+                            streamJson.choices?.[0]?.message?.content || "";
+                        callbacks.onComplete(content);
+                        return;
+                    }
 
-    if (contentType.includes("application/json") || !response.body) {
-        const json = await response.json();
-        if (json.model === "doggy-privacy" && realModel) {
-            json.model = realModel;
-        }
-        console.log(json);
-        console.log("[generateAlpha] JSON response, re-streaming via proxy");
-
-        if (apiUrl && apiKey) {
-            try {
-                const streamResp = await fetch(apiUrl, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${apiKey}`,
-                    },
-                    body: JSON.stringify(json),
-                    signal,
-                });
-
-                if (!streamResp.ok) {
-                    throw new Error(`HTTP ${streamResp.status}`);
-                }
-
-                const streamType = streamResp.headers.get("content-type") || "";
-                if (
-                    streamType.includes("application/json") ||
-                    !streamResp.body
-                ) {
-                    const streamJson = await streamResp.json();
-                    const content =
-                        streamJson.choices?.[0]?.message?.content || "";
-                    callbacks.onComplete(content);
+                    const reader = streamResp.body.getReader();
+                    await readSSEStream(reader, signal, callbacks);
+                    return;
+                } catch (err: unknown) {
+                    if (signal.aborted) return;
+                    callbacks.onError(
+                        err instanceof Error ? err : new Error(String(err)),
+                    );
                     return;
                 }
-
-                const reader = streamResp.body.getReader();
-                await readSSEStream(reader, signal, callbacks);
-                return;
-            } catch (err: any) {
-                if (signal.aborted) return;
-                callbacks.onError(err);
-                return;
             }
-        }
 
-        callbacks.onComplete("");
-        return;
-    }
-
-    const reader = response.body.getReader();
-    await readSSEStream(reader, signal, callbacks);
+            callbacks.onComplete("");
+        },
+    });
 }
 
 export async function cancelGeneration(): Promise<void> {
-    await apiClient.post("https://janitorai.com/generateAlpha/cancel");
+    await request<void>({ method: "POST", url: GENERATE_ALPHA_CANCEL_URL });
 }
 
 export async function fetchSystemPrompt(detail: ChatDetail): Promise<string> {
-    const headers = await buildAuthHeaders({ contentType: "application/json" });
-
-    const body = {
+    const body: SystemPromptRequestBody = {
         chat: {
             character_id: detail.chat.character_id,
         },
@@ -296,23 +293,44 @@ export async function fetchSystemPrompt(detail: ChatDetail): Promise<string> {
         },
     };
 
-    const response = await fetch("https://janitorai.com/generateAlpha", {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
+    let result = "";
+    await streamRequest({
+        url: GENERATE_ALPHA_URL,
+        body,
+        headers: await buildAuthHeaders({ contentType: "application/json" }),
+        callbacks: {
+            onToken: () => {},
+            onThinking: () => {},
+            onComplete: (msg: string) => {
+                result = msg;
+            },
+            onError: (err: Error) => {
+                throw err;
+            },
+        },
+        onJson: async (json: unknown) => {
+            if (isRecord(json)) {
+                const messages = json.messages;
+                if (
+                    Array.isArray(messages) &&
+                    messages.length > 0 &&
+                    isRecord(messages[0])
+                ) {
+                    const content = messages[0].content;
+                    if (typeof content === "string") {
+                        result = content;
+                        return;
+                    }
+                }
+            }
+            result = JSON.stringify(json);
+        },
+        onStream: async (response) => {
+            const text = await response.text();
+            result = text;
+        },
     });
-
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-    const contentType = response.headers.get("content-type") || "";
-
-    if (contentType.includes("application/json") || !response.body) {
-        const json = await response.json();
-        return json.messages?.[0]?.content ?? JSON.stringify(json);
-    }
-
-    const text = await response.text();
-    return text;
+    return result;
 }
 
 export async function attemptExtractSystemPrompt(
@@ -335,7 +353,7 @@ export async function attemptExtractSystemPrompt(
         }
     };
 
-    const body = {
+    const body: SystemPromptRequestBody = {
         chat: { character_id: characterId },
         chatMessages: [{ is_bot: false, is_main: true, message }],
         forcedPromptGenerationCacheRefetch: {
@@ -356,7 +374,6 @@ export async function attemptExtractSystemPrompt(
         let fullContent = "";
         generateAlpha(body, signal, {
             onToken: (token: string) => {
-                console.log(token)
                 fullContent += token;
             },
             onThinking: () => {},
