@@ -1,9 +1,6 @@
 import { useCallback } from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import CustomBottomSheet from "../common/CustomBottomSheet";
-import type { OptionSheetAction } from "../common/OptionSheet";
-import { colors } from "../../utils/colors";
+import OptionSheet, { type OptionSheetAction } from "../common/OptionSheet";
 
 export default function ChatSettingsOverlay({
   visible,
@@ -84,116 +81,34 @@ export default function ChatSettingsOverlay({
     onAttemptViewSystemPrompt?.();
   }, [onClose, onAttemptViewSystemPrompt]);
 
-  const sections: { header: string; actions: OptionSheetAction[] }[] = [
+  const actions: OptionSheetAction[] = [
+    { label: "View Character", onPress: handleViewCharacter },
     {
-      header: "CHARACTER",
-      actions: [
-        { label: "View Character", onPress: handleViewCharacter },
-        ...(creatorId
-          ? [{ label: "View Creator", onPress: handleViewCreator }]
-          : []),
-        {
-          label: allowProxy ? "View System Prompt" : "Fetch System Prompt",
-          onPress: allowProxy
-            ? handleViewSystemPrompt
-            : handleAttemptViewSystemPrompt,
-        },
-      ],
+      label: allowProxy ? "View System Prompt" : "Fetch System Prompt",
+      onPress: allowProxy
+        ? handleViewSystemPrompt
+        : handleAttemptViewSystemPrompt,
     },
+    ...(creatorId
+      ? [{ label: "View Creator", onPress: handleViewCreator }]
+      : []),
+    { label: "Generation Settings", onPress: handleGenerationSettings },
+    { label: "New Chat", onPress: handleNewChat },
+    { label: "All Chats", onPress: handleAllChats },
     {
-      header: "GENERATION",
-      actions: [
-        { label: "Generation Settings", onPress: handleGenerationSettings },
-      ],
+      label: "Messages Actions",
+      onPress: handleMessagesActions,
+      accent: true,
     },
-    {
-      header: "CHAT",
-      actions: [
-        { label: "New Chat", onPress: handleNewChat },
-        { label: "All Chats", onPress: handleAllChats },
-        {
-          label: "Messages Actions",
-          onPress: handleMessagesActions,
-          accent: true,
-        },
-        { label: "Delete Chat", onPress: handleDeleteChat, destructive: true },
-      ],
-    },
+    { label: "Delete Chat", onPress: handleDeleteChat, destructive: true },
   ];
 
   return (
-    <CustomBottomSheet visible={visible} onClose={onClose}>
-      <View style={styles.content}>
-        <Text style={styles.title}>{characterName}</Text>
-        {sections.map((section) => (
-          <View key={section.header}>
-            <Text style={styles.sectionHeader}>{section.header}</Text>
-            {section.actions.map((action) => (
-              <Pressable
-                key={action.label}
-                style={({ pressed }) => [
-                  styles.option,
-                  pressed && { opacity: 0.7 },
-                ]}
-                onPress={action.onPress}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    action.destructive && styles.deleteText,
-                    action.accent && styles.accentText,
-                  ]}
-                >
-                  {action.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        ))}
-      </View>
-    </CustomBottomSheet>
+    <OptionSheet
+      visible={visible}
+      onClose={onClose}
+      title={characterName}
+      actions={actions}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 4,
-  },
-  title: {
-    color: colors.textSecondary,
-    fontSize: 18,
-    fontWeight: "700",
-    textAlign: "center",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    marginBottom: 4,
-  },
-  sectionHeader: {
-    color: colors.textDim,
-    fontSize: 11,
-    fontWeight: "600",
-    letterSpacing: 1,
-    textAlign: "center",
-    paddingTop: 12,
-    paddingBottom: 4,
-  },
-  option: {
-    paddingVertical: 16,
-    alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  optionText: {
-    color: colors.textSecondary,
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  deleteText: {
-    color: colors.danger,
-  },
-  accentText: {
-    color: colors.accent,
-  },
-});
