@@ -3,6 +3,7 @@ import {
     useSharedValue,
     useAnimatedStyle,
     withTiming,
+    ReduceMotion,
 } from "react-native-reanimated";
 import { Gesture } from "react-native-gesture-handler";
 
@@ -41,10 +42,11 @@ export function useTabSwipe({
                 pageWidthMode === "screen" ? screenWidth : tabRowWidth.value;
             translateX.value = withTiming(-index * pageWidth, {
                 duration: 250,
+                reduceMotion: ReduceMotion.System,
             });
             tabIndicator.value = withTiming(
                 index * (tabRowWidth.value / tabCount),
-                { duration: 250 },
+                { duration: 250, reduceMotion: ReduceMotion.System },
             );
         },
         [

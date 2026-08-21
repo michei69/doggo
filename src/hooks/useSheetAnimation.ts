@@ -7,6 +7,7 @@ import {
     withTiming,
     interpolate,
     cancelAnimation,
+    ReduceMotion,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
@@ -42,8 +43,12 @@ export function useSheetAnimation(onClose: () => void) {
             damping: 24,
             stiffness: 200,
             mass: 0.8,
+            reduceMotion: ReduceMotion.System,
         });
-        backdropOpacity.value = withTiming(1, { duration: 200 });
+        backdropOpacity.value = withTiming(1, {
+            duration: 200,
+            reduceMotion: ReduceMotion.System,
+        });
     }, [translateY, backdropOpacity, windowHeightSV]);
 
     const animateOut = useCallback(
@@ -54,10 +59,17 @@ export function useSheetAnimation(onClose: () => void) {
             const h = windowHeightSV.value;
             cancelAnimation(translateY);
             cancelAnimation(backdropOpacity);
-            translateY.value = withTiming(h, { duration: 250 });
-            backdropOpacity.value = withTiming(0, { duration: 250 }, () => {
-                scheduleOnRN(onFinish ?? onClose);
+            translateY.value = withTiming(h, {
+                duration: 250,
+                reduceMotion: ReduceMotion.System,
             });
+            backdropOpacity.value = withTiming(
+                0,
+                { duration: 250, reduceMotion: ReduceMotion.System },
+                () => {
+                    scheduleOnRN(onFinish ?? onClose);
+                },
+            );
         },
         [isClosing, translateY, backdropOpacity, onClose, windowHeightSV],
     );
@@ -86,8 +98,12 @@ export function useSheetAnimation(onClose: () => void) {
                     damping: 24,
                     stiffness: 200,
                     mass: 0.8,
+                    reduceMotion: ReduceMotion.System,
                 });
-                backdropOpacity.value = withTiming(1, { duration: 200 });
+                backdropOpacity.value = withTiming(1, {
+                    duration: 200,
+                    reduceMotion: ReduceMotion.System,
+                });
             }
         });
 

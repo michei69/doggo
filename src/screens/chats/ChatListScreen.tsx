@@ -420,7 +420,12 @@ const SearchBar = React.memo(function SearchBar({
         autoCapitalize="none"
       />
       {query.length > 0 && (
-        <Pressable onPress={() => onQueryChange("")}>
+        <Pressable
+          onPress={() => onQueryChange("")}
+          hitSlop={{ top: 13, bottom: 13, left: 4, right: 4 }}
+          accessibilityRole="button"
+          accessibilityLabel="Clear search"
+        >
           <Text style={styles.clearBtn}>Clear</Text>
         </Pressable>
       )}

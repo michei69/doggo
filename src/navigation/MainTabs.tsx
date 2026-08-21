@@ -184,6 +184,7 @@ export default function MainTabs() {
         component={ChatsStackNavigator}
         options={({ route }) => ({
           tabBarLabel: "Chats",
+          tabBarAccessibilityLabel: "Chats",
           tabBarIcon: ({ color, size }) => (
             <MessageCircle color={color} size={size || 22} />
           ),
@@ -198,6 +199,7 @@ export default function MainTabs() {
         component={CharactersStackNavigator}
         options={({ route }) => ({
           tabBarLabel: "Discover",
+          tabBarAccessibilityLabel: "Discover",
           tabBarIcon: ({ color, size }) => (
             <Compass color={color} size={size || 22} />
           ),
@@ -212,6 +214,7 @@ export default function MainTabs() {
         component={CreateStackNavigator}
         options={{
           tabBarLabel: "Create",
+          tabBarAccessibilityLabel: "Create",
           tabBarIcon: ({ color, size }) => (
             <SquarePen color={color} size={size || 22} />
           ),
@@ -223,6 +226,7 @@ export default function MainTabs() {
         component={ProfileStackNavigator}
         options={{
           tabBarLabel: "Profile",
+          tabBarAccessibilityLabel: "Profile",
           tabBarIcon: ({ color, size }) => (
             <User color={color} size={size || 22} />
           ),

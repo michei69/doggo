@@ -19,7 +19,13 @@ const ChatScreenHeader = React.memo(
         title={title}
         onBack={onBack}
         rightElement={
-          <Pressable onPress={onOpenSettings} style={styles.backBtn}>
+          <Pressable
+            onPress={onOpenSettings}
+            style={styles.backBtn}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Open settings"
+          >
             <Settings size={22} color={colors.accent} />
           </Pressable>
         }

@@ -1,5 +1,6 @@
 import type React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../../utils/colors";
 
 export default function ScreenHeader({
@@ -11,9 +12,16 @@ export default function ScreenHeader({
   onBack: () => void;
   rightElement?: React.ReactNode;
 }) {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.header}>
-      <Pressable onPress={onBack} style={styles.backBtn}>
+    <View style={[styles.header, { paddingTop: insets.top }]}>
+      <Pressable
+        onPress={onBack}
+        style={styles.backBtn}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+      >
         <Text style={styles.backText}>{"←"}</Text>
       </Pressable>
       <Text style={styles.headerTitle} numberOfLines={1}>
@@ -29,7 +37,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingTop: 50,
     paddingBottom: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,

@@ -288,6 +288,9 @@ export default function WebBrowserScreen() {
                         pressed && styles.pressed,
                     ]}
                     onPress={handleClose}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close"
                 >
                     <X size={22} color={colors.textSecondary} />
                 </Pressable>

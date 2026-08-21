@@ -6,6 +6,7 @@ import {
     TextInput,
     View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SlidersHorizontal, Filter, Globe } from "lucide-react-native";
 import type { ProfileSearchResult } from "../../../types/api";
 import CharacterDiscoverActionsSheet from "../../../components/character/CharacterDiscoverActionsSheet";
@@ -50,17 +51,40 @@ export const SearchHeader = React.memo(function SearchHeader({
     onOpenSwipe: () => void;
     onOpenBrowser: () => void;
 }) {
+    const insets = useSafeAreaInsets();
     return (
         <>
             <View style={styles.titleRow}>
-                <Text style={styles.title}>Discover</Text>
-                <Pressable style={styles.browserButton} onPress={onOpenBrowser}>
+                <Text style={[styles.title, { paddingTop: insets.top }]}>
+                    Discover
+                </Text>
+                <Pressable
+                    style={[styles.browserButton, { marginTop: insets.top }]}
+                    onPress={onOpenBrowser}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Browse web"
+                >
                     <Globe size={18} color={colors.textSecondary} />
                 </Pressable>
-                <Pressable style={styles.swipeButton} onPress={onOpenSwipe}>
+                <Pressable
+                    style={[styles.swipeButton, { marginTop: insets.top }]}
+                    onPress={onOpenSwipe}
+                    accessibilityRole="button"
+                    accessibilityLabel="Open swipe discover"
+                >
                     <Text style={styles.swipeButtonText}>Swipe</Text>
                 </Pressable>
-                <Pressable style={styles.modeToggle} onPress={onToggleMode}>
+                <Pressable
+                    style={[styles.modeToggle, { marginTop: insets.top }]}
+                    onPress={onToggleMode}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                        discoveryMode === "characters"
+                            ? "Switch to creators"
+                            : "Switch to characters"
+                    }
+                >
                     <Text style={styles.modeToggleText}>
                         {discoveryMode === "characters" ? "Creators" : "Characters"}
                     </Text>
@@ -133,7 +157,13 @@ export const ControlsRow = React.memo(function ControlsRow({
                 <Text style={styles.controlButtonText}>{tagsLabel}</Text>
             </Pressable>
 
-            <Pressable style={styles.controlButtonIcon} onPress={onOpenFilters}>
+            <Pressable
+                style={styles.controlButtonIcon}
+                onPress={onOpenFilters}
+                hitSlop={4}
+                accessibilityRole="button"
+                accessibilityLabel="Filter results"
+            >
                 <Filter size={18} color={colors.textSecondary} />
             </Pressable>
         </View>
@@ -360,7 +390,6 @@ const styles = StyleSheet.create({
         fontSize: 28,
         fontWeight: "800",
         paddingHorizontal: 20,
-        paddingTop: 60,
     },
     subtitle: {
         color: colors.textDim,
@@ -438,7 +467,6 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         paddingHorizontal: 14,
         paddingVertical: 8,
-        marginTop: 60,
     },
     modeToggleText: {
         color: colors.accent,
@@ -450,7 +478,6 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         paddingHorizontal: 14,
         paddingVertical: 8,
-        marginTop: 60,
     },
     swipeButtonText: {
         color: colors.background,
@@ -467,6 +494,5 @@ const styles = StyleSheet.create({
         height: 36,
         alignItems: "center",
         justifyContent: "center",
-        marginTop: 60,
     },
 });

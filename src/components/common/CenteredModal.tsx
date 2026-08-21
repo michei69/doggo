@@ -41,13 +41,20 @@ export default function CenteredModal({
           { backgroundColor: `rgba(0,0,0,${backdropOpacity})` },
         ]}
         onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel="Close"
       >
         <Pressable style={[styles.content, contentStyle]} onPress={() => {}}>
           {title && (
             <View style={styles.header}>
               <Text style={styles.title}>{title}</Text>
               {!hideCloseButton && (
-                <Pressable onPress={onClose} hitSlop={8}>
+                <Pressable
+                  onPress={onClose}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close"
+                >
                   <X size={20} color={colors.text} />
                 </Pressable>
               )}
