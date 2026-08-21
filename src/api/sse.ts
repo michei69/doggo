@@ -158,6 +158,7 @@ export async function streamRequest({
     onStream,
 }: StreamRequestOptions): Promise<void> {
     let response: Response;
+    console.log("[API]", "POST", url);
     try {
         response = await fetch(url, {
             method: "POST",
@@ -165,7 +166,9 @@ export async function streamRequest({
             body: JSON.stringify(body),
             signal,
         });
+        console.log("[API]", response.status, "POST", url);
     } catch (err: unknown) {
+        console.log("[API] ERR", "NO_RESPONSE", "POST", url, err instanceof Error ? err.message : String(err));
         if (signal?.aborted) return;
         callbacks.onError(err instanceof Error ? err : new Error(String(err)));
         return;
