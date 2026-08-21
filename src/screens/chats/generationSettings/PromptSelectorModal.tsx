@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import {
   ActivityIndicator,
@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -44,22 +45,28 @@ export default function PromptSelectorModal({
   const [form, setForm] = useState<PromptEditForm>({ name: "", content: "" });
   const [formSaving, setFormSaving] = useState(false);
 
+  // Animates the form view sliding in (matches the modal open/close feel).
+  const formAnim = useSharedValue(0);
+
   const openCreate = useCallback(() => {
     setForm({ name: "", content: "" });
     editingIdRef.current = null;
     setMode("creating");
-  }, []);
+    formAnim.value = withTiming(1, { duration: 200 });
+  }, [formAnim]);
 
   const openEditPrompt = useCallback((prompt: PromptLibraryItem) => {
     setForm({ name: prompt.name, content: prompt.content });
     editingIdRef.current = prompt.id;
     setMode("editing");
-  }, []);
+    formAnim.value = withTiming(1, { duration: 200 });
+  }, [formAnim]);
 
   const goBackToList = useCallback(() => {
     setMode("list");
     editingIdRef.current = null;
-  }, []);
+    formAnim.value = 0;
+  }, [formAnim]);
 
   const handleSaveForm = useCallback(async () => {
     if (!form.name.trim()) return;
@@ -119,16 +126,25 @@ export default function PromptSelectorModal({
     [showAlert, dismissAlert, selectedPromptId, setPrompts, onSelect],
   );
 
-  const isFormView = mode === "editing" || mode === "creating";
+  const promptKeyExtractor = useCallback((p: PromptLibraryItem) => p.id, []);
 
-  // Animate the form view sliding in (matches the modal open/close feel).
-  const formAnim = useSharedValue(0);
-  useEffect(() => {
-    if (isFormView) {
-      formAnim.value = 0;
-      formAnim.value = withTiming(1, { duration: 200 });
-    }
-  }, [isFormView, mode, formAnim]);
+  const renderPromptItem = useCallback(
+    ({ item: p }: { item: PromptLibraryItem }) => (
+      <PromptRow
+        prompt={p}
+        selected={selectedPromptId === p.id}
+        onSelect={() => {
+          onSelect(p.id);
+          onClose();
+        }}
+        onEdit={() => openEditPrompt(p)}
+        onDelete={() => handleDeletePrompt(p)}
+      />
+    ),
+    [selectedPromptId, onSelect, onClose, openEditPrompt, handleDeletePrompt],
+  );
+
+  const isFormView = mode === "editing" || mode === "creating";
 
   const formStyle = useAnimatedStyle(() => ({
     opacity: formAnim.value,
@@ -233,10 +249,7 @@ export default function PromptSelectorModal({
               </ScrollView>
               </Animated.View>
             ) : (
-              <ScrollView
-                style={styles.modalScroll}
-                showsVerticalScrollIndicator={false}
-              >
+              <View style={styles.modalScroll}>
                 <Pressable
                   style={[
                     styles.promptItem,
@@ -249,38 +262,13 @@ export default function PromptSelectorModal({
                 >
                   <Text style={styles.promptItemName}>None</Text>
                 </Pressable>
-                {prompts.map((p) => (
-                  <View key={p.id} style={styles.promptItemRow}>
-                    <Pressable
-                      style={[
-                        styles.promptItem,
-                        { flex: 1, marginBottom: 0 },
-                        selectedPromptId === p.id && styles.promptItemSelected,
-                      ]}
-                      onPress={() => {
-                        onSelect(p.id);
-                        onClose();
-                      }}
-                    >
-                      <Text style={styles.promptItemName} numberOfLines={2}>
-                        {p.name || "(unnamed)"}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      style={styles.promptItemActionBtn}
-                      onPress={() => openEditPrompt(p)}
-                    >
-                      <Text style={styles.promptItemActionText}>Edit</Text>
-                    </Pressable>
-                    <Pressable
-                      style={styles.promptItemIconBtn}
-                      onPress={() => handleDeletePrompt(p)}
-                    >
-                      <Text style={styles.promptItemIconText}>{"\u{1F5D1}"}</Text>
-                    </Pressable>
-                  </View>
-                ))}
-              </ScrollView>
+                <FlashList
+                  data={prompts}
+                  keyExtractor={promptKeyExtractor}
+                  renderItem={renderPromptItem}
+                  showsVerticalScrollIndicator={false}
+                />
+              </View>
             )}
           </Pressable>
         </Pressable>
@@ -289,10 +277,47 @@ export default function PromptSelectorModal({
   );
 }
 
+const PromptRow = React.memo(function PromptRow({
+  prompt,
+  selected,
+  onSelect,
+  onEdit,
+  onDelete,
+}: {
+  prompt: PromptLibraryItem;
+  selected: boolean;
+  onSelect: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <View style={styles.promptItemRow}>
+      <Pressable
+        style={[
+          styles.promptItem,
+          styles.promptItemRowMain,
+          selected && styles.promptItemSelected,
+        ]}
+        onPress={onSelect}
+      >
+        <Text style={styles.promptItemName} numberOfLines={2}>
+          {prompt.name || "(unnamed)"}
+        </Text>
+      </Pressable>
+      <Pressable style={styles.promptItemActionBtn} onPress={onEdit}>
+        <Text style={styles.promptItemActionText}>Edit</Text>
+      </Pressable>
+      <Pressable style={styles.promptItemIconBtn} onPress={onDelete}>
+        <Text style={styles.promptItemIconText}>{"\u{1F5D1}"}</Text>
+      </Pressable>
+    </View>
+  );
+});
+
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.8)",
+    backgroundColor: colors.overlayStrong,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -410,8 +435,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   promptItemSelected: {
-    backgroundColor: "rgba(124, 92, 231, 0.15)",
+    backgroundColor: colors.accentSoft,
     borderColor: colors.accent,
+  },
+  promptItemRowMain: {
+    flex: 1,
+    marginBottom: 0,
   },
   promptItemName: {
     color: colors.textSecondary,

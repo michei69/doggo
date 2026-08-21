@@ -4,7 +4,6 @@ import {
   Text,
   ActivityIndicator,
   StyleSheet,
-  RefreshControl,
   TextInput,
   Pressable,
   ScrollView,
@@ -23,12 +22,16 @@ import { withChallengeRetry } from "../../hooks/useChat";
 import { useTurnstile } from "../../components/turnstile/TurnstileProvider";
 import { botAvatarUrl } from "../../utils/assets";
 import { stripHtml } from "../../utils/markdown";
-import type { ChatListItem } from "../../types/api";
+import type { ChatListItem, PersonaRef } from "../../types/api";
 import type { ChatsStackParamList } from "../../navigation/types";
 import ChatEntryActions from "../../components/chat/ChatEntryActions";
 import PersonaPicker from "../../components/chat/PersonaPicker";
+import ChatsSheet from "../../components/chat/ChatsSheet";
+import { ChatRow } from "../../components/chat/ChatRow";
 import CustomAlert from "../../components/common/CustomAlert";
 import CustomBottomSheet from "../../components/common/CustomBottomSheet";
+import EmptyState from "../../components/common/EmptyState";
+import { useRefreshControl } from "../../components/common/useRefreshControl";
 import {
   getCharacterChats,
   deleteChat as deleteChatApi,
@@ -161,7 +164,7 @@ export default function ChatListScreen() {
     setPersonaPickerVisible(true);
   }, [targetChat]);
   const handlePersonaSelect = useCallback(
-    async (persona: { id: string; name: string; avatar: string } | null) => {
+    async (persona: PersonaRef | null) => {
       if (!targetChat) return;
       try {
         const chatId = await startNewChat(targetChat.character_id, persona?.id);
@@ -233,6 +236,12 @@ export default function ChatListScreen() {
       openChat(item);
     },
     [openChat],
+  );
+  const renderCharChatRow = useCallback(
+    ({ item }: { item: ChatListItem }) => (
+      <ChatRow item={item} onPress={openCharChat} />
+    ),
+    [openCharChat],
   );
 
   const handleActionsClose = useCallback(() => setActionsVisible(false), []);
@@ -311,12 +320,13 @@ export default function ChatListScreen() {
         visible={characterChatsVisible}
         onClose={handleAllChatsClose}
       >
-        <CharacterChatsSheet
-          name={characterChatsName}
+        <ChatsSheet
+          title={characterChatsName}
           loading={characterChatsLoading}
           chats={characterChats}
-          onOpenItem={openCharChat}
+          emptyText="No other chats with this character"
           onBack={handleCharChatsBack}
+          renderItem={renderCharChatRow}
         />
       </CustomBottomSheet>
 
@@ -425,25 +435,18 @@ const ChatListEmptyState = React.memo(function ChatListEmptyState({
   isRefreshing: boolean;
   onRefresh: () => void;
 }) {
-  const refreshControl = useMemo(
-    () => (
-      <RefreshControl
-        refreshing={isRefreshing}
-        onRefresh={onRefresh}
-        tintColor={colors.accent}
-      />
-    ),
-    [isRefreshing, onRefresh],
-  );
+  const refreshControl = useRefreshControl(isRefreshing, onRefresh);
   return (
     <ScrollView
       contentContainerStyle={[styles.centered, { flexGrow: 1 }]}
       refreshControl={refreshControl}
     >
-      <Text style={styles.emptyText}>No chats yet</Text>
-      <Text style={styles.emptySubtext}>
-        Start a chat from the Discover tab
-      </Text>
+      <EmptyState
+        text="No chats yet"
+        subtext="Start a chat from the Discover tab"
+        textStyle={styles.emptyText}
+        subtextStyle={styles.emptySubtext}
+      />
     </ScrollView>
   );
 });
@@ -493,36 +496,6 @@ const ChatListItemRow = React.memo(function ChatListItemRow({
   );
 });
 
-const CharChatRow = React.memo(function CharChatRow({
-  item,
-  onOpen,
-}: {
-  item: ChatListItem;
-  onOpen: (item: ChatListItem) => void;
-}) {
-  return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.charChatRow,
-        pressed && { opacity: 0.7 },
-      ]}
-      onPress={() => onOpen(item)}
-    >
-      <Avatar
-        uri={botAvatarUrl(item.character.avatar)}
-        name={item.character.name}
-        size={36}
-      />
-      <View style={{ flex: 1 }}>
-        <Text style={styles.charChatRowName} numberOfLines={1}>
-          {item.character.name}
-        </Text>
-        <Text style={styles.charChatRowMeta}>{item.chat_count} messages</Text>
-      </View>
-    </Pressable>
-  );
-});
-
 const ChatsList = React.memo(function ChatsList({
   data,
   onOpenItem,
@@ -559,16 +532,7 @@ const ChatsList = React.memo(function ChatsList({
     [],
   );
 
-  const refreshControl = useMemo(
-    () => (
-      <RefreshControl
-        refreshing={isRefreshing}
-        onRefresh={onRefresh}
-        tintColor={colors.accent}
-      />
-    ),
-    [isRefreshing, onRefresh],
-  );
+  const refreshControl = useRefreshControl(isRefreshing, onRefresh);
 
   return (
     <FlashList
@@ -592,62 +556,6 @@ const ChatsList = React.memo(function ChatsList({
         ) : null
       }
     />
-  );
-});
-
-const CharacterChatsSheet = React.memo(function CharacterChatsSheet({
-  name,
-  loading,
-  chats,
-  onOpenItem,
-  onBack,
-}: {
-  name: string;
-  loading: boolean;
-  chats: ChatListItem[];
-  onOpenItem: (item: ChatListItem) => void;
-  onBack: () => void;
-}) {
-  const renderItem = useCallback(
-    ({ item }: { item: ChatListItem }) => (
-      <CharChatRow item={item} onOpen={onOpenItem} />
-    ),
-    [onOpenItem],
-  );
-
-  const keyExtractor = useCallback(
-    (item: ChatListItem) => item.id.toString(),
-    [],
-  );
-
-  return (
-    <View style={styles.charChatsContent}>
-      <View style={styles.charChatsTitleRow}>
-        <Pressable onPress={onBack} style={styles.charChatsBackBtn}>
-          <Text style={styles.charChatsBackText}>{"\u2190"}</Text>
-        </Pressable>
-        <Text style={styles.charChatsTitle}>{name}</Text>
-        <View style={styles.charChatsBackBtn} />
-      </View>
-      {loading ? (
-        <ActivityIndicator
-          color={colors.accent}
-          style={{ paddingVertical: 24 }}
-        />
-      ) : chats.length === 0 ? (
-        <Text style={styles.charChatsEmpty}>
-          No other chats with this character
-        </Text>
-      ) : (
-        <FlashList
-          data={chats}
-          renderItem={renderItem}
-          keyExtractor={keyExtractor}
-          style={styles.charChatsList}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
-    </View>
   );
 });
 
@@ -801,64 +709,5 @@ const styles = StyleSheet.create({
   },
   footerLoader: {
     paddingVertical: 20,
-  },
-  charChatsContent: {
-    paddingHorizontal: 20,
-    paddingTop: 4,
-    paddingBottom: 8,
-  },
-  charChatsTitle: {
-    color: colors.textSecondary,
-    fontSize: 18,
-    fontWeight: "700",
-    textAlign: "center",
-    paddingVertical: 12,
-    flex: 1,
-  },
-  charChatsTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    marginBottom: 4,
-  },
-  charChatsBackBtn: {
-    width: 40,
-    height: 48,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  charChatsBackText: {
-    color: colors.accent,
-    fontSize: 20,
-    fontWeight: "600",
-  },
-  charChatsEmpty: {
-    color: colors.textFaint,
-    textAlign: "center",
-    paddingVertical: 24,
-    fontSize: 14,
-  },
-  charChatsList: {
-    maxHeight: 300,
-  },
-  charChatRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  charChatRowName: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  charChatRowMeta: {
-    color: colors.textDim,
-    fontSize: 12,
-    marginTop: 2,
   },
 });

@@ -11,7 +11,6 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { ChatsStackParamList } from "../../navigation/types";
-import { getMyProfile } from "../../api/profile";
 import { getApiSettings, updateApiSettings } from "../../api/settings";
 import { colors } from "../../utils/colors";
 import ScreenHeader from "../../components/common/ScreenHeader";
@@ -93,7 +92,6 @@ export default function GenerationSettingsScreen() {
   const [isDirty, setIsDirty] = useState(false);
   const [privacyMode, setPrivacyMode] = useState(false);
   const fetchedRef = useRef(false);
-  const clientIdRef = useRef<string>("");
   const activeChatId = useChatStore((s) => s.activeChatId);
   const keyboardHeight = useKeyboardHeight();
   const { alert, showAlert, dismissAlert } = useAlert();
@@ -101,7 +99,6 @@ export default function GenerationSettingsScreen() {
     proxyConfigs,
     setProxyConfigs,
     setSettings,
-    clientIdRef,
     showAlert,
     dismissAlert,
     setIsDirty,
@@ -175,13 +172,11 @@ export default function GenerationSettingsScreen() {
     let cancelled = false;
     const load = async () => {
       try {
-        const [apiSettings, profile, savedPrivacyMode] = await Promise.all([
+        const [apiSettings, savedPrivacyMode] = await Promise.all([
           getApiSettings(),
-          getMyProfile(),
           storage.getPrivacyMode(),
         ]);
         if (cancelled) return;
-        clientIdRef.current = profile.id;
         setSettings(apiSettings.settings);
         setProxyConfigs(apiSettings.proxy_configs);
         setPrompts(apiSettings.prompts);

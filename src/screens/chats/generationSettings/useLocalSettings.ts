@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import { attemptExtractSystemPrompt, fetchSystemPrompt } from "../../../api/chats";
 import { useChatStore } from "../../../stores/chatStore";
 import { storage } from "../../../utils/storage";
-import { processSystemMessage } from "../../../utils/processText";
-import { cleanTags, generify } from "../../../utils/markdown";
+import { fetchPersonaField } from "../../../utils/systemPrompt";
 import type { ShowAlert } from "./types";
 
 export function useLocalSettings({
@@ -93,28 +91,9 @@ export function useLocalSettings({
             const detail = useChatStore.getState().activeChatDetail;
             if (!detail) throw new Error("Chat not loaded");
             const characterName = detail.character.chat_name || detail.character.name;
-            try {
-                const prompt = await fetchSystemPrompt(detail);
-                const { personality } = processSystemMessage(prompt, characterName);
-                setLocalPersonality(
-                    generify(
-                        cleanTags(personality ?? "", `${characterName}'s Persona`),
-                        characterName,
-                    ),
-                );
-            } catch {
-                const abortController = new AbortController();
-                const { character_id } = detail.chat;
-                const personaTag = `${characterName}'s Persona`;
-                const personaResult = await attemptExtractSystemPrompt(
-                    character_id,
-                    personaTag,
-                    abortController.signal,
-                );
-                setLocalPersonality(
-                    generify(cleanTags(personaResult, personaTag), characterName),
-                );
-            }
+            setLocalPersonality(
+                await fetchPersonaField(detail, `${characterName}'s Persona`, "personality"),
+            );
         } catch (err: any) {
             showAlert("Error", err.message || "Failed to fetch personality", [
                 { text: "OK", onPress: dismissAlert },
@@ -130,25 +109,9 @@ export function useLocalSettings({
         try {
             const detail = useChatStore.getState().activeChatDetail;
             if (!detail) throw new Error("Chat not loaded");
-            const characterName = detail.character.chat_name || detail.character.name;
-            try {
-                const prompt = await fetchSystemPrompt(detail);
-                const { scenario } = processSystemMessage(prompt, characterName);
-                setLocalScenario(
-                    generify(cleanTags(scenario ?? "", "Scenario"), characterName),
-                );
-            } catch {
-                const abortController = new AbortController();
-                const { character_id } = detail.chat;
-                const scenario = await attemptExtractSystemPrompt(
-                    character_id,
-                    "Scenario",
-                    abortController.signal,
-                );
-                setLocalScenario(
-                    generify(cleanTags(scenario ?? "", "Scenario"), characterName),
-                );
-            }
+            setLocalScenario(
+                await fetchPersonaField(detail, "Scenario", "scenario"),
+            );
         } catch (err: any) {
             showAlert("Error", err.message || "Failed to fetch scenario", [
                 { text: "OK", onPress: dismissAlert },

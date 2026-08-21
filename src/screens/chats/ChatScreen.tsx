@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { View, StyleSheet } from "react-native";
 import ChatSettingsOverlay from "../../components/chat/ChatSettingsOverlay";
 import MessagesActionsSheet from "../../components/chat/MessagesActionsSheet";

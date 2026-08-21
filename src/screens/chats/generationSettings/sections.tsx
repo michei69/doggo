@@ -624,7 +624,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   proxyOptionActive: {
-    backgroundColor: "rgba(124, 92, 231, 0.15)",
+    backgroundColor: colors.accentSoft,
     borderColor: colors.accent,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
@@ -637,7 +637,7 @@ const styles = StyleSheet.create({
   },
   proxyModelChip: {
     alignSelf: "flex-start",
-    backgroundColor: "rgba(124, 92, 231, 0.15)",
+    backgroundColor: colors.accentSoft,
     borderRadius: 5,
     paddingHorizontal: 7,
     paddingVertical: 2,
@@ -784,7 +784,7 @@ const styles = StyleSheet.create({
   badWordChip: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(231, 76, 60, 0.15)",
+    backgroundColor: colors.dangerSoft,
     borderRadius: 14,
     paddingHorizontal: 10,
     paddingVertical: 4,

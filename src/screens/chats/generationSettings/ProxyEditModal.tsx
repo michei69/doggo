@@ -132,7 +132,7 @@ export default function ProxyEditModal({
       {Platform.OS === "ios" ? (
         <KeyboardAvoidingView style={styles.modalOverlay} behavior="padding">
           <Pressable
-            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+            style={{ flex: 1, width: "100%", justifyContent: "center", alignItems: "center" }}
             onPress={onCancel}
           >
             <Pressable style={styles.modalContent} onPress={() => {}}>
@@ -147,7 +147,7 @@ export default function ProxyEditModal({
       ) : (
         <View style={[styles.modalOverlay, { paddingBottom: keyboardHeight }]}>
           <Pressable
-            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+            style={{ flex: 1, width: "100%", justifyContent: "center", alignItems: "center" }}
             onPress={onCancel}
           >
             <Pressable style={styles.modalContent} onPress={() => {}}>
@@ -167,7 +167,7 @@ export default function ProxyEditModal({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.8)",
+    backgroundColor: colors.overlayStrong,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -178,6 +178,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     width: "90%",
     maxHeight: "80%",
+    flexShrink: 1,
     padding: 20,
   },
   modalTitle: {
@@ -186,7 +187,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 16,
   },
-  modalScroll: { maxHeight: "100%" },
+  modalScroll: { flexShrink: 1 },
   editLabel: {
     color: colors.textFaint,
     fontSize: 12,

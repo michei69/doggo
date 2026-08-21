@@ -5,17 +5,22 @@ import { useChat } from "../../../hooks/useChat";
 import { useAuthStore } from "../../../stores/authStore";
 import { useChatStore } from "../../../stores/chatStore";
 import type { ChatsStackParamList } from "../../../navigation/types";
-import type { ChatMessage, ChatListItem } from "../../../types/api";
+import type {
+    ChatMessage,
+    ChatListItem,
+    PersonaRef,
+} from "../../../types/api";
 import { avatarUrl, botAvatarUrl } from "../../../utils/assets";
 import { useAlert } from "../../../hooks/useAlert";
 import {
+    attemptExtractSystemPrompt,
     clearAndResetMessages,
-    getCharacterChats,
+    deleteMessagesInBatches,
     fetchSystemPrompt,
     forkChat,
-    attemptExtractSystemPrompt,
+    getCharacterChats,
+    postMessages,
 } from "../../../api/chats";
-import { apiClient } from "../../../api/client";
 import { useKeyboardHeight } from "../../../hooks/useKeyboardHeight";
 import { useIsTablet } from "../../../hooks/useIsTablet";
 import { processSystemMessage, processText } from "../../../utils/processText";
@@ -29,31 +34,6 @@ import { useSheetStore } from "../../../stores/sheetStore";
 
 type Route = RouteProp<ChatsStackParamList, "ChatScreen">;
 type Nav = NativeStackNavigationProp<ChatsStackParamList, "ChatScreen">;
-
-interface MessageBatchBody {
-    is_bot: boolean;
-    is_main: boolean;
-    message: string;
-    metadata: unknown;
-    character_id: string;
-    chat_id: number;
-    created_at: string;
-}
-
-async function postMessageBatches(
-    chatId: number,
-    bodies: MessageBatchBody[],
-): Promise<void> {
-    const batches: MessageBatchBody[][] = [];
-    for (let i = 0; i < bodies.length; i += 10) {
-        batches.push(bodies.slice(i, i + 10).reverse());
-    }
-    await batches.reduce(
-        (prev, batch) =>
-            prev.then(() => apiClient.post(`/chats/${chatId}/messages`, batch)),
-        Promise.resolve(),
-    );
-}
 
 export function useChatScreen() {
     const route = useRoute<Route>();
@@ -301,7 +281,6 @@ export function useChatScreen() {
                             detail.character.chat_name || detail.character.name;
 
                         const doExtraction = async () => {
-                            console.log("extracting");
                             let extractionError: string | null = null;
                             const personaTag = `${characterName}'s Persona`;
 
@@ -368,7 +347,7 @@ export function useChatScreen() {
     }, []);
 
     const handleNewChatPersonaSelect = useCallback(
-        async (persona: { id: string; name: string; avatar: string } | null) => {
+        async (persona: PersonaRef | null) => {
             try {
                 const newChatId = await startNewChat(characterId, persona?.id);
                 navigate("ChatScreen", {
@@ -474,20 +453,7 @@ export function useChatScreen() {
                     },
                     [],
                 );
-                await Promise.all(
-                    (() => {
-                        const requests: Promise<unknown>[] = [];
-                        for (let i = 0; i < currentIds.length; i += 256) {
-                            const batch = currentIds.slice(i, i + 256);
-                            requests.push(
-                                apiClient.delete(`/chats/${chatId}/messages`, {
-                                    data: { message_ids: batch },
-                                }),
-                            );
-                        }
-                        return requests;
-                    })(),
-                );
+                await deleteMessagesInBatches(chatId, currentIds);
                 // Post imported messages in batches of 25
                 const body = messages.map((m) => ({
                     is_bot: m.is_bot,
@@ -498,7 +464,7 @@ export function useChatScreen() {
                     chat_id: chatId,
                     created_at: m.created_at,
                 }));
-                await postMessageBatches(chatId, body);
+                await postMessages(chatId, body);
                 await loadMessages(chatId);
                 toast("Messages imported successfully");
             } catch {

@@ -1,4 +1,3 @@
-import type { AlertButton } from "../../../components/common/CustomAlert";
 import type {
     ApiProxyConfig,
     ApiSettingsGeneration,
@@ -8,11 +7,7 @@ import type {
 
 export type GenSettings = ApiSettingsGeneration;
 export type UpdateGen = (patch: Partial<ApiSettingsGeneration>) => void;
-export type ShowAlert = (
-    title: string,
-    message: string,
-    buttons: AlertButton[],
-) => void;
+export type { ShowAlert } from "../../../components/common/CustomAlert";
 export type ProxyEditForm = {
     name: string;
     model: string;

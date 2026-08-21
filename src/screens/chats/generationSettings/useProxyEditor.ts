@@ -6,6 +6,7 @@ import {
     getApiSettings,
     updateProxyConfig,
 } from "../../../api/settings";
+import { uuidv4 } from "../../../utils/uuid";
 import type {
     ApiProxyConfig,
     ApiSettingsSettings,
@@ -17,7 +18,6 @@ export function useProxyEditor({
     proxyConfigs,
     setProxyConfigs,
     setSettings,
-    clientIdRef,
     showAlert,
     dismissAlert,
     setIsDirty,
@@ -25,7 +25,6 @@ export function useProxyEditor({
     proxyConfigs: ApiProxyConfig[];
     setProxyConfigs: Dispatch<SetStateAction<ApiProxyConfig[]>>;
     setSettings: Dispatch<SetStateAction<ApiSettingsSettings>>;
-    clientIdRef: React.MutableRefObject<string>;
     showAlert: ShowAlert;
     dismissAlert: () => void;
     setIsDirty: Dispatch<SetStateAction<boolean>>;
@@ -82,15 +81,19 @@ export function useProxyEditor({
         setProxySaving(true);
         try {
             if (isCreatingProxy) {
-                const created = await createProxyConfig({
+                await createProxyConfig({
                     api_key: editForm.api_key,
                     api_url: editForm.api_url,
-                    client_id: clientIdRef.current,
+                    client_id: uuidv4(),
                     model: editForm.model,
                     name: editForm.name,
                     prompt_id: editForm.prompt_id,
                 });
-                setProxyConfigs((prev) => [...prev, created]);
+                // Refetch so the list matches server truth (id, position,
+                // prompt materialization). Appending the raw response risks a
+                // duplicate id / stale shape -> React key collision.
+                const apiSettings = await getApiSettings();
+                setProxyConfigs(apiSettings.proxy_configs);
             } else {
                 const updated = await updateProxyConfig(editingProxyId, {
                     api_key: editForm.api_key,
@@ -112,7 +115,7 @@ export function useProxyEditor({
         } finally {
             setProxySaving(false);
         }
-    }, [editingProxyId, isCreatingProxy, editForm, clientIdRef, setProxyConfigs, showAlert, dismissAlert]);
+    }, [editingProxyId, isCreatingProxy, editForm, setProxyConfigs, showAlert, dismissAlert]);
 
     const duplicateProxy = useCallback(
         async (proxy: ApiProxyConfig) => {
@@ -122,7 +125,7 @@ export function useProxyEditor({
                 await createProxyConfig({
                     api_key: proxy.api_key,
                     api_url: proxy.api_url,
-                    client_id: clientIdRef.current,
+                    client_id: uuidv4(),
                     model: proxy.model,
                     name: `${proxy.name} (Copy)`,
                     prompt_id: proxy.prompt?.id ?? null,
@@ -145,7 +148,7 @@ export function useProxyEditor({
                 setDuplicatingId(null);
             }
         },
-        [clientIdRef, setProxyConfigs, setSettings, showAlert, dismissAlert, duplicatingId],
+        [setProxyConfigs, setSettings, showAlert, dismissAlert, duplicatingId],
     );
 
     const deleteProxy = useCallback(

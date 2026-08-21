@@ -148,7 +148,7 @@ const SystemPromptModal = React.memo(
 const styles = StyleSheet.create({
   sysPromptOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.8)",
+    backgroundColor: colors.overlayStrong,
     justifyContent: "center",
     alignItems: "center",
   },
