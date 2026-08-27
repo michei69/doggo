@@ -1,4 +1,7 @@
-# Doggo
+![](https://raw.githubusercontent.com/michei69/disclaimers/refs/heads/main/ai/x2.png)
+![](https://raw.githubusercontent.com/michei69/disclaimers/refs/heads/main/no-maintenance/x2.png)
+
+# doggo
 
 a sloppy ass client for [janitorAI](https://janitorai.com). goon with ur characters, discover new ones, create your own, and manage personas - all from a mobile app that actually fucking works and isnt just a webview.
 
