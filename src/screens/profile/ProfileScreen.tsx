@@ -1,5 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, type DimensionValue } from "react-native";
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  StyleSheet,
+  type DimensionValue,
+} from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import Animated, {
@@ -8,7 +15,13 @@ import Animated, {
   withRepeat,
   withTiming,
 } from "react-native-reanimated";
-import { User, Settings, MessageSquare, Users, ChevronRight } from "lucide-react-native";
+import {
+  User,
+  Settings,
+  MessageSquare,
+  Users,
+  ChevronRight,
+} from "lucide-react-native";
 import Avatar from "../../components/common/Avatar";
 import { useAuthStore } from "../../stores/authStore";
 import { getMyProfile } from "../../api/profile";
@@ -46,7 +59,10 @@ function SkeletonBlock({
   return (
     <View style={{ width, height, overflow: "hidden" }}>
       <Animated.View
-        style={[{ flex: 1, borderRadius, backgroundColor: SKELETON_BASE }, animatedStyle]}
+        style={[
+          { flex: 1, borderRadius, backgroundColor: SKELETON_BASE },
+          animatedStyle,
+        ]}
       />
     </View>
   );
@@ -171,17 +187,9 @@ export default function ProfileScreen() {
         <Text style={styles.sectionTitle}>Account</Text>
         {isLoading ? (
           <>
-            <SkeletonBlock
-              width="100%"
-              height={48}
-              borderRadius={10}
-            />
+            <SkeletonBlock width="100%" height={48} borderRadius={10} />
             <View style={{ height: 8 }} />
-            <SkeletonBlock
-              width="100%"
-              height={48}
-              borderRadius={10}
-            />
+            <SkeletonBlock width="100%" height={48} borderRadius={10} />
           </>
         ) : (
           <>

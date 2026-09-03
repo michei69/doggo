@@ -1,10 +1,5 @@
 import type React from "react";
-import {
-  useEffect,
-  useEffectEvent,
-  useImperativeHandle,
-  useRef,
-} from "react";
+import { useEffect, useEffectEvent, useImperativeHandle, useRef } from "react";
 import {
   View,
   Text,

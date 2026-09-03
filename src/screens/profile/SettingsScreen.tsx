@@ -363,7 +363,10 @@ export default function SettingsScreen() {
   }, [logout, showAlert, dismissAlert]);
 
   const openLayoutPicker = useCallback(() => setLayoutPickerVisible(true), []);
-  const closeLayoutPicker = useCallback(() => setLayoutPickerVisible(false), []);
+  const closeLayoutPicker = useCallback(
+    () => setLayoutPickerVisible(false),
+    [],
+  );
   const selectLayout = useCallback(
     (key: string) => {
       setChatLayout(key as LayoutOption);

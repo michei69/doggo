@@ -51,6 +51,11 @@ interface ChatState {
     removeChat: (chatId: number) => void;
     addMessage: (message: ChatMessage) => void;
     updateMessage: (messageId: number, newContent: string) => void;
+    updateChatSummary: (
+        chatId: number,
+        summary: string,
+        summaryChatId: number | null,
+    ) => void;
     removeMessages: (messageIds: number[]) => void;
     replaceMessages: (messages: ChatMessage[]) => void;
     setActiveChat: (chatId: number | null) => void;
@@ -194,6 +199,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
         set((state) => ({
             messages: state.messages.map((m) =>
                 m.id === messageId ? { ...m, message: newContent } : m,
+            ),
+        }));
+    },
+
+    updateChatSummary: (chatId, summary, summaryChatId) => {
+        set((state) => ({
+            activeChatDetail:
+                state.activeChatDetail?.chat.id === chatId
+                    ? {
+                          ...state.activeChatDetail,
+                          chat: {
+                              ...state.activeChatDetail.chat,
+                              summary,
+                              summary_chat_id: summaryChatId,
+                          },
+                      }
+                    : state.activeChatDetail,
+            chats: state.chats.map((chat) =>
+                chat.id === chatId ? { ...chat, summary } : chat,
             ),
         }));
     },

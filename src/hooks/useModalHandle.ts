@@ -1,8 +1,4 @@
-import {
-  useCallback,
-  useImperativeHandle,
-  useState,
-} from "react";
+import { useCallback, useImperativeHandle, useState } from "react";
 import type React from "react";
 
 /**
@@ -11,19 +7,19 @@ import type React from "react";
  * callback runs before the modal becomes visible (used to reset draft state).
  */
 export function useModalHandle(
-  ref: React.Ref<{ open: () => void }> | undefined,
-  onOpen?: () => void,
+    ref: React.Ref<{ open: () => void }> | undefined,
+    onOpen?: () => void,
 ) {
-  const [visible, setVisible] = useState(false);
+    const [visible, setVisible] = useState(false);
 
-  const open = useCallback(() => {
-    onOpen?.();
-    setVisible(true);
-  }, [onOpen]);
+    const open = useCallback(() => {
+        onOpen?.();
+        setVisible(true);
+    }, [onOpen]);
 
-  const close = useCallback(() => setVisible(false), []);
+    const close = useCallback(() => setVisible(false), []);
 
-  useImperativeHandle(ref, () => ({ open, close }));
+    useImperativeHandle(ref, () => ({ open, close }));
 
-  return { visible, open, close };
+    return { visible, open, close };
 }

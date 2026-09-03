@@ -91,7 +91,9 @@ export async function getPersonaGroups(): Promise<PersonaGroup[]> {
     });
 }
 
-export async function createPersonaGroup(data: PersonaGroupBody): Promise<PersonaGroup> {
+export async function createPersonaGroup(
+    data: PersonaGroupBody,
+): Promise<PersonaGroup> {
     return request<PersonaGroup>({
         method: "POST",
         url: "/persona-groups",

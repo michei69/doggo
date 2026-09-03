@@ -1,7 +1,4 @@
-import {
-    attemptExtractSystemPrompt,
-    fetchSystemPrompt,
-} from "../api/chats";
+import { attemptExtractSystemPrompt, fetchSystemPrompt } from "../api/chats";
 import type { ChatDetail } from "../types/api";
 import { processSystemMessage } from "./processText";
 import { cleanTags, generify } from "./markdown";
@@ -24,7 +21,7 @@ export async function fetchPersonaField(
             characterName,
         );
         const value =
-            field === "personality" ? personality ?? "" : scenario ?? "";
+            field === "personality" ? (personality ?? "") : (scenario ?? "");
         return generify(cleanTags(value, tag), characterName);
     } catch {
         const abortController = new AbortController();

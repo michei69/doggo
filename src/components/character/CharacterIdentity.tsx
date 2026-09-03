@@ -32,8 +32,7 @@ export default function CharacterIdentity({
   const [preview, setPreview] = useState<AvatarPreviewState | null>(null);
 
   const compact = variant === "compact";
-  const hasTags =
-    character.tags.length > 0 || character.custom_tags.length > 0;
+  const hasTags = character.tags.length > 0 || character.custom_tags.length > 0;
 
   const openPreview = () => {
     setPreview({
@@ -71,7 +70,8 @@ export default function CharacterIdentity({
               compact && styles.subscriberBadgeCompact,
             ]}
           >
-            {" "}Subscriber
+            {" "}
+            Subscriber
           </Text>
         </View>
       ) : null}

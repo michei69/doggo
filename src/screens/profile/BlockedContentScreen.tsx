@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   View,
   Text,
@@ -10,9 +16,7 @@ import {
   useWindowDimensions,
   Keyboard,
 } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-} from "react-native-reanimated";
+import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { FlashList } from "@shopify/flash-list";
 import { GestureDetector } from "react-native-gesture-handler";
 import { useNavigation } from "@react-navigation/native";
@@ -112,17 +116,10 @@ const TabBar = React.memo(function TabBar({
   );
 });
 
-function RemoveButton({
-  onPress,
-}: {
-  onPress: () => void;
-}) {
+function RemoveButton({ onPress }: { onPress: () => void }) {
   return (
     <Pressable
-      style={({ pressed }) => [
-        styles.removeBtn,
-        pressed && { opacity: 0.7 },
-      ]}
+      style={({ pressed }) => [styles.removeBtn, pressed && { opacity: 0.7 }]}
       onPress={onPress}
     >
       <Text style={styles.removeBtnText}>✕</Text>
@@ -183,10 +180,7 @@ const AddButton = React.memo(function AddButton({
 }) {
   return (
     <Pressable
-      style={({ pressed }) => [
-        styles.addBtn,
-        pressed && { opacity: 0.7 },
-      ]}
+      style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.7 }]}
       onPress={onPress}
     >
       <Text style={styles.addBtnText}>Add</Text>
@@ -242,10 +236,7 @@ const AutocompleteInput = React.memo(function AutocompleteInput({
     [onSelectSuggestion],
   );
 
-  const suggestionKeyExtractor = useCallback(
-    (item: OptionRow) => item.key,
-    [],
-  );
+  const suggestionKeyExtractor = useCallback((item: OptionRow) => item.key, []);
 
   return (
     <View style={styles.autocompleteContainer}>
@@ -399,9 +390,7 @@ const TagsPanel = React.memo(function TagsPanel({
           const tag = allTags.find((t) => t.id === id);
           return (
             <View key={String(id)} style={styles.itemRow}>
-              <Text style={styles.itemText}>
-                {tag ? tag.name : `#${id}`}
-              </Text>
+              <Text style={styles.itemText}>{tag ? tag.name : `#${id}`}</Text>
               <RemoveButton onPress={() => onRemoveTag(id)} />
             </View>
           );
@@ -474,10 +463,7 @@ export default function BlockedContentScreen() {
           const target = Math.min(TAB_COUNT - 1, currentIdx + 1);
           scheduleOnRN(snapToTab, TABS[target].key);
         } else {
-          const idx = Math.max(
-            0,
-            Math.min(TAB_COUNT - 1, currentIdx),
-          );
+          const idx = Math.max(0, Math.min(TAB_COUNT - 1, currentIdx));
           scheduleOnRN(snapToTab, TABS[idx].key);
         }
       }),
@@ -486,15 +472,14 @@ export default function BlockedContentScreen() {
 
   const loadBlockedContent = useCallback(async () => {
     try {
-      const [data, tags] = await Promise.all([
-        getBlockedContent(),
-        getTags(),
-      ]);
+      const [data, tags] = await Promise.all([getBlockedContent(), getTags()]);
       setBlocked(data);
       setAllTags(tags);
       initialRef.current = JSON.parse(JSON.stringify(data));
     } catch {
-      showAlert("Error", "Failed to load blocked content", [{ text: "OK", onPress: dismissAlert }]);
+      showAlert("Error", "Failed to load blocked content", [
+        { text: "OK", onPress: dismissAlert },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -514,9 +499,13 @@ export default function BlockedContentScreen() {
     try {
       await updateBlockedContent(blocked);
       initialRef.current = JSON.parse(JSON.stringify(blocked));
-      showAlert("Saved", "Blocked content updated", [{ text: "OK", onPress: dismissAlert }]);
+      showAlert("Saved", "Blocked content updated", [
+        { text: "OK", onPress: dismissAlert },
+      ]);
     } catch {
-      showAlert("Error", "Failed to save blocked content", [{ text: "OK", onPress: dismissAlert }]);
+      showAlert("Error", "Failed to save blocked content", [
+        { text: "OK", onPress: dismissAlert },
+      ]);
     } finally {
       setSaving(false);
     }
@@ -581,17 +570,14 @@ export default function BlockedContentScreen() {
       .slice(0, 20);
   }, [tagSearchValue, allTags, blockedTagsSet]);
 
-  const handleAddTag = useCallback(
-    (tag: CharacterTag) => {
-      setBlocked((prev) => ({
-        ...prev,
-        tags: [...prev.tags, tag.id],
-      }));
-      setTagSearchValue("");
-      setShowTagSuggestions(false);
-    },
-    [],
-  );
+  const handleAddTag = useCallback((tag: CharacterTag) => {
+    setBlocked((prev) => ({
+      ...prev,
+      tags: [...prev.tags, tag.id],
+    }));
+    setTagSearchValue("");
+    setShowTagSuggestions(false);
+  }, []);
 
   const handleInputChange = useCallback(
     (text: string) => {

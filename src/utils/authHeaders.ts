@@ -1,9 +1,11 @@
 import { storage } from "./storage";
 import { getUserAgent } from "./userAgent";
 
-export async function buildAuthHeaders(options: {
-    contentType?: string;
-} = {}): Promise<Record<string, string>> {
+export async function buildAuthHeaders(
+    options: {
+        contentType?: string;
+    } = {},
+): Promise<Record<string, string>> {
     const [token, cfClearance, cfBm] = await Promise.all([
         storage.getAccessToken(),
         storage.getCfClearance(),

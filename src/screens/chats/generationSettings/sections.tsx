@@ -147,7 +147,10 @@ export const ProxyConfigList = memo(function ProxyConfigList({
                     disabled={duplicatingId === proxy.id}
                   >
                     {duplicatingId === proxy.id ? (
-                      <ActivityIndicator size="small" color={colors.textSecondary} />
+                      <ActivityIndicator
+                        size="small"
+                        color={colors.textSecondary}
+                      />
                     ) : (
                       <Text style={styles.proxyActionText}>Duplicate</Text>
                     )}
@@ -331,7 +334,9 @@ export const LocalSettingsSection = memo(function LocalSettingsSection({
             {fetchingPersonality ? (
               <ActivityIndicator size="small" color={colors.text} />
             ) : (
-              <Text style={styles.fetchBtnText}>Fetch Original Personality</Text>
+              <Text style={styles.fetchBtnText}>
+                Fetch Original Personality
+              </Text>
             )}
           </Pressable>
         </View>

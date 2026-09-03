@@ -98,8 +98,14 @@ function ProfileStackNavigator() {
     >
       <ProfileStack.Screen name="ProfileHome" component={ProfileScreen} />
       <ProfileStack.Screen name="Settings" component={SettingsScreen} />
-      <ProfileStack.Screen name="BlockedContent" component={BlockedContentScreen} />
-      <ProfileStack.Screen name="HiddenCharacters" component={HiddenCharactersScreen} />
+      <ProfileStack.Screen
+        name="BlockedContent"
+        component={BlockedContentScreen}
+      />
+      <ProfileStack.Screen
+        name="HiddenCharacters"
+        component={HiddenCharactersScreen}
+      />
       <ProfileStack.Screen name="MyPersonas" component={MyPersonasScreen} />
       <ProfileStack.Screen name="MyCharacters" component={MyCharactersScreen} />
       <ProfileStack.Screen
@@ -134,7 +140,9 @@ function CreateStackNavigator() {
 }
 
 function getTabBarVisibility(
-  route: Partial<RouteProp<MainTabParamList, "ChatsTab">> | Partial<RouteProp<MainTabParamList, "DiscoverTab">>,
+  route:
+    | Partial<RouteProp<MainTabParamList, "ChatsTab">>
+    | Partial<RouteProp<MainTabParamList, "DiscoverTab">>,
 ): object {
   const routeName = getFocusedRouteNameFromRoute(route);
   if (
@@ -169,71 +177,71 @@ export default function MainTabs() {
     <View style={{ flex: 1 }}>
       <Tab.Navigator
         screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.textDim,
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: "600",
-          marginTop: 2,
-        },
-      }}
-    >
-      <Tab.Screen
-        name="ChatsTab"
-        component={ChatsStackNavigator}
-        options={({ route }) => ({
-          tabBarLabel: "Chats",
-          tabBarAccessibilityLabel: "Chats",
-          tabBarIcon: ({ color, size }) => (
-            <MessageCircle color={color} size={size || 22} />
-          ),
-          tabBarStyle: {
-            ...baseTabBarStyle,
-            ...getTabBarVisibility(route),
+          headerShown: false,
+          tabBarActiveTintColor: colors.accent,
+          tabBarInactiveTintColor: colors.textDim,
+          tabBarLabelStyle: {
+            fontSize: 11,
+            fontWeight: "600",
+            marginTop: 2,
           },
-        })}
-      />
-      <Tab.Screen
-        name="DiscoverTab"
-        component={CharactersStackNavigator}
-        options={({ route }) => ({
-          tabBarLabel: "Discover",
-          tabBarAccessibilityLabel: "Discover",
-          tabBarIcon: ({ color, size }) => (
-            <Compass color={color} size={size || 22} />
-          ),
-          tabBarStyle: {
-            ...baseTabBarStyle,
-            ...getTabBarVisibility(route),
-          },
-        })}
-      />
-      <Tab.Screen
-        name="CreateTab"
-        component={CreateStackNavigator}
-        options={{
-          tabBarLabel: "Create",
-          tabBarAccessibilityLabel: "Create",
-          tabBarIcon: ({ color, size }) => (
-            <SquarePen color={color} size={size || 22} />
-          ),
-          tabBarStyle: baseTabBarStyle,
         }}
-      />
-      <Tab.Screen
-        name="ProfileTab"
-        component={ProfileStackNavigator}
-        options={{
-          tabBarLabel: "Profile",
-          tabBarAccessibilityLabel: "Profile",
-          tabBarIcon: ({ color, size }) => (
-            <User color={color} size={size || 22} />
-          ),
-          tabBarStyle: baseTabBarStyle,
-        }}
-      />
-    </Tab.Navigator>
+      >
+        <Tab.Screen
+          name="ChatsTab"
+          component={ChatsStackNavigator}
+          options={({ route }) => ({
+            tabBarLabel: "Chats",
+            tabBarAccessibilityLabel: "Chats",
+            tabBarIcon: ({ color, size }) => (
+              <MessageCircle color={color} size={size || 22} />
+            ),
+            tabBarStyle: {
+              ...baseTabBarStyle,
+              ...getTabBarVisibility(route),
+            },
+          })}
+        />
+        <Tab.Screen
+          name="DiscoverTab"
+          component={CharactersStackNavigator}
+          options={({ route }) => ({
+            tabBarLabel: "Discover",
+            tabBarAccessibilityLabel: "Discover",
+            tabBarIcon: ({ color, size }) => (
+              <Compass color={color} size={size || 22} />
+            ),
+            tabBarStyle: {
+              ...baseTabBarStyle,
+              ...getTabBarVisibility(route),
+            },
+          })}
+        />
+        <Tab.Screen
+          name="CreateTab"
+          component={CreateStackNavigator}
+          options={{
+            tabBarLabel: "Create",
+            tabBarAccessibilityLabel: "Create",
+            tabBarIcon: ({ color, size }) => (
+              <SquarePen color={color} size={size || 22} />
+            ),
+            tabBarStyle: baseTabBarStyle,
+          }}
+        />
+        <Tab.Screen
+          name="ProfileTab"
+          component={ProfileStackNavigator}
+          options={{
+            tabBarLabel: "Profile",
+            tabBarAccessibilityLabel: "Profile",
+            tabBarIcon: ({ color, size }) => (
+              <User color={color} size={size || 22} />
+            ),
+            tabBarStyle: baseTabBarStyle,
+          }}
+        />
+      </Tab.Navigator>
       <SheetPortalHost />
     </View>
   );

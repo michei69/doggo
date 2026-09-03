@@ -7,10 +7,16 @@ export function validateMessagesImport(
     try {
         data = JSON.parse(raw);
     } catch {
-        return { valid: false, error: "Invalid JSON: could not parse the input." };
+        return {
+            valid: false,
+            error: "Invalid JSON: could not parse the input.",
+        };
     }
     if (!Array.isArray(data)) {
-        return { valid: false, error: "Invalid format: expected a JSON array." };
+        return {
+            valid: false,
+            error: "Invalid format: expected a JSON array.",
+        };
     }
     const messages: ChatMessage[] = [];
     for (let i = 0; i < data.length; i++) {

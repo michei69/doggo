@@ -99,7 +99,9 @@ export default function LoginScreen() {
             onPress={() => setShowPassword(!showPassword)}
             style={styles.eyeBtn}
             accessibilityRole="button"
-            accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+            accessibilityLabel={
+              showPassword ? "Hide password" : "Show password"
+            }
           >
             {showPassword ? (
               <EyeOff size={20} color={colors.textFaint} />

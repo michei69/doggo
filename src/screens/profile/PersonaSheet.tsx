@@ -148,9 +148,7 @@ function AvatarField({
         <Avatar name={name} size={80} />
       )}
       <View style={styles.avatarBadge}>
-        <Text style={styles.avatarBadgeText}>
-          {uploading ? "..." : "Edit"}
-        </Text>
+        <Text style={styles.avatarBadgeText}>{uploading ? "..." : "Edit"}</Text>
       </View>
     </Pressable>
   );
@@ -354,7 +352,7 @@ export default function PersonaSheet({
 }) {
   const sheetRef = useRef<FormSheetHandle>(null);
   const isMainPersona = mode === "editMain";
-  const editingId = mode === "edit" ? persona?.id ?? null : null;
+  const editingId = mode === "edit" ? (persona?.id ?? null) : null;
   const { alert, showAlert, dismissAlert } = useAlert();
 
   const [form, setForm] = useState<PersonaForm>(() =>
@@ -378,15 +376,19 @@ export default function PersonaSheet({
         });
       });
       if (result.status === "denied") {
-        showAlert("Permission needed", "Allow access to photos to change your avatar.", [
-          { text: "OK", onPress: dismissAlert },
-        ]);
+        showAlert(
+          "Permission needed",
+          "Allow access to photos to change your avatar.",
+          [{ text: "OK", onPress: dismissAlert }],
+        );
         return;
       }
       if (result.status === "cancelled") return;
       setForm((f) => ({ ...f, avatar: result.filename }));
     } catch {
-      showAlert("Error", "Failed to upload avatar", [{ text: "OK", onPress: dismissAlert }]);
+      showAlert("Error", "Failed to upload avatar", [
+        { text: "OK", onPress: dismissAlert },
+      ]);
     } finally {
       setUploading(false);
     }
@@ -394,7 +396,9 @@ export default function PersonaSheet({
 
   const handleSave = useCallback(async () => {
     if (!form.name.trim()) {
-      showAlert("Error", "Name is required", [{ text: "OK", onPress: dismissAlert }]);
+      showAlert("Error", "Name is required", [
+        { text: "OK", onPress: dismissAlert },
+      ]);
       return;
     }
     setSaving(true);
@@ -430,7 +434,9 @@ export default function PersonaSheet({
 
       sheetRef.current?.close(onSaved);
     } catch {
-      showAlert("Error", "Failed to save persona", [{ text: "OK", onPress: dismissAlert }]);
+      showAlert("Error", "Failed to save persona", [
+        { text: "OK", onPress: dismissAlert },
+      ]);
     } finally {
       setSaving(false);
     }
@@ -513,9 +519,7 @@ export default function PersonaSheet({
         <GroupField
           personaGroups={personaGroups}
           groupId={form.groupId}
-          onGroupIdChange={(groupId) =>
-            setForm((f) => ({ ...f, groupId }))
-          }
+          onGroupIdChange={(groupId) => setForm((f) => ({ ...f, groupId }))}
         />
       )}
 
@@ -526,9 +530,7 @@ export default function PersonaSheet({
           onPresetChange={(preset) =>
             setForm((f) => ({ ...f, pronounPreset: preset }))
           }
-          onPronounsChange={(pronouns) =>
-            setForm((f) => ({ ...f, pronouns }))
-          }
+          onPronounsChange={(pronouns) => setForm((f) => ({ ...f, pronouns }))}
         />
       )}
     </FormSheet>

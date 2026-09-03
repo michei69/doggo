@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { View, StyleSheet } from "react-native";
 import ChatSettingsOverlay from "../../components/chat/ChatSettingsOverlay";
+import ChatSummaryModal from "../../components/chat/ChatSummaryModal";
 import MessagesActionsSheet from "../../components/chat/MessagesActionsSheet";
 import PersonaPicker from "../../components/chat/PersonaPicker";
 import CustomAlert from "../../components/common/CustomAlert";
@@ -52,6 +53,17 @@ export default function ChatScreen() {
     keyboardHeight,
     settingsVisible,
     handleSettingsClose,
+    chatSummaryVisible,
+    handleChatSummaryOpen,
+    handleChatSummaryClose,
+    chatSummaryDraft,
+    handleChatSummaryDraftChange,
+    chatSummaryLoading,
+    chatSummarySaving,
+    handleChatSummarySave,
+    handleChatSummaryGenerateFromChat,
+    handleChatSummaryGenerateFromLastMessage,
+    canGenerateChatSummaryFromLastMessage,
     creatorId,
     creatorName,
     allowProxy,
@@ -162,6 +174,20 @@ export default function ChatScreen() {
         onDeleteChat={handleDeleteChatFromCog}
         onViewSystemPrompt={handleViewSystemPrompt}
         onAttemptViewSystemPrompt={handleAttemptViewSystemPrompt}
+        onChatSummary={handleChatSummaryOpen}
+      />
+
+      <ChatSummaryModal
+        visible={chatSummaryVisible}
+        summary={chatSummaryDraft}
+        onChangeSummary={handleChatSummaryDraftChange}
+        onClose={handleChatSummaryClose}
+        onSave={handleChatSummarySave}
+        saving={chatSummarySaving}
+        loading={chatSummaryLoading}
+        canGenerateFromLastMessage={canGenerateChatSummaryFromLastMessage}
+        onGenerateFromChat={handleChatSummaryGenerateFromChat}
+        onGenerateFromLastMessage={handleChatSummaryGenerateFromLastMessage}
       />
 
       <MessagesActionsSheet

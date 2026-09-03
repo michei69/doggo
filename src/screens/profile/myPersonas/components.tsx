@@ -19,11 +19,7 @@ import CustomAlert from "../../../components/common/CustomAlert";
 import EmptyState from "../../../components/common/EmptyState";
 import PersonaSheet from "../PersonaSheet";
 import PersonaGroupSheet from "../PersonaGroupSheet";
-import type {
-  UserProfile,
-  Persona,
-  PersonaGroup,
-} from "../../../types/api";
+import type { UserProfile, Persona, PersonaGroup } from "../../../types/api";
 import { colors } from "../../../utils/colors";
 import { avatarUrl } from "../../../utils/assets";
 import { pronounLabel, type DragState } from "./personaUtils";
@@ -72,7 +68,9 @@ export const TabBar = memo(function TabBar({
         </Text>
       </Pressable>
       <Pressable onPress={() => onSelectTab("groups")} style={styles.tab}>
-        <Text style={[styles.tabText, tab === "groups" && styles.tabTextActive]}>
+        <Text
+          style={[styles.tabText, tab === "groups" && styles.tabTextActive]}
+        >
           Persona Groups
         </Text>
       </Pressable>
@@ -243,7 +241,10 @@ export const PersonasPanel = memo(function PersonasPanel({
                         </View>
                       )}
                     </View>
-                    <Text style={styles.personaCardAppearance} numberOfLines={1}>
+                    <Text
+                      style={styles.personaCardAppearance}
+                      numberOfLines={1}
+                    >
                       {p.appearance || "No appearance"}
                     </Text>
                     {group && (

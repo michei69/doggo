@@ -124,9 +124,8 @@ export default function GenerationSettingsScreen() {
       NativeStackNavigationProp<ChatsStackParamList, "GenerationSettings">
     >();
   const { goBack } = navigation;
-  const [settings, setSettings] = useState<ApiSettingsSettings>(
-    buildDefaultSettings,
-  );
+  const [settings, setSettings] =
+    useState<ApiSettingsSettings>(buildDefaultSettings);
   const [proxyConfigs, setProxyConfigs] = useState<ApiProxyConfig[]>([]);
   const [prompts, setPrompts] = useState<PromptLibraryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,16 +151,13 @@ export default function GenerationSettingsScreen() {
     setIsDirty,
   });
 
-  const updateGen = useCallback(
-    (patch: Partial<ApiSettingsGeneration>) => {
-      setSettings((s) => ({
-        ...s,
-        generation_settings: { ...s.generation_settings, ...patch },
-      }));
-      setIsDirty(true);
-    },
-    [],
-  );
+  const updateGen = useCallback((patch: Partial<ApiSettingsGeneration>) => {
+    setSettings((s) => ({
+      ...s,
+      generation_settings: { ...s.generation_settings, ...patch },
+    }));
+    setIsDirty(true);
+  }, []);
 
   const handleApiSelect = useCallback((mode: "janitor" | "proxy") => {
     setSettings((s) => ({ ...s, source: mode }));
@@ -242,18 +238,14 @@ export default function GenerationSettingsScreen() {
     const onBeforeRemove = (e: any) => {
       if (!isDirty) return;
       e.preventDefault();
-      showAlert(
-        "Unsaved Changes",
-        "You have unsaved changes. Discard them?",
-        [
-          { text: "Stay", style: "cancel" as const, onPress: dismissAlert },
-          {
-            text: "Leave",
-            style: "destructive" as const,
-            onPress: () => navigation.dispatch(e.data.action),
-          },
-        ],
-      );
+      showAlert("Unsaved Changes", "You have unsaved changes. Discard them?", [
+        { text: "Stay", style: "cancel" as const, onPress: dismissAlert },
+        {
+          text: "Leave",
+          style: "destructive" as const,
+          onPress: () => navigation.dispatch(e.data.action),
+        },
+      ]);
     };
     navigation.addListener("beforeRemove", onBeforeRemove);
     return () => navigation.removeListener("beforeRemove", onBeforeRemove);
@@ -382,9 +374,7 @@ export default function GenerationSettingsScreen() {
         prompts={prompts}
         setPrompts={setPrompts}
         selectedPromptId={proxy.editForm.prompt_id}
-        onSelect={(id) =>
-          proxy.setEditForm((f) => ({ ...f, prompt_id: id }))
-        }
+        onSelect={(id) => proxy.setEditForm((f) => ({ ...f, prompt_id: id }))}
         onClose={proxy.closePromptSelector}
         showAlert={showAlert}
         dismissAlert={dismissAlert}

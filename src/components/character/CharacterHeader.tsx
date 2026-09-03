@@ -2,7 +2,15 @@ import { useState, useMemo, useCallback, memo } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { EnrichedMarkdownText } from "react-native-enriched-markdown";
-import { BadgeCheck, CirclePlus, ScrollText, Code, Clock, Lock, MessageCircle } from "lucide-react-native";
+import {
+  BadgeCheck,
+  CirclePlus,
+  ScrollText,
+  Code,
+  Clock,
+  Lock,
+  MessageCircle,
+} from "lucide-react-native";
 import AvatarPreview from "../common/AvatarPreview";
 import Avatar from "../common/Avatar";
 import Button from "../common/Button";
@@ -79,9 +87,7 @@ const CharIdentity = memo(function CharIdentity({
 
       <Pressable onPress={onCreatorPress} hitSlop={8}>
         <View style={styles.creatorRow}>
-          <Text style={styles.creator}>
-            by {character.creator_name}
-          </Text>
+          <Text style={styles.creator}>by {character.creator_name}</Text>
           {character.creator_verified && (
             <BadgeCheck size={14} color={colors.accent} />
           )}
@@ -225,7 +231,11 @@ const ChatActionButtons = memo(function ChatActionButtons({
         title={`Start chatting with ${chatName}`}
         onPress={onStartChat}
         loading={isLoading}
-        style={onContinueChat ? [styles.startBtn, styles.startBtnWithContinue] : styles.startBtn}
+        style={
+          onContinueChat
+            ? [styles.startBtn, styles.startBtnWithContinue]
+            : styles.startBtn
+        }
       />
     </>
   );
@@ -275,10 +285,7 @@ const AlternateMessagesSection = memo(function AlternateMessagesSection({
       />
       <View style={styles.altNav}>
         <Pressable
-          style={[
-            styles.altNavBtn,
-            index === 0 && styles.altNavBtnDisabled,
-          ]}
+          style={[styles.altNavBtn, index === 0 && styles.altNavBtnDisabled]}
           onPress={onPrev}
           disabled={index === 0}
         >
@@ -305,8 +312,7 @@ const AlternateMessagesSection = memo(function AlternateMessagesSection({
           <Text
             style={[
               styles.altNavText,
-              index === messages.length - 1 &&
-                styles.altNavTextDisabled,
+              index === messages.length - 1 && styles.altNavTextDisabled,
             ]}
           >
             Next →
@@ -328,7 +334,10 @@ const ScriptsList = memo(function ScriptsList({
     <View style={styles.scriptsSection}>
       <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>Scripts</Text>
       {scripts.map((script) => {
-        const theme = SCRIPT_THEMES[script.theme] ?? { light: colors.accent, dark: colors.card };
+        const theme = SCRIPT_THEMES[script.theme] ?? {
+          light: colors.accent,
+          dark: colors.card,
+        };
         const ScriptIcon = script.type === "simple" ? ScrollText : Code;
         return (
           <View
@@ -340,20 +349,32 @@ const ScriptsList = memo(function ScriptsList({
           >
             <View style={styles.scriptHeaderRow}>
               <ScriptIcon size={16} color={theme.light} />
-              <Text style={[styles.scriptTitle, { color: theme.light }]}>{script.title}</Text>
+              <Text style={[styles.scriptTitle, { color: theme.light }]}>
+                {script.title}
+              </Text>
               {!script.is_public && (
-                <Lock size={14} color={theme.light} style={{ marginLeft: "auto" }} />
+                <Lock
+                  size={14}
+                  color={theme.light}
+                  style={{ marginLeft: "auto" }}
+                />
               )}
             </View>
-            <Text style={[styles.scriptDesc, { color: theme.light }]}>{script.description}</Text>
+            <Text style={[styles.scriptDesc, { color: theme.light }]}>
+              {script.description}
+            </Text>
             <View style={styles.scriptFooterRow}>
-              <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
+              <View
+                style={{ flexDirection: "row", gap: 4, alignItems: "center" }}
+              >
                 <Clock size={12} color={theme.light} />
                 <Text style={{ color: theme.light, fontSize: 12 }}>
                   {formatDate(script.updated_at, dateFormat)}
                 </Text>
               </View>
-              <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
+              <View
+                style={{ flexDirection: "row", gap: 4, alignItems: "center" }}
+              >
                 <MessageCircle size={12} color={theme.light} />
                 <Text style={{ color: theme.light, fontSize: 12 }}>
                   {script.message_count}
@@ -404,16 +425,32 @@ const CharacterDetails = memo(function CharacterDetails({
   return (
     <>
       {character.personality ? (
-        <MarkdownSection title="Personality" markdown={personalityMarkdown} onLinkPress={onLinkPress} />
+        <MarkdownSection
+          title="Personality"
+          markdown={personalityMarkdown}
+          onLinkPress={onLinkPress}
+        />
       ) : null}
       {character.scenario ? (
-        <MarkdownSection title="Scenario" markdown={scenarioMarkdown} onLinkPress={onLinkPress} />
+        <MarkdownSection
+          title="Scenario"
+          markdown={scenarioMarkdown}
+          onLinkPress={onLinkPress}
+        />
       ) : null}
       {character.example_dialogs ? (
-        <MarkdownSection title="Example Dialogue" markdown={dialogsMarkdown} onLinkPress={onLinkPress} />
+        <MarkdownSection
+          title="Example Dialogue"
+          markdown={dialogsMarkdown}
+          onLinkPress={onLinkPress}
+        />
       ) : null}
       {character.first_message ? (
-        <MarkdownSection title="First Message" markdown={firstMessageMarkdown} onLinkPress={onLinkPress} />
+        <MarkdownSection
+          title="First Message"
+          markdown={firstMessageMarkdown}
+          onLinkPress={onLinkPress}
+        />
       ) : null}
       {altMessages.length > 0 && (
         <AlternateMessagesSection
@@ -450,9 +487,7 @@ export default function CharacterHeader({
 }) {
   const [descExpanded, setDescExpanded] = useState(false);
   const [descTruncated, setDescTruncated] = useState(false);
-  const [preview, setPreview] = useState<AvatarPreviewState | null>(
-    null,
-  );
+  const [preview, setPreview] = useState<AvatarPreviewState | null>(null);
   const [altIndex, setAltIndex] = useState(0);
   const nav = useNavigation<any>();
   const onLinkPress = useNavigateToJanitorLink();

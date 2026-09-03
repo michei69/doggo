@@ -179,9 +179,7 @@ export async function reactToComment(
     });
 }
 
-export async function removeCommentReaction(
-    commentId: string,
-): Promise<void> {
+export async function removeCommentReaction(commentId: string): Promise<void> {
     await request<void>({
         method: "DELETE",
         url: `/reviews/react/comment/${commentId}`,

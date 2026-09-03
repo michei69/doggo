@@ -15,10 +15,7 @@ export function ChatRow({
 }) {
   return (
     <Pressable
-      style={({ pressed }) => [
-        styles.row,
-        pressed && { opacity: 0.7 },
-      ]}
+      style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
       onPress={() => onPress(item)}
     >
       <Avatar

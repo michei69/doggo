@@ -49,13 +49,10 @@ function ReportModal({
     onClose();
   }, [onClose]);
 
-  const handleSelectReason = useCallback(
-    (label: string, type: string) => {
-      setReason(label);
-      setReportType(type);
-    },
-    [],
-  );
+  const handleSelectReason = useCallback((label: string, type: string) => {
+    setReason(label);
+    setReportType(type);
+  }, []);
 
   const handleContinue = useCallback(() => {
     if (!reportType) return;
@@ -109,10 +106,7 @@ function ReportModal({
                     ]}
                   >
                     <View
-                      style={[
-                        styles.radio,
-                        selected && styles.radioSelected,
-                      ]}
+                      style={[styles.radio, selected && styles.radioSelected]}
                     >
                       {selected && <View style={styles.radioDot} />}
                     </View>
@@ -155,9 +149,7 @@ function ReportModal({
 
               {showLinkField && reportType === "stolen" && (
                 <>
-                  <Text style={styles.label}>
-                    Link to your original bot
-                  </Text>
+                  <Text style={styles.label}>Link to your original bot</Text>
                   <TextInput
                     style={styles.input}
                     placeholder={linkPlaceholder}
@@ -191,10 +183,7 @@ function ReportModal({
 
               <Pressable
                 onPress={handleSubmit}
-                style={[
-                  styles.submitBtn,
-                  submitting && { opacity: 0.5 },
-                ]}
+                style={[styles.submitBtn, submitting && { opacity: 0.5 }]}
                 disabled={submitting}
               >
                 {submitting ? (

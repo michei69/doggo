@@ -1,4 +1,10 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import React, {
+  useState,
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import {
   View,
   Text,
@@ -29,9 +35,7 @@ export default function PersonaPicker({
 }: {
   visible: boolean;
   onClose: () => void;
-  onSelect: (
-    persona: PersonaRef | null,
-  ) => void;
+  onSelect: (persona: PersonaRef | null) => void;
   characterName: string;
   title?: string;
   subtitle?: string;
@@ -99,7 +103,9 @@ export default function PersonaPicker({
     >
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.content} onPress={() => {}}>
-          <Text style={styles.title}>{title ?? `Start Chat with ${characterName}`}</Text>
+          <Text style={styles.title}>
+            {title ?? `Start Chat with ${characterName}`}
+          </Text>
           <Text style={styles.subtitle}>{subtitle ?? "Choose a persona"}</Text>
 
           {loading ? (
@@ -129,7 +135,11 @@ export default function PersonaPicker({
             >
               {entries.map((item) => (
                 <View key={item.id}>
-                  <PersonaRow item={item} onClose={onClose} onSelect={onSelect} />
+                  <PersonaRow
+                    item={item}
+                    onClose={onClose}
+                    onSelect={onSelect}
+                  />
                 </View>
               ))}
             </ScrollView>
@@ -161,10 +171,7 @@ const PersonaRow = React.memo(function PersonaRow({
 }) {
   return (
     <Pressable
-      style={({ pressed }) => [
-        styles.persona,
-        pressed && { opacity: 0.7 },
-      ]}
+      style={({ pressed }) => [styles.persona, pressed && { opacity: 0.7 }]}
       onPress={() => {
         onClose();
         onSelect(

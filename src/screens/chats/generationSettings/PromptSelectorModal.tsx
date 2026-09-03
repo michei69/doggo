@@ -16,7 +16,11 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
 } from "react-native-reanimated";
-import { createPrompt, deletePrompt, updatePrompt } from "../../../api/settings";
+import {
+  createPrompt,
+  deletePrompt,
+  updatePrompt,
+} from "../../../api/settings";
 import { colors } from "../../../utils/colors";
 import type { PromptEditForm, PromptLibraryItem, ShowAlert } from "./types";
 
@@ -55,12 +59,15 @@ export default function PromptSelectorModal({
     formAnim.value = withTiming(1, { duration: 200 });
   }, [formAnim]);
 
-  const openEditPrompt = useCallback((prompt: PromptLibraryItem) => {
-    setForm({ name: prompt.name, content: prompt.content });
-    editingIdRef.current = prompt.id;
-    setMode("editing");
-    formAnim.value = withTiming(1, { duration: 200 });
-  }, [formAnim]);
+  const openEditPrompt = useCallback(
+    (prompt: PromptLibraryItem) => {
+      setForm({ name: prompt.name, content: prompt.content });
+      editingIdRef.current = prompt.id;
+      setMode("editing");
+      formAnim.value = withTiming(1, { duration: 200 });
+    },
+    [formAnim],
+  );
 
   const goBackToList = useCallback(() => {
     setMode("list");
@@ -203,50 +210,53 @@ export default function PromptSelectorModal({
 
             {isFormView ? (
               <Animated.View style={formStyle}>
-              <ScrollView
-                style={styles.modalScroll}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-              >
-                <Text style={styles.editLabel}>Name</Text>
-                <TextInput
-                  style={styles.editInput}
-                  value={form.name}
-                  onChangeText={(v) => setForm((f) => ({ ...f, name: v }))}
-                  placeholderTextColor={colors.textDimAlt}
-                  placeholder="Prompt name..."
-                />
-                <Text style={styles.editLabel}>Content</Text>
-                <TextInput
-                  style={styles.editMultiline}
-                  value={form.content}
-                  onChangeText={(v) => setForm((f) => ({ ...f, content: v }))}
-                  placeholderTextColor={colors.textDimAlt}
-                  placeholder="Prompt content..."
-                  multiline
-                />
-                <View style={[styles.modalActions, { marginBottom: 4 }]}>
-                  <Pressable
-                    style={styles.modalCancelBtn}
-                    onPress={goBackToList}
-                  >
-                    <Text style={styles.modalCancelText}>Cancel</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.modalSaveBtn, formSaving && { opacity: 0.6 }]}
-                    onPress={handleSaveForm}
-                    disabled={formSaving}
-                  >
-                    {formSaving ? (
-                      <ActivityIndicator color={colors.text} size="small" />
-                    ) : (
-                      <Text style={styles.modalSaveText}>
-                        {mode === "creating" ? "Create" : "Save"}
-                      </Text>
-                    )}
-                  </Pressable>
-                </View>
-              </ScrollView>
+                <ScrollView
+                  style={styles.modalScroll}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                >
+                  <Text style={styles.editLabel}>Name</Text>
+                  <TextInput
+                    style={styles.editInput}
+                    value={form.name}
+                    onChangeText={(v) => setForm((f) => ({ ...f, name: v }))}
+                    placeholderTextColor={colors.textDimAlt}
+                    placeholder="Prompt name..."
+                  />
+                  <Text style={styles.editLabel}>Content</Text>
+                  <TextInput
+                    style={styles.editMultiline}
+                    value={form.content}
+                    onChangeText={(v) => setForm((f) => ({ ...f, content: v }))}
+                    placeholderTextColor={colors.textDimAlt}
+                    placeholder="Prompt content..."
+                    multiline
+                  />
+                  <View style={[styles.modalActions, { marginBottom: 4 }]}>
+                    <Pressable
+                      style={styles.modalCancelBtn}
+                      onPress={goBackToList}
+                    >
+                      <Text style={styles.modalCancelText}>Cancel</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.modalSaveBtn,
+                        formSaving && { opacity: 0.6 },
+                      ]}
+                      onPress={handleSaveForm}
+                      disabled={formSaving}
+                    >
+                      {formSaving ? (
+                        <ActivityIndicator color={colors.text} size="small" />
+                      ) : (
+                        <Text style={styles.modalSaveText}>
+                          {mode === "creating" ? "Create" : "Save"}
+                        </Text>
+                      )}
+                    </Pressable>
+                  </View>
+                </ScrollView>
               </Animated.View>
             ) : (
               <View style={styles.modalScroll}>

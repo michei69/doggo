@@ -9,30 +9,26 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import {
-    ThumbsUp,
-    ThumbsDown,
-    CirclePlus,
-    MessageCircle,
-    Pin,
-    Trash2,
-    BadgeCheck,
-    Shield,
-    Send,
+  ThumbsUp,
+  ThumbsDown,
+  CirclePlus,
+  MessageCircle,
+  Pin,
+  Trash2,
+  BadgeCheck,
+  Shield,
+  Send,
 } from "lucide-react-native";
 import Avatar from "../common/Avatar";
-import type {
-    Review,
-    ReviewComment,
-    ReviewUserProfile,
-} from "../../types/api";
+import type { Review, ReviewComment, ReviewUserProfile } from "../../types/api";
 import {
-    getReviewComments,
-    createComment,
-    deleteComment,
-    likeReview,
-    deleteReview as deleteReviewApi,
-    reactToReview,
-    removeReviewReaction,
+  getReviewComments,
+  createComment,
+  deleteComment,
+  likeReview,
+  deleteReview as deleteReviewApi,
+  reactToReview,
+  removeReviewReaction,
 } from "../../api/reviews";
 import { useAuthStore } from "../../stores/authStore";
 import { storage } from "../../utils/storage";

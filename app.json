@@ -1,41 +1,47 @@
 {
-  "expo": {
-    "name": "Doggo",
-    "slug": "doggo",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "ios": {
-      "supportsTablet": true,
-      "associatedDomains": ["applinks:janitorai.com"]
-    },
-    "android": {
-      "package": "dev.michei.doggo",
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "autoVerify": true,
-          "data": [
-            { "scheme": "https", "host": "janitorai.com", "pathPrefix": "/" },
-            { "scheme": "janitorai", "host": "*", "pathPrefix": "/" }
-          ],
-          "category": ["BROWSABLE", "DEFAULT"]
-        }
-      ],
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      },
-      "predictiveBackGestureEnabled": false
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "plugins": [
-      "react-native-enriched-markdown"
-    ]
-  }
+    "expo": {
+        "name": "Doggo",
+        "slug": "doggo",
+        "version": "1.0.0",
+        "orientation": "portrait",
+        "icon": "./assets/icon.png",
+        "userInterfaceStyle": "light",
+        "ios": {
+            "supportsTablet": true,
+            "associatedDomains": ["applinks:janitorai.com"]
+        },
+        "android": {
+            "package": "dev.michei.doggo",
+            "intentFilters": [
+                {
+                    "action": "VIEW",
+                    "autoVerify": true,
+                    "data": [
+                        {
+                            "scheme": "https",
+                            "host": "janitorai.com",
+                            "pathPrefix": "/"
+                        },
+                        {
+                            "scheme": "janitorai",
+                            "host": "*",
+                            "pathPrefix": "/"
+                        }
+                    ],
+                    "category": ["BROWSABLE", "DEFAULT"]
+                }
+            ],
+            "adaptiveIcon": {
+                "backgroundColor": "#E6F4FE",
+                "foregroundImage": "./assets/android-icon-foreground.png",
+                "backgroundImage": "./assets/android-icon-background.png",
+                "monochromeImage": "./assets/android-icon-monochrome.png"
+            },
+            "predictiveBackGestureEnabled": false
+        },
+        "web": {
+            "favicon": "./assets/favicon.png"
+        },
+        "plugins": ["react-native-enriched-markdown"]
+    }
 }

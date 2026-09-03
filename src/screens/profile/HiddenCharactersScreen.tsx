@@ -60,10 +60,7 @@ export default function HiddenCharactersScreen() {
                 e.id === item.id
                   ? {
                       ...e,
-                      name:
-                        detail.chat_name ||
-                        detail.name ||
-                        item.id,
+                      name: detail.chat_name || detail.name || item.id,
                       avatar: detail.avatar ?? "",
                       loading: false,
                     }
@@ -127,7 +124,9 @@ export default function HiddenCharactersScreen() {
           return;
         }
         const ids = Array.isArray(parsed)
-          ? (parsed as unknown[]).filter((x): x is string => typeof x === "string")
+          ? (parsed as unknown[]).filter(
+              (x): x is string => typeof x === "string",
+            )
           : typeof parsed === "object" && parsed !== null
             ? Object.keys(parsed)
             : [];
@@ -189,30 +188,26 @@ export default function HiddenCharactersScreen() {
 
   const handleRemove = useCallback(
     (id: string) => {
-      showAlert(
-        "Remove Hidden Character",
-        "Unhide this character?",
-        [
-          {
-            text: "Remove",
-            style: "destructive",
-            onPress: async () => {
-              dismissAlert();
-              try {
-                const existing = await storage.getHiddenCharacters();
-                await storage.setHiddenCharacters(
-                  existing.filter((x) => x !== id),
-                );
-                setEntries((prev) => prev.filter((e) => e.id !== id));
-                toast("Character unhidden");
-              } catch {
-                toast("Failed to remove character", "error");
-              }
-            },
+      showAlert("Remove Hidden Character", "Unhide this character?", [
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            dismissAlert();
+            try {
+              const existing = await storage.getHiddenCharacters();
+              await storage.setHiddenCharacters(
+                existing.filter((x) => x !== id),
+              );
+              setEntries((prev) => prev.filter((e) => e.id !== id));
+              toast("Character unhidden");
+            } catch {
+              toast("Failed to remove character", "error");
+            }
           },
-          { text: "Cancel", style: "cancel", onPress: dismissAlert },
-        ],
-      );
+        },
+        { text: "Cancel", style: "cancel", onPress: dismissAlert },
+      ]);
     },
     [showAlert, dismissAlert],
   );
@@ -247,13 +242,19 @@ export default function HiddenCharactersScreen() {
       <ScreenHeader title="Hidden Characters" onBack={goBack} />
       <View style={styles.actionsRow}>
         <Pressable
-          style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.7 }]}
+          style={({ pressed }) => [
+            styles.actionBtn,
+            pressed && { opacity: 0.7 },
+          ]}
           onPress={handleImport}
         >
           <Text style={styles.actionBtnText}>Import</Text>
         </Pressable>
         <Pressable
-          style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.7 }]}
+          style={({ pressed }) => [
+            styles.actionBtn,
+            pressed && { opacity: 0.7 },
+          ]}
           onPress={handleExport}
         >
           <Text style={styles.actionBtnText}>Export</Text>

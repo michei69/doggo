@@ -132,7 +132,12 @@ export default function ProxyEditModal({
       {Platform.OS === "ios" ? (
         <KeyboardAvoidingView style={styles.modalOverlay} behavior="padding">
           <Pressable
-            style={{ flex: 1, width: "100%", justifyContent: "center", alignItems: "center" }}
+            style={{
+              flex: 1,
+              width: "100%",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
             onPress={onCancel}
           >
             <Pressable style={styles.modalContent} onPress={() => {}}>
@@ -147,7 +152,12 @@ export default function ProxyEditModal({
       ) : (
         <View style={[styles.modalOverlay, { paddingBottom: keyboardHeight }]}>
           <Pressable
-            style={{ flex: 1, width: "100%", justifyContent: "center", alignItems: "center" }}
+            style={{
+              flex: 1,
+              width: "100%",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
             onPress={onCancel}
           >
             <Pressable style={styles.modalContent} onPress={() => {}}>

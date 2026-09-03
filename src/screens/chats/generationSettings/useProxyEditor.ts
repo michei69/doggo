@@ -67,7 +67,13 @@ export function useProxyEditor({
     const openAdd = useCallback(() => {
         setEditingProxyId("__new__");
         setIsCreatingProxy(true);
-        setEditForm({ name: "", model: "", api_url: "", api_key: "", prompt_id: null });
+        setEditForm({
+            name: "",
+            model: "",
+            api_url: "",
+            api_key: "",
+            prompt_id: null,
+        });
         setShowApiKey(false);
     }, []);
 
@@ -115,7 +121,14 @@ export function useProxyEditor({
         } finally {
             setProxySaving(false);
         }
-    }, [editingProxyId, isCreatingProxy, editForm, setProxyConfigs, showAlert, dismissAlert]);
+    }, [
+        editingProxyId,
+        isCreatingProxy,
+        editForm,
+        setProxyConfigs,
+        showAlert,
+        dismissAlert,
+    ]);
 
     const duplicateProxy = useCallback(
         async (proxy: ApiProxyConfig) => {
@@ -138,7 +151,8 @@ export function useProxyEditor({
                 setSettings((s) => ({
                     ...s,
                     selected_proxy_config_id:
-                        s.selected_proxy_config_id || apiSettings.settings.selected_proxy_config_id,
+                        s.selected_proxy_config_id ||
+                        apiSettings.settings.selected_proxy_config_id,
                 }));
             } catch (err: any) {
                 showAlert("Error", err.message || "Failed to duplicate proxy", [
@@ -161,18 +175,24 @@ export function useProxyEditor({
                         dismissAlert();
                         try {
                             await deleteProxyConfig(proxy.id);
-                            setProxyConfigs((prev) => prev.filter((p) => p.id !== proxy.id));
+                            setProxyConfigs((prev) =>
+                                prev.filter((p) => p.id !== proxy.id),
+                            );
                             setSettings((s) => ({
                                 ...s,
                                 selected_proxy_config_id:
                                     s.selected_proxy_config_id === proxy.id
-                                        ? (proxyConfigs.find((p) => p.id !== proxy.id)?.id ?? "")
+                                        ? (proxyConfigs.find(
+                                              (p) => p.id !== proxy.id,
+                                          )?.id ?? "")
                                         : s.selected_proxy_config_id,
                             }));
                         } catch (err: any) {
-                            showAlert("Error", err.message || "Failed to delete proxy", [
-                                { text: "OK", onPress: dismissAlert },
-                            ]);
+                            showAlert(
+                                "Error",
+                                err.message || "Failed to delete proxy",
+                                [{ text: "OK", onPress: dismissAlert }],
+                            );
                         }
                     },
                 },

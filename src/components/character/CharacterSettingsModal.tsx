@@ -1,12 +1,5 @@
 import { memo, useCallback } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  Modal,
-  Switch,
-} from "react-native";
+import { View, Text, StyleSheet, Pressable, Modal, Switch } from "react-native";
 import type { CharacterDetail } from "../../types/api";
 import { colors } from "../../utils/colors";
 
@@ -20,7 +13,9 @@ function CharacterSettingsModal({
   visible: boolean;
   character: CharacterDetail;
   savingKey: string | null;
-  onToggle: (key: "showdefinition" | "allow_proxy" | "allow_published_chats") => void;
+  onToggle: (
+    key: "showdefinition" | "allow_proxy" | "allow_published_chats",
+  ) => void;
   onClose: () => void;
 }) {
   return (

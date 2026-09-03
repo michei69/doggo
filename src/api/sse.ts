@@ -168,7 +168,13 @@ export async function streamRequest({
         });
         console.log("[API]", response.status, "POST", url);
     } catch (err: unknown) {
-        console.log("[API] ERR", "NO_RESPONSE", "POST", url, err instanceof Error ? err.message : String(err));
+        console.log(
+            "[API] ERR",
+            "NO_RESPONSE",
+            "POST",
+            url,
+            err instanceof Error ? err.message : String(err),
+        );
         if (signal?.aborted) return;
         callbacks.onError(err instanceof Error ? err : new Error(String(err)));
         return;
@@ -195,7 +201,11 @@ export async function streamRequest({
     }
 
     const reader = response.body.getReader();
-    await readSSEStream(reader, signal ?? new AbortController().signal, callbacks);
+    await readSSEStream(
+        reader,
+        signal ?? new AbortController().signal,
+        callbacks,
+    );
 }
 
 class SSEClient {
@@ -220,7 +230,9 @@ class SSEClient {
             : `${baseUrl}/chat/completions`;
 
         const thinkingParam = {
-            type: enableReasoning ? ("enabled" as const) : ("disabled" as const),
+            type: enableReasoning
+                ? ("enabled" as const)
+                : ("disabled" as const),
         };
 
         const body: Record<string, unknown> = {

@@ -38,7 +38,12 @@ export default function Avatar({
     >
       {uri ? (
         <Image
-          source={{ uri: useThumbnail && !uri.includes("?width=") ? `${uri}?width=${size}` : uri }}
+          source={{
+            uri:
+              useThumbnail && !uri.includes("?width=")
+                ? `${uri}?width=${size}`
+                : uri,
+          }}
           style={[styles.image, { borderRadius: size / 2 }]}
         />
       ) : (

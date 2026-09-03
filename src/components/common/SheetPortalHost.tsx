@@ -9,7 +9,11 @@ export default function SheetPortalHost() {
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {entries.map((entry) =>
         entry.standalone ? (
-          <View key={entry.key} style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          <View
+            key={entry.key}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="box-none"
+          >
             {entry.children}
           </View>
         ) : (

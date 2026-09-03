@@ -10,7 +10,7 @@ export default function App() {
   return (
     <GestureHandlerRootView style={styles.container}>
       <SafeAreaProvider>
-        <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+        <SafeAreaView style={styles.safeArea} edges={["bottom"]}>
           <TurnstileProvider>
             <AppNavigator />
             <StatusBar style="light" />

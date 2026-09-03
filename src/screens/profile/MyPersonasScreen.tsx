@@ -1,8 +1,4 @@
-import {
-  useState,
-  useCallback,
-  useEffect,
-} from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -20,10 +16,7 @@ import CustomAlert, {
   type AlertButton,
 } from "../../components/common/CustomAlert";
 import { useAuthStore } from "../../stores/authStore";
-import type {
-  Persona,
-  PersonaGroup,
-} from "../../types/api";
+import type { Persona, PersonaGroup } from "../../types/api";
 import type { ProfileStackParamList } from "../../navigation/types";
 import { colors } from "../../utils/colors";
 import { avatarUrl } from "../../utils/assets";
@@ -102,7 +95,9 @@ export default function MyPersonasScreen() {
     handlePersonaSaved,
     handlePersonaDeleteRequested,
     handleDelete,
-  } = usePersonaSheet(profile, setProfile, setPersonas, showAlert, () => setAlertVisible(false));
+  } = usePersonaSheet(profile, setProfile, setPersonas, showAlert, () =>
+    setAlertVisible(false),
+  );
   const {
     groupModalVisible,
     setGroupModalVisible,

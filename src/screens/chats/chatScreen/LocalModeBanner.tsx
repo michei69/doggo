@@ -2,18 +2,20 @@ import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { colors } from "../../../utils/colors";
 
-const LocalModeBanner = React.memo(
-  function LocalModeBanner({ onDismiss }: { onDismiss: () => void }) {
-    return (
-      <View style={styles.localModeBanner}>
-        <Text style={styles.localModeBannerText}>Local mode enabled.</Text>
-        <Pressable onPress={onDismiss} style={styles.localModeBannerClose}>
-          <Text style={styles.localModeBannerCloseText}>{"\u2715"}</Text>
-        </Pressable>
-      </View>
-    );
-  },
-);
+const LocalModeBanner = React.memo(function LocalModeBanner({
+  onDismiss,
+}: {
+  onDismiss: () => void;
+}) {
+  return (
+    <View style={styles.localModeBanner}>
+      <Text style={styles.localModeBannerText}>Local mode enabled.</Text>
+      <Pressable onPress={onDismiss} style={styles.localModeBannerClose}>
+        <Text style={styles.localModeBannerCloseText}>{"\u2715"}</Text>
+      </Pressable>
+    </View>
+  );
+});
 
 const styles = StyleSheet.create({
   localModeBanner: {

@@ -399,13 +399,18 @@ export function useChat() {
                     let chosenId: number | undefined;
                     if (botMsgs.length === 1) {
                         chosenId = botMsgs[0].id;
-                        chatsApi.setMessageMain(chatId, botMsgs[0].id).catch(() => {});
+                        chatsApi
+                            .setMessageMain(chatId, botMsgs[0].id)
+                            .catch(() => {});
                     } else if (botMsgs.length > 1) {
-                        const chosenIds = useChatStore.getState().chosenVariantIds;
+                        const chosenIds =
+                            useChatStore.getState().chosenVariantIds;
                         const chosen = botMsgs.find((m) => chosenIds.has(m.id));
                         if (chosen) {
                             chosenId = chosen.id;
-                            chatsApi.setMessageMain(chatId, chosen.id).catch(() => {});
+                            chatsApi
+                                .setMessageMain(chatId, chosen.id)
+                                .catch(() => {});
                         }
                     }
                     if (chosenId !== undefined) {
@@ -495,39 +500,58 @@ export function useChat() {
                 if (localData?.local_mode) {
                     const { personality, scenario } = localData;
 
-                    const apiUrl = selectedProxy?.apiUrl || userConfig.open_ai_reverse_proxy;
-                    const apiKey = selectedProxy?.apiKey || userConfig.reverseProxyKey;
-                    const model = selectedProxy?.model || userConfig.openAiModel;
+                    const apiUrl =
+                        selectedProxy?.apiUrl ||
+                        userConfig.open_ai_reverse_proxy;
+                    const apiKey =
+                        selectedProxy?.apiKey || userConfig.reverseProxyKey;
+                    const model =
+                        selectedProxy?.model || userConfig.openAiModel;
 
                     if (!apiUrl || !apiKey || !model) {
                         throw new Error("No proxy configured for local mode");
                     }
 
                     // Build system prompt: OpenAI completions format with persona tags
-                    const charName = detail.character.chat_name || detail.character.name;
-                    const activePersona = detail.chat.persona_id != null
-                        ? detail.personas.find((p) => p.id === detail.chat.persona_id)
-                        : detail.personas[0];
+                    const charName =
+                        detail.character.chat_name || detail.character.name;
+                    const activePersona =
+                        detail.chat.persona_id != null
+                            ? detail.personas.find(
+                                  (p) => p.id === detail.chat.persona_id,
+                              )
+                            : detail.personas[0];
                     const userName = activePersona?.name ?? "user";
                     const personaContent = activePersona?.appearance ?? "";
 
                     const systemParts: string[] = [];
-                    const jailbreakPrompt = selectedProxy?.jailbreakPrompt || userConfig.open_ai_jailbreak_prompt;
-                    const globalPrompt = userConfig.proxy_global_prompt
+                    const jailbreakPrompt =
+                        selectedProxy?.jailbreakPrompt ||
+                        userConfig.open_ai_jailbreak_prompt;
+                    const globalPrompt = userConfig.proxy_global_prompt;
                     if (globalPrompt) {
-                        systemParts.push(globalPrompt)
+                        systemParts.push(globalPrompt);
                     }
                     if (jailbreakPrompt) {
                         systemParts.push(jailbreakPrompt);
                     }
                     if (personality) {
-                        systemParts.push(`<${charName}'s Persona>${personality}</${charName}'s Persona>`);
+                        systemParts.push(
+                            `<${charName}'s Persona>${personality}</${charName}'s Persona>`,
+                        );
                     }
                     if (personaContent) {
-                        systemParts.push(`<${userName}'s Persona>${personaContent}</${userName}'s Persona>`);
+                        systemParts.push(
+                            `<${userName}'s Persona>${personaContent}</${userName}'s Persona>`,
+                        );
                     }
                     if (scenario?.trim()) {
                         systemParts.push(`<Scenario>${scenario}</Scenario>`);
+                    }
+                    if (detail.chat.summary?.trim()) {
+                        systemParts.push(
+                            `<Summary>${detail.chat.summary}</Summary>`,
+                        );
                     }
                     const systemContent = systemParts.join("\n");
 
@@ -556,13 +580,18 @@ export function useChat() {
                     const msgArr: Array<{ role: string; content: string }> = [
                         { role: "system", content: systemContent },
                         ...filteredMessages.map((m) => ({
-                            role: m.is_bot ? "assistant" as const : "user" as const,
-                            content: m.is_bot ? m.message : `${userName}: ${m.message}`,
+                            role: m.is_bot
+                                ? ("assistant" as const)
+                                : ("user" as const),
+                            content: m.is_bot
+                                ? m.message
+                                : `${userName}: ${m.message}`,
                         })),
                     ];
 
                     const prefillEnabled =
-                        userConfig.generation_settings?.prefill_enabled === true;
+                        userConfig.generation_settings?.prefill_enabled ===
+                        true;
                     const prefillText = prefillEnabled
                         ? (userConfig.generation_settings?.prefill_text ?? "")
                         : "";
@@ -628,9 +657,10 @@ export function useChat() {
                                 );
                             },
                         }),
-                        userConfig.generation_settings?.enable_reasoning !== false &&
-                            userConfig.generation_settings?.enable_reasoning_chat ===
-                                true,
+                        userConfig.generation_settings?.enable_reasoning !==
+                            false &&
+                            userConfig.generation_settings
+                                ?.enable_reasoning_chat === true,
                         prefillText || undefined,
                     );
                     return; // Skip generateAlpha
@@ -667,17 +697,22 @@ export function useChat() {
                         id: detail.chat.id,
                         persona_id: detail.chat.persona_id || personaId,
                         summary: detail.chat.summary,
+                        summary_chat_id: detail.chat.summary_chat_id,
                         user_id: detail.chat.user_id,
                     },
-                    chatMessages: chatMessages.map(m => ({
+                    chatMessages: chatMessages.map((m) => ({
                         chat_id: m.chat_id,
                         created_at: m.created_at,
                         id: m.id,
                         is_bot: m.is_bot,
                         is_main: m.is_main,
                         message: m.message,
-                        character_id: m.is_bot ? detail.chat.character_id : undefined,
-                        persona_id: m.is_bot ? undefined : detail.chat.persona_id || personaId
+                        character_id: m.is_bot
+                            ? detail.chat.character_id
+                            : undefined,
+                        persona_id: m.is_bot
+                            ? undefined
+                            : detail.chat.persona_id || personaId,
                     })),
                     clientPlatform: "web",
                     forcedPromptGenerationCacheRefetch: {
@@ -706,7 +741,7 @@ export function useChat() {
                         openAIKey: null,
                         selectedProxyConfigId: undefined,
                         bio_preview_images: undefined,
-                        claudeApiKey: null
+                        claudeApiKey: null,
                     },
                 };
 

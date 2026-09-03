@@ -1,15 +1,15 @@
 import { useEffect, useCallback, useMemo, useState, useRef } from "react";
-import { useRoute, useNavigation, type RouteProp } from "@react-navigation/native";
+import {
+    useRoute,
+    useNavigation,
+    type RouteProp,
+} from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useChat } from "../../../hooks/useChat";
 import { useAuthStore } from "../../../stores/authStore";
 import { useChatStore } from "../../../stores/chatStore";
 import type { ChatsStackParamList } from "../../../navigation/types";
-import type {
-    ChatMessage,
-    ChatListItem,
-    PersonaRef,
-} from "../../../types/api";
+import type { ChatMessage, ChatListItem, PersonaRef } from "../../../types/api";
 import { avatarUrl, botAvatarUrl } from "../../../utils/assets";
 import { useAlert } from "../../../hooks/useAlert";
 import {
@@ -20,12 +20,17 @@ import {
     forkChat,
     getCharacterChats,
     postMessages,
+    updateChatSummary,
 } from "../../../api/chats";
 import { useKeyboardHeight } from "../../../hooks/useKeyboardHeight";
 import { useIsTablet } from "../../../hooks/useIsTablet";
 import { processSystemMessage, processText } from "../../../utils/processText";
+import { generateChatSummary } from "../../../utils/chatSummary";
 import { File as ExpoFile } from "expo-file-system";
-import { StorageAccessFramework, writeAsStringAsync } from "expo-file-system/legacy";
+import {
+    StorageAccessFramework,
+    writeAsStringAsync,
+} from "expo-file-system/legacy";
 import { toast } from "../../../utils/toast";
 import { cleanTags, generify } from "../../../utils/markdown";
 import { storage } from "../../../utils/storage";
@@ -46,7 +51,9 @@ export function useChatScreen() {
         message: ChatMessage;
         isUser: boolean;
     } | null>(null);
-    const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
+    const [editingMessageId, setEditingMessageId] = useState<number | null>(
+        null,
+    );
     const { alert: deleteAlert, showAlert, dismissAlert } = useAlert();
     const [newChatPickerVisible, setNewChatPickerVisible] = useState(false);
     const [allChatsVisible, setAllChatsVisible] = useState(false);
@@ -61,8 +68,13 @@ export function useChatScreen() {
         error: null as string | null,
     });
     const [messagesActionsVisible, setMessagesActionsVisible] = useState(false);
+    const [chatSummaryVisible, setChatSummaryVisible] = useState(false);
+    const [chatSummaryDraft, setChatSummaryDraft] = useState("");
+    const [chatSummaryLoading, setChatSummaryLoading] = useState(false);
+    const [chatSummarySaving, setChatSummarySaving] = useState(false);
     const [localMode, setLocalMode] = useState(false);
-    const [localModeBannerDismissed, setLocalModeBannerDismissed] = useState(false);
+    const [localModeBannerDismissed, setLocalModeBannerDismissed] =
+        useState(false);
     const {
         activeChatDetail,
         messages,
@@ -96,7 +108,8 @@ export function useChatScreen() {
             detail.chat.persona_id !== undefined
         ) {
             return (
-                detail.personas.find((p) => p.id === detail.chat.persona_id) ?? null
+                detail.personas.find((p) => p.id === detail.chat.persona_id) ??
+                null
             );
         }
         return detail.personas[0] ?? null;
@@ -245,10 +258,28 @@ export function useChatScreen() {
                     prompt,
                     characterName,
                 );
-                setSystemPrompt((p) => ({ ...p, botPersonality: generify(cleanTags(personality ?? "", `${characterName}'s Persona`), characterName) }));
-                setSystemPrompt((p) => ({ ...p, scenario: generify(cleanTags(scenario ?? "", "Scenario"), characterName) }));
+                setSystemPrompt((p) => ({
+                    ...p,
+                    botPersonality: generify(
+                        cleanTags(
+                            personality ?? "",
+                            `${characterName}'s Persona`,
+                        ),
+                        characterName,
+                    ),
+                }));
+                setSystemPrompt((p) => ({
+                    ...p,
+                    scenario: generify(
+                        cleanTags(scenario ?? "", "Scenario"),
+                        characterName,
+                    ),
+                }));
             } catch (err: any) {
-                setSystemPrompt((p) => ({ ...p, error: err.message || "Failed to load system prompt" }));
+                setSystemPrompt((p) => ({
+                    ...p,
+                    error: err.message || "Failed to load system prompt",
+                }));
             } finally {
                 setSystemPrompt((p) => ({ ...p, loading: false }));
             }
@@ -257,7 +288,8 @@ export function useChatScreen() {
     }, []);
 
     const handleAttemptViewSystemPrompt = useCallback(() => {
-        showAlert("Extract System Prompt",
+        showAlert(
+            "Extract System Prompt",
             "This will attempt to extract the system prompt by having the AI reproduce it. " +
                 "It may take a while and the extracted content may be incomplete or incorrect. Continue?",
             [
@@ -268,7 +300,10 @@ export function useChatScreen() {
 
                         const detail = useChatStore.getState().activeChatDetail;
                         if (!detail) {
-                            setSystemPrompt((p) => ({ ...p, error: "Chat not loaded" }));
+                            setSystemPrompt((p) => ({
+                                ...p,
+                                error: "Chat not loaded",
+                            }));
                             setSystemPrompt((p) => ({ ...p, visible: true }));
                             return;
                         }
@@ -292,11 +327,12 @@ export function useChatScreen() {
                             const personaTag = `${characterName}'s Persona`;
 
                             try {
-                                const personaResult = await attemptExtractSystemPrompt(
-                                    character_id,
-                                    personaTag,
-                                    abortController.signal,
-                                );
+                                const personaResult =
+                                    await attemptExtractSystemPrompt(
+                                        character_id,
+                                        personaTag,
+                                        abortController.signal,
+                                    );
                                 setSystemPrompt((p) => ({
                                     ...p,
                                     botPersonality: generify(
@@ -312,15 +348,19 @@ export function useChatScreen() {
 
                             if (!extractionError) {
                                 try {
-                                    const scenarioResult = await attemptExtractSystemPrompt(
-                                        character_id,
-                                        "Scenario",
-                                        abortController.signal,
-                                    );
+                                    const scenarioResult =
+                                        await attemptExtractSystemPrompt(
+                                            character_id,
+                                            "Scenario",
+                                            abortController.signal,
+                                        );
                                     setSystemPrompt((p) => ({
                                         ...p,
                                         scenario: generify(
-                                            cleanTags(scenarioResult, "Scenario"),
+                                            cleanTags(
+                                                scenarioResult,
+                                                "Scenario",
+                                            ),
                                             characterName,
                                         ),
                                     }));
@@ -332,7 +372,10 @@ export function useChatScreen() {
                             }
 
                             if (extractionError) {
-                                setSystemPrompt((p) => ({ ...p, error: extractionError }));
+                                setSystemPrompt((p) => ({
+                                    ...p,
+                                    error: extractionError,
+                                }));
                             }
                             setSystemPrompt((p) => ({ ...p, loading: false }));
                             attemptAbortRef.current = null;
@@ -345,7 +388,8 @@ export function useChatScreen() {
                     style: "cancel",
                     onPress: () => dismissAlert(),
                 },
-            ]);
+            ],
+        );
     }, [showAlert, dismissAlert]);
 
     const handleSystemPromptClose = useCallback(() => {
@@ -384,71 +428,77 @@ export function useChatScreen() {
             return;
         }
         dismissAlert();
-        showAlert("Export as", "Copy the JSON to clipboard or save as a file?", [
-            {
-                text: "Copy",
-                onPress: async () => {
-                    dismissAlert();
-                    try {
-                        const json = JSON.stringify(
-                            currentMessages.map((m) => ({
-                                is_bot: m.is_bot,
-                                is_main: m.is_main,
-                                message: m.message,
-                                metadata: m.metadata,
-                            })),
-                            null,
-                            2,
-                        );
-                        const Clipboard = require("expo-clipboard");
-                        await Clipboard.setStringAsync(json);
-                        toast("Copied to clipboard");
-                    } catch {}
+        showAlert(
+            "Export as",
+            "Copy the JSON to clipboard or save as a file?",
+            [
+                {
+                    text: "Copy",
+                    onPress: async () => {
+                        dismissAlert();
+                        try {
+                            const json = JSON.stringify(
+                                currentMessages.map((m) => ({
+                                    is_bot: m.is_bot,
+                                    is_main: m.is_main,
+                                    message: m.message,
+                                    metadata: m.metadata,
+                                })),
+                                null,
+                                2,
+                            );
+                            const Clipboard = require("expo-clipboard");
+                            await Clipboard.setStringAsync(json);
+                            toast("Copied to clipboard");
+                        } catch {}
+                    },
                 },
-            },
-            {
-                text: "Save as File",
-                onPress: async () => {
-                    dismissAlert();
-                    try {
-                        const json = JSON.stringify(
-                            currentMessages.map((m) => ({
-                                is_bot: m.is_bot,
-                                is_main: m.is_main,
-                                message: m.message,
-                                metadata: m.metadata,
-                            })),
-                            null,
-                            2,
-                        );
-                        const filename = `chat_${chatId}_messages.json`;
-                        const perm =
-                            await StorageAccessFramework.requestDirectoryPermissionsAsync();
-                        if (!perm.granted) {
-                            toast("Save cancelled", "error");
-                            return;
-                        }
-                        const fileUri = await StorageAccessFramework.createFileAsync(
-                            perm.directoryUri,
-                            filename,
-                            "application/json",
-                        );
-                        await writeAsStringAsync(fileUri, json, {
-                            encoding: "utf8" as any,
-                        });
-                        toast(`Saved ${filename}`);
-                    } catch {}
+                {
+                    text: "Save as File",
+                    onPress: async () => {
+                        dismissAlert();
+                        try {
+                            const json = JSON.stringify(
+                                currentMessages.map((m) => ({
+                                    is_bot: m.is_bot,
+                                    is_main: m.is_main,
+                                    message: m.message,
+                                    metadata: m.metadata,
+                                })),
+                                null,
+                                2,
+                            );
+                            const filename = `chat_${chatId}_messages.json`;
+                            const perm =
+                                await StorageAccessFramework.requestDirectoryPermissionsAsync();
+                            if (!perm.granted) {
+                                toast("Save cancelled", "error");
+                                return;
+                            }
+                            const fileUri =
+                                await StorageAccessFramework.createFileAsync(
+                                    perm.directoryUri,
+                                    filename,
+                                    "application/json",
+                                );
+                            await writeAsStringAsync(fileUri, json, {
+                                encoding: "utf8" as any,
+                            });
+                            toast(`Saved ${filename}`);
+                        } catch {}
+                    },
                 },
-            },
-        ]);
+            ],
+        );
     }, [chatId, showAlert, dismissAlert]);
 
     const handleImport = useCallback(() => {
         const importMessagesToServer = async (messages: ChatMessage[]) => {
             try {
                 // Delete existing server messages first
-                const currentIds = useChatStore.getState().messages.reduce<number[]>(
-                    (acc, m) => {
+                const currentIds = useChatStore
+                    .getState()
+                    .messages.reduce<number[]>((acc, m) => {
                         if (
                             m.id > 0 &&
                             m.id <= 99000000000 &&
@@ -457,9 +507,7 @@ export function useChatScreen() {
                             acc.push(m.id);
                         }
                         return acc;
-                    },
-                    [],
-                );
+                    }, []);
                 await deleteMessagesInBatches(chatId, currentIds);
                 // Post imported messages in batches of 25
                 const body = messages.map((m) => ({
@@ -488,65 +536,103 @@ export function useChatScreen() {
                     style: "destructive",
                     onPress: () => {
                         dismissAlert();
-                        showAlert("Import from", "Read JSON from clipboard or pick a file?", [
-                            {
-                                text: "Clipboard",
-                                onPress: async () => {
-                                    dismissAlert();
-                                    try {
-                                        const Clipboard = require("expo-clipboard");
-                                        const text = await Clipboard.getStringAsync();
-                                        if (!text || text.trim().length === 0) {
-                                            showAlert("Import Failed", "Clipboard is empty.", [
-                                                {
-                                                    text: "OK",
-                                                    onPress: dismissAlert,
-                                                },
-                                            ]);
-                                            return;
-                                        }
-                                        const result = validateMessagesImport(text);
-                                        if (!result.valid) {
-                                            showAlert("Import Failed", result.error, [
-                                                {
-                                                    text: "OK",
-                                                    onPress: dismissAlert,
-                                                },
-                                            ]);
-                                            return;
-                                        }
-                                        await importMessagesToServer(result.messages);
-                                    } catch {}
+                        showAlert(
+                            "Import from",
+                            "Read JSON from clipboard or pick a file?",
+                            [
+                                {
+                                    text: "Clipboard",
+                                    onPress: async () => {
+                                        dismissAlert();
+                                        try {
+                                            const Clipboard = require("expo-clipboard");
+                                            const text =
+                                                await Clipboard.getStringAsync();
+                                            if (
+                                                !text ||
+                                                text.trim().length === 0
+                                            ) {
+                                                showAlert(
+                                                    "Import Failed",
+                                                    "Clipboard is empty.",
+                                                    [
+                                                        {
+                                                            text: "OK",
+                                                            onPress:
+                                                                dismissAlert,
+                                                        },
+                                                    ],
+                                                );
+                                                return;
+                                            }
+                                            const result =
+                                                validateMessagesImport(text);
+                                            if (!result.valid) {
+                                                showAlert(
+                                                    "Import Failed",
+                                                    result.error,
+                                                    [
+                                                        {
+                                                            text: "OK",
+                                                            onPress:
+                                                                dismissAlert,
+                                                        },
+                                                    ],
+                                                );
+                                                return;
+                                            }
+                                            await importMessagesToServer(
+                                                result.messages,
+                                            );
+                                        } catch {}
+                                    },
                                 },
-                            },
-                            {
-                                text: "File",
-                                onPress: async () => {
-                                    dismissAlert();
-                                    try {
-                                        const pickResult = await ExpoFile.pickFileAsync({
-                                            mimeTypes: "application/json",
-                                        });
-                                        if (pickResult.canceled || !pickResult.result) return;
-                                        const pickedFile = Array.isArray(pickResult.result)
-                                            ? pickResult.result[0]
-                                            : pickResult.result;
-                                        const text = await pickedFile.text();
-                                        const result = validateMessagesImport(text);
-                                        if (!result.valid) {
-                                            showAlert("Import Failed", result.error, [
-                                                {
-                                                    text: "OK",
-                                                    onPress: dismissAlert,
-                                                },
-                                            ]);
-                                            return;
-                                        }
-                                        await importMessagesToServer(result.messages);
-                                    } catch {}
+                                {
+                                    text: "File",
+                                    onPress: async () => {
+                                        dismissAlert();
+                                        try {
+                                            const pickResult =
+                                                await ExpoFile.pickFileAsync({
+                                                    mimeTypes:
+                                                        "application/json",
+                                                });
+                                            if (
+                                                pickResult.canceled ||
+                                                !pickResult.result
+                                            )
+                                                return;
+                                            const pickedFile = Array.isArray(
+                                                pickResult.result,
+                                            )
+                                                ? pickResult.result[0]
+                                                : pickResult.result;
+                                            const text =
+                                                await pickedFile.text();
+                                            const result =
+                                                validateMessagesImport(text);
+                                            if (!result.valid) {
+                                                showAlert(
+                                                    "Import Failed",
+                                                    result.error,
+                                                    [
+                                                        {
+                                                            text: "OK",
+                                                            onPress:
+                                                                dismissAlert,
+                                                        },
+                                                    ],
+                                                );
+                                                return;
+                                            }
+                                            await importMessagesToServer(
+                                                result.messages,
+                                            );
+                                        } catch {}
+                                    },
                                 },
-                            },
-                        ]);
+                            ],
+                        );
                     },
                 },
                 {
@@ -560,7 +646,8 @@ export function useChatScreen() {
 
     const handleReset = useCallback(() => {
         if (!activeChatDetail) return;
-        showAlert("Reset Messages",
+        showAlert(
+            "Reset Messages",
             "Reset this conversation to the first messages? All current messages will be permanently deleted.",
             [
                 {
@@ -571,12 +658,13 @@ export function useChatScreen() {
                         try {
                             const currentMessages =
                                 useChatStore.getState().messages;
-                            const serverIds = currentMessages.reduce<
-                                number[]
-                            >((acc, m) => {
-                                if (m.id > 0) acc.push(m.id);
-                                return acc;
-                            }, []);
+                            const serverIds = currentMessages.reduce<number[]>(
+                                (acc, m) => {
+                                    if (m.id > 0) acc.push(m.id);
+                                    return acc;
+                                },
+                                [],
+                            );
                             useChatStore.getState().clearMessages();
                             await clearAndResetMessages(
                                 chatId,
@@ -592,11 +680,13 @@ export function useChatScreen() {
                     style: "cancel",
                     onPress: () => dismissAlert(),
                 },
-            ]);
+            ],
+        );
     }, [chatId, activeChatDetail, loadMessages, showAlert, dismissAlert]);
 
     const handleDeleteChatFromCog = useCallback(() => {
-        showAlert("Delete Chat",
+        showAlert(
+            "Delete Chat",
             `Delete conversation with ${characterName}? This cannot be undone.`,
             [
                 {
@@ -615,16 +705,97 @@ export function useChatScreen() {
                     style: "cancel",
                     onPress: () => dismissAlert(),
                 },
-            ]);
+            ],
+        );
     }, [chatId, characterName, deleteChat, goBack, showAlert, dismissAlert]);
 
-    const handleSettingsClose = useCallback(() => setSettingsVisible(false), []);
+    const handleSettingsClose = useCallback(
+        () => setSettingsVisible(false),
+        [],
+    );
+
+    const handleChatSummaryOpen = useCallback(() => {
+        const detail = useChatStore.getState().activeChatDetail;
+        setChatSummaryDraft(detail?.chat.summary ?? "");
+        setSettingsVisible(false);
+        setChatSummaryVisible(true);
+    }, []);
+
+    const handleChatSummaryClose = useCallback(() => {
+        setChatSummaryVisible(false);
+    }, []);
+
+    const handleChatSummaryDraftChange = useCallback((value: string) => {
+        setChatSummaryDraft(value);
+    }, []);
+
+    const runChatSummaryGeneration = useCallback(
+        async (fromMessageId?: number | null) => {
+            if (!useChatStore.getState().activeChatDetail) return;
+            setChatSummaryLoading(true);
+            try {
+                const result = await generateChatSummary({
+                    chatId,
+                    characterId,
+                    fromMessageId,
+                });
+                setChatSummaryDraft(result);
+            } catch (err: any) {
+                toast(err?.message || "Failed to generate summary", "error");
+            } finally {
+                setChatSummaryLoading(false);
+            }
+        },
+        [chatId, characterId],
+    );
+
+    const handleChatSummaryGenerateFromChat = useCallback(() => {
+        void runChatSummaryGeneration();
+    }, [runChatSummaryGeneration]);
+
+    const handleChatSummaryGenerateFromLastMessage = useCallback(() => {
+        const detail = useChatStore.getState().activeChatDetail;
+        if (detail?.chat.summary_chat_id != null) {
+            void runChatSummaryGeneration(detail.chat.summary_chat_id);
+        }
+    }, [runChatSummaryGeneration]);
+
+    const handleChatSummarySave = useCallback(async () => {
+        const detail = useChatStore.getState().activeChatDetail;
+        if (!detail) return;
+        const summary = chatSummaryDraft.trim();
+        const currentMessages = useChatStore.getState().messages;
+        const lastServerMessageId = currentMessages.reduce<number>(
+            (maxId, message) =>
+                message.id > 0 ? Math.max(maxId, message.id) : maxId,
+            0,
+        );
+        const summaryChatId = summary
+            ? lastServerMessageId || detail.chat.summary_chat_id
+            : null;
+        setChatSummarySaving(true);
+        try {
+            await updateChatSummary(chatId, summary, summaryChatId);
+            useChatStore
+                .getState()
+                .updateChatSummary(chatId, summary, summaryChatId);
+            setChatSummaryVisible(false);
+            toast("Summary saved");
+        } catch {
+            toast("Failed to save summary", "error");
+        } finally {
+            setChatSummarySaving(false);
+        }
+    }, [chatId, chatSummaryDraft]);
 
     const handleNewChatPickerClose = useCallback(
         () => setNewChatPickerVisible(false),
         [],
     );
-    const handleAllChatsClose = useCallback(() => setAllChatsVisible(false), []);
+    const handleAllChatsClose = useCallback(
+        () => setAllChatsVisible(false),
+        [],
+    );
     const handleAllChatsBack = useCallback(() => {
         setAllChatsVisible(false);
         setSettingsVisible(true);
@@ -695,7 +866,9 @@ export function useChatScreen() {
 
     const handleActionsDelete = useCallback(() => {
         if (!actionsTarget) return;
-        const idx = messages.findIndex((m) => m.id === actionsTarget.message.id);
+        const idx = messages.findIndex(
+            (m) => m.id === actionsTarget.message.id,
+        );
         const hasAfter = idx !== -1 && idx < messages.length - 1;
 
         const doDelete = (ids: number[]) => {
@@ -709,7 +882,8 @@ export function useChatScreen() {
 
         if (hasAfter) {
             const afterCount = messages.length - 1 - idx;
-            showAlert("Delete Message",
+            showAlert(
+                "Delete Message",
                 `Delete just this message, or this message and the ${afterCount} message${afterCount > 1 ? "s" : ""} after it?`,
                 [
                     {
@@ -719,7 +893,8 @@ export function useChatScreen() {
                     {
                         text: "All after",
                         style: "destructive",
-                        onPress: () => doDelete(messages.slice(idx).map((m) => m.id)),
+                        onPress: () =>
+                            doDelete(messages.slice(idx).map((m) => m.id)),
                     },
                     {
                         text: "Cancel",
@@ -729,11 +904,19 @@ export function useChatScreen() {
                             dismissAlert();
                         },
                     },
-                ]);
+                ],
+            );
         } else {
             doDelete([actionsTarget.message.id]);
         }
-    }, [actionsTarget, messages, handleDelete, storeRemoveMessages, showAlert, dismissAlert]);
+    }, [
+        actionsTarget,
+        messages,
+        handleDelete,
+        storeRemoveMessages,
+        showAlert,
+        dismissAlert,
+    ]);
 
     const handleEditingDone = useCallback(() => {
         setEditingMessageId(null);
@@ -784,10 +967,10 @@ export function useChatScreen() {
         setActionsTarget(null);
     }, [actionsTarget, chatId, editMsg]);
 
-    const handleRetry = useCallback(() => loadMessages(chatId), [
-        loadMessages,
-        chatId,
-    ]);
+    const handleRetry = useCallback(
+        () => loadMessages(chatId),
+        [loadMessages, chatId],
+    );
 
     const handleLocalModeBannerDismiss = useCallback(() => {
         setLocalModeBannerDismissed(true);
@@ -842,6 +1025,18 @@ export function useChatScreen() {
         keyboardHeight,
         settingsVisible,
         handleSettingsClose,
+        chatSummaryVisible,
+        handleChatSummaryOpen,
+        handleChatSummaryClose,
+        chatSummaryDraft,
+        handleChatSummaryDraftChange,
+        chatSummaryLoading,
+        chatSummarySaving,
+        handleChatSummarySave,
+        handleChatSummaryGenerateFromChat,
+        handleChatSummaryGenerateFromLastMessage,
+        canGenerateChatSummaryFromLastMessage:
+            activeChatDetail?.chat.summary_chat_id != null,
         creatorId: activeChatDetail?.character.creator_id,
         creatorName: activeChatDetail?.character.creator_name,
         allowProxy: activeChatDetail?.character.allow_proxy,

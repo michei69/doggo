@@ -31,7 +31,12 @@ import CustomAlert, {
   type AlertButton,
 } from "../../components/common/CustomAlert";
 import { useAlert } from "../../hooks/useAlert";
-import { getProfile, followUser, unfollowUser, getMyFollowing } from "../../api/profile";
+import {
+  getProfile,
+  followUser,
+  unfollowUser,
+  getMyFollowing,
+} from "../../api/profile";
 import { getCharacters } from "../../api/characters";
 import { stripHtml } from "../../utils/markdown";
 import { assetUrl, avatarUrl } from "../../utils/assets";
@@ -55,7 +60,12 @@ import FilterModal, {
 } from "../../components/discover/FilterModal";
 import { type FilterState, INITIAL_FILTERS } from "../../utils/discover";
 import AdvancedSearchModal from "../../components/discover/AdvancedSearchModal";
-import { BadgeCheck, CirclePlus, Search, SlidersHorizontal } from "lucide-react-native";
+import {
+  BadgeCheck,
+  CirclePlus,
+  Search,
+  SlidersHorizontal,
+} from "lucide-react-native";
 
 type Route = RouteProp<CharactersStackParamList, "CreatorScreen">;
 
@@ -110,7 +120,15 @@ const ProfileSection = React.memo(function ProfileSection({
     } finally {
       setFollowingLoading(false);
     }
-  }, [userId, isFollowing, followingLoading, setIsFollowing, setFollowerCount, setFollowingLoading, onFollowError]);
+  }, [
+    userId,
+    isFollowing,
+    followingLoading,
+    setIsFollowing,
+    setFollowerCount,
+    setFollowingLoading,
+    onFollowError,
+  ]);
 
   return (
     <View style={[styles.profileSection, isTablet && { paddingTop: 0 }]}>
@@ -121,7 +139,9 @@ const ProfileSection = React.memo(function ProfileSection({
           size={80}
         />
       </Pressable>
-      <Text style={styles.profileName}>{profile.name || `@${profile.user_name}`}</Text>
+      <Text style={styles.profileName}>
+        {profile.name || `@${profile.user_name}`}
+      </Text>
       {profile.user_name ? (
         <Text style={styles.profileUsername}>@{profile.user_name}</Text>
       ) : null}
@@ -190,11 +210,7 @@ const ProfileSection = React.memo(function ProfileSection({
               isFollowing && styles.followingBtnText,
             ]}
           >
-            {followingLoading
-              ? "..."
-              : isFollowing
-                ? "Following"
-                : "Follow"}
+            {followingLoading ? "..." : isFollowing ? "Following" : "Follow"}
           </Text>
         </Pressable>
       )}
@@ -213,20 +229,14 @@ const FilterRow = React.memo(function FilterRow({
     <View style={styles.filterRow}>
       <Pressable
         onPress={onOpenFilters}
-        style={({ pressed }) => [
-          styles.filterBtn,
-          pressed && { opacity: 0.7 },
-        ]}
+        style={({ pressed }) => [styles.filterBtn, pressed && { opacity: 0.7 }]}
       >
         <SlidersHorizontal size={16} color={colors.accent} />
         <Text style={styles.filterBtnText}>Filters</Text>
       </Pressable>
       <Pressable
         onPress={onOpenAdvanced}
-        style={({ pressed }) => [
-          styles.filterBtn,
-          pressed && { opacity: 0.7 },
-        ]}
+        style={({ pressed }) => [styles.filterBtn, pressed && { opacity: 0.7 }]}
       >
         <Search size={16} color={colors.accent} />
         <Text style={styles.filterBtnText}>Advanced</Text>
@@ -315,7 +325,9 @@ function CharacterList({
       contentContainerStyle={styles.listContent}
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={
-        isTablet ? filterRow : (
+        isTablet ? (
+          filterRow
+        ) : (
           <>
             {profileSection}
             {filterRow}
@@ -352,7 +364,12 @@ const ScreenModals = React.memo(function ScreenModals({
   longPressCharacter: TrendingCharacter | null;
   actionsVisible: boolean;
   reportVisible: boolean;
-  alert: { visible: boolean; title: string; message: string; buttons: AlertButton[] };
+  alert: {
+    visible: boolean;
+    title: string;
+    message: string;
+    buttons: AlertButton[];
+  };
   dismissAlert: () => void;
   preview: AvatarPreviewState | null;
   setPreview: React.Dispatch<React.SetStateAction<AvatarPreviewState | null>>;
@@ -396,7 +413,13 @@ const ScreenModals = React.memo(function ScreenModals({
   );
 });
 
-function ProfileState({ loading, error }: { loading: boolean; error: string | null }) {
+function ProfileState({
+  loading,
+  error,
+}: {
+  loading: boolean;
+  error: string | null;
+}) {
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -432,7 +455,8 @@ function useCreatorProfile(userId: string, isOwnProfile: boolean) {
         setFollowerCount(parseInt(profile.followers_count ?? "0", 10) || 0);
         setIsFollowing(following.some((f) => f.user_id === userId));
       } catch (err: any) {
-        if (!cancelled) setProfileError(err.message || "Failed to load profile");
+        if (!cancelled)
+          setProfileError(err.message || "Failed to load profile");
       } finally {
         if (!cancelled) setProfileLoading(false);
       }
@@ -605,9 +629,7 @@ export default function CreatorScreen() {
   } = useCreatorProfile(userId, isOwnProfile);
 
   const [aboutExpanded, setAboutExpanded] = useState(false);
-  const [preview, setPreview] = useState<AvatarPreviewState | null>(
-    null,
-  );
+  const [preview, setPreview] = useState<AvatarPreviewState | null>(null);
 
   const [advancedKeywords, setAdvancedKeywords] = useState<string[]>([]);
   const [advancedBlacklist, setAdvancedBlacklist] = useState<string[]>([]);

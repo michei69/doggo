@@ -147,10 +147,7 @@ function FirstMessageEditor({
           <Pressable
             onPress={onNext}
             disabled={index >= count - 1}
-            style={[
-              styles.navBtn,
-              index >= count - 1 && styles.navBtnDisabled,
-            ]}
+            style={[styles.navBtn, index >= count - 1 && styles.navBtnDisabled]}
           >
             <Text
               style={[
@@ -186,9 +183,7 @@ function ContentRatingToggle({
           style={[styles.toggleOption, !isNsfw && styles.toggleActive]}
           onPress={onSelectLimited}
         >
-          <Text
-            style={[styles.toggleText, !isNsfw && styles.toggleTextActive]}
-          >
+          <Text style={[styles.toggleText, !isNsfw && styles.toggleTextActive]}>
             Limited
           </Text>
         </Pressable>
@@ -274,9 +269,7 @@ function TagEditor({
                 onPress={() => onToggleTag(tag.id)}
               >
                 <Text
-                  style={
-                    selected ? styles.chipSelectedText : styles.chipText
-                  }
+                  style={selected ? styles.chipSelectedText : styles.chipText}
                 >
                   {tag.name}
                 </Text>

@@ -73,9 +73,7 @@ export default React.memo(function ChatBubble({
     null,
   );
   const [thinkingExpanded, setThinkingExpanded] = useState(false);
-  const [preview, setPreview] = useState<AvatarPreviewState | null>(
-    null,
-  );
+  const [preview, setPreview] = useState<AvatarPreviewState | null>(null);
   const inputRef = useRef<TextInput>(null);
   const onLinkPress = useNavigateToJanitorLink();
 
@@ -112,17 +110,36 @@ export default React.memo(function ChatBubble({
     return extractThinking(
       replaceTags(rawContent, personaName, characterChatName, personaPronouns),
     );
-  }, [rawContent, isEmpty, isUser, personaName, characterChatName, personaPronouns]);
+  }, [
+    rawContent,
+    isEmpty,
+    isUser,
+    personaName,
+    characterChatName,
+    personaPronouns,
+  ]);
 
   const thinkingContent = activeThinking || messageThinking;
   const showThinking = !isUser && !!thinkingContent && enableThinking;
   const displayContent = useMemo(() => {
     if (isEmpty || isUser)
-      return replaceTags(rawContent, personaName, characterChatName, personaPronouns);
+      return replaceTags(
+        rawContent,
+        personaName,
+        characterChatName,
+        personaPronouns,
+      );
     return extractThinking(
       replaceTags(rawContent, personaName, characterChatName, personaPronouns),
     ).rest;
-  }, [rawContent, isEmpty, isUser, personaName, characterChatName, personaPronouns]);
+  }, [
+    rawContent,
+    isEmpty,
+    isUser,
+    personaName,
+    characterChatName,
+    personaPronouns,
+  ]);
 
   const avatarUri = isUser ? personaAvatar : characterAvatar;
   const avatarName = isUser
@@ -175,7 +192,11 @@ export default React.memo(function ChatBubble({
         <View>
           <StreamdownText
             markdown={displayContent}
-            markdownStyle={isUser && chatLayout === "messaging" ? userMarkdownStyle : markdownStyle}
+            markdownStyle={
+              isUser && chatLayout === "messaging"
+                ? userMarkdownStyle
+                : markdownStyle
+            }
             selectable={false}
             onLinkPress={onLinkPress}
           />

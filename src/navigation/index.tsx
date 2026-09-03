@@ -142,10 +142,7 @@ function getStateFromPath(path: string) {
   }
 
   // /create_character -> navigate to CreateTab
-  if (
-    cleanPath === "/create_character" ||
-    cleanPath === "/create_character/"
-  ) {
+  if (cleanPath === "/create_character" || cleanPath === "/create_character/") {
     return {
       routes: [
         {

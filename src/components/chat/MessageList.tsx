@@ -5,12 +5,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import {
-  View,
-  StyleSheet,
-  Text,
-  Pressable,
-} from "react-native";
+import { View, StyleSheet, Text, Pressable } from "react-native";
 import type { DimensionValue } from "react-native";
 import { FlashList, type FlashListRef } from "@shopify/flash-list";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -26,7 +21,14 @@ import { setMessageMainState } from "../../api/chats";
 import { groupMessages, type MessageGroup } from "../../utils/messages";
 
 const SKELETON_BUBBLE_HEIGHTS = [64, 96, 56, 120, 72, 88];
-const SKELETON_BUBBLE_WIDTHS: DimensionValue[] = ["70%", "55%", "80%", "45%", "65%", "75%"];
+const SKELETON_BUBBLE_WIDTHS: DimensionValue[] = [
+  "70%",
+  "55%",
+  "80%",
+  "45%",
+  "65%",
+  "75%",
+];
 
 const MessagingSkeleton = React.memo(function MessagingSkeleton() {
   return (
@@ -46,7 +48,8 @@ const MessagingSkeleton = React.memo(function MessagingSkeleton() {
               style={[
                 styles.skelMsgCard,
                 {
-                  width: SKELETON_BUBBLE_WIDTHS[i % SKELETON_BUBBLE_WIDTHS.length],
+                  width:
+                    SKELETON_BUBBLE_WIDTHS[i % SKELETON_BUBBLE_WIDTHS.length],
                   height: h,
                 },
               ]}
@@ -83,7 +86,12 @@ const EdgeToEdgeSkeleton = React.memo(function EdgeToEdgeSkeleton() {
             <View style={styles.skelAvatarXs} />
             <View style={styles.skelNameBar} />
           </View>
-          <View style={[styles.skelMsgCardFull, { height: h, marginHorizontal: 12 }]} />
+          <View
+            style={[
+              styles.skelMsgCardFull,
+              { height: h, marginHorizontal: 12 },
+            ]}
+          />
         </View>
       ))}
     </View>
@@ -191,7 +199,10 @@ const MessageGroupRenderer = React.memo(
       if (safeIdxRef.current >= variantCountRef.current - 1) {
         onRerollRef.current?.();
       } else {
-        const newIdx = Math.min(variantCountRef.current - 1, safeIdxRef.current + 1);
+        const newIdx = Math.min(
+          variantCountRef.current - 1,
+          safeIdxRef.current + 1,
+        );
         setActiveIdx(newIdx);
         syncVariantToServer(newIdx);
       }
@@ -348,7 +359,10 @@ const MessageGroupRenderer = React.memo(
     for (let i = 0; i < prevLen; i++) {
       if (prev.group.messages[i]?.message !== next.group.messages[i]?.message)
         return false;
-      if (i < prevLen && prev.group.messages[i]?.is_main !== next.group.messages[i]?.is_main)
+      if (
+        i < prevLen &&
+        prev.group.messages[i]?.is_main !== next.group.messages[i]?.is_main
+      )
         return false;
     }
 
@@ -415,8 +429,15 @@ export default function MessageList({
   }, []);
 
   const handleScroll = useCallback(
-    (event: { nativeEvent: { contentOffset: { y: number }; contentSize: { height: number }; layoutMeasurement: { height: number } } }) => {
-      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    (event: {
+      nativeEvent: {
+        contentOffset: { y: number };
+        contentSize: { height: number };
+        layoutMeasurement: { height: number };
+      };
+    }) => {
+      const { contentOffset, contentSize, layoutMeasurement } =
+        event.nativeEvent;
       const distanceFromBottom =
         contentSize.height - contentOffset.y - layoutMeasurement.height;
       isNearBottomRef.current = distanceFromBottom < 200;
@@ -441,7 +462,7 @@ export default function MessageList({
     }
   }, [scrollToBottom]);
 
-    const renderItem = useCallback(
+  const renderItem = useCallback(
     ({ item, index }: { item: MessageGroup; index: number }) => {
       const isLast = index === groups.length - 1;
       return (

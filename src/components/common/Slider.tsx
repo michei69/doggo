@@ -1,10 +1,5 @@
 import { useRef, useCallback, useMemo } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  type LayoutChangeEvent,
-} from "react-native";
+import { View, Text, StyleSheet, type LayoutChangeEvent } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { scheduleOnRN } from "react-native-worklets";
 import { colors } from "../../utils/colors";

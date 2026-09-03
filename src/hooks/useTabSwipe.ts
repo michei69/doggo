@@ -115,8 +115,7 @@ export function useTabSwipe({
     const handleTabRowLayout = useCallback(
         (width: number) => {
             tabRowWidth.value = width;
-            const pageWidth =
-                pageWidthMode === "screen" ? screenWidth : width;
+            const pageWidth = pageWidthMode === "screen" ? screenWidth : width;
             tabIndicator.value = activeIndex * (width / tabCount);
             translateX.value = -activeIndex * pageWidth;
         },

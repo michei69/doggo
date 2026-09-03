@@ -1,4 +1,11 @@
-import { useState, useEffect, useCallback, useReducer, useRef, memo } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useReducer,
+  useRef,
+  memo,
+} from "react";
 import {
   View,
   Text,
@@ -17,7 +24,12 @@ import {
   pinReview,
   unpinReview,
 } from "../../api/reviews";
-import type { Review, ReviewCounts, ReviewSettings, ReviewSort } from "../../types/api";
+import type {
+  Review,
+  ReviewCounts,
+  ReviewSettings,
+  ReviewSort,
+} from "../../types/api";
 import { useAuthStore } from "../../stores/authStore";
 import { colors } from "../../utils/colors";
 import ReviewCard from "./ReviewCard";
@@ -77,9 +89,7 @@ function reviewsListReducer(
       return {
         ...state,
         reviews: state.reviews.map((r) =>
-          r.id === action.id
-            ? { ...r, is_pinned: false, pinned_at: null }
-            : r,
+          r.id === action.id ? { ...r, is_pinned: false, pinned_at: null } : r,
         ),
       };
     default:
@@ -187,7 +197,11 @@ export default function ReviewsSection({
         size: 20,
         sortBy,
       });
-      dispatchList({ type: "APPEND", reviews: data, hasMore: data.length === 20 });
+      dispatchList({
+        type: "APPEND",
+        reviews: data,
+        hasMore: data.length === 20,
+      });
       pageRef.current = nextPage;
     } catch {
       // silently fail
@@ -421,10 +435,7 @@ const ReviewForm = memo(function ReviewForm({
     <View style={styles.formCard}>
       <View style={styles.likeToggle}>
         <Pressable
-          style={[
-            styles.likeOption,
-            reviewIsLike && styles.likeOptionActive,
-          ]}
+          style={[styles.likeOption, reviewIsLike && styles.likeOptionActive]}
           onPress={() => onToggleLike(true)}
         >
           <ThumbsUp
@@ -478,8 +489,7 @@ const ReviewForm = memo(function ReviewForm({
         <Pressable
           style={[
             styles.submitBtn,
-            (!reviewContent.trim() || submitting) &&
-              styles.submitBtnDisabled,
+            (!reviewContent.trim() || submitting) && styles.submitBtnDisabled,
           ]}
           onPress={onSubmit}
           disabled={!reviewContent.trim() || submitting}
@@ -518,9 +528,7 @@ const ReviewsList = memo(function ReviewsList({
     );
   }
   if (reviews.length === 0) {
-    return (
-      <Text style={styles.emptyText}>No reviews yet. Be the first!</Text>
-    );
+    return <Text style={styles.emptyText}>No reviews yet. Be the first!</Text>;
   }
   return (
     <View style={styles.list}>

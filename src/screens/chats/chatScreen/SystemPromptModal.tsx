@@ -12,138 +12,133 @@ import CollapsibleSection from "../../../components/common/CollapsibleSection";
 import TextInput from "../../../components/common/TextInput";
 import { colors } from "../../../utils/colors";
 
-const SystemPromptModal = React.memo(
-  function SystemPromptModal({
-    visible,
-    content,
-    botPersonality,
-    scenario,
-    loading,
-    error,
-    onClose,
-  }: {
-    visible: boolean;
-    content: string;
-    botPersonality: string;
-    scenario: string;
-    loading: boolean;
-    error: string | null;
-    onClose: () => void;
-  }) {
-    return (
-      <Modal
-        visible={visible}
-        transparent
-        animationType="fade"
-        onRequestClose={onClose}
-      >
-        <View style={styles.sysPromptOverlay}>
-          <View style={styles.sysPromptModal}>
-            <View style={styles.sysPromptHeader}>
-              <Text style={styles.sysPromptTitle}>System Prompt</Text>
-              <Pressable onPress={onClose}>
-                <Text style={styles.sysPromptClose}>{"\u2715"}</Text>
-              </Pressable>
-            </View>
-            {error ? (
-              <Text style={styles.sysPromptError}>{error}</Text>
-            ) : loading && !content && !botPersonality && !scenario ? (
-              <ActivityIndicator
-                color={colors.accent}
-                style={{ paddingVertical: 24 }}
-              />
-            ) : (
-              <ScrollView style={styles.sysPromptScroll}>
-                {loading && (
-                  <View style={styles.sysPromptLoadingBar}>
-                    <ActivityIndicator
-                      size="small"
-                      color={colors.accent}
-                    />
-                    <Text style={styles.sysPromptLoadingText}>
-                      Loading system prompt…
-                    </Text>
-                  </View>
-                )}
-                {content.length > 0 && (
-                  <CollapsibleSection title="System Prompt">
-                    <TextInput
-                      multiline
-                      label="Raw System Prompt"
-                      style={styles.sysPromptTextInput}
-                      editable={!loading}
-                    >
-                      {content}
-                    </TextInput>
-                    <Pressable
-                      style={styles.sysPromptCopyBtn}
-                      onPress={() => {
-                        try {
-                          const Clipboard = require("expo-clipboard");
-                          Clipboard.setStringAsync(content);
-                        } catch {}
-                      }}
-                    >
-                      <Text style={styles.sysPromptCopyText}>Copy</Text>
-                    </Pressable>
-                  </CollapsibleSection>
-                )}
-                {botPersonality.length > 0 && (
-                  <CollapsibleSection title="Personality">
-                    <TextInput
-                      multiline
-                      label="Bot Personality"
-                      style={styles.sysPromptTextInput}
-                      editable={!loading}
-                    >
-                      {botPersonality}
-                    </TextInput>
-
-                    <Pressable
-                      style={styles.sysPromptCopyBtn}
-                      onPress={() => {
-                        try {
-                          const Clipboard = require("expo-clipboard");
-                          Clipboard.setStringAsync(botPersonality);
-                        } catch {}
-                      }}
-                    >
-                      <Text style={styles.sysPromptCopyText}>Copy</Text>
-                    </Pressable>
-                  </CollapsibleSection>
-                )}
-                {scenario.length > 0 && (
-                  <CollapsibleSection title="Scenario">
-                    <TextInput
-                      multiline
-                      label="Scenario"
-                      style={styles.sysPromptTextInput}
-                      editable={!loading}
-                    >
-                      {scenario}
-                    </TextInput>
-
-                    <Pressable
-                      style={styles.sysPromptCopyBtn}
-                      onPress={() => {
-                        try {
-                          const Clipboard = require("expo-clipboard");
-                          Clipboard.setStringAsync(scenario);
-                        } catch {}
-                      }}
-                    >
-                      <Text style={styles.sysPromptCopyText}>Copy</Text>
-                    </Pressable>
-                  </CollapsibleSection>
-                )}
-              </ScrollView>
-            )}
+const SystemPromptModal = React.memo(function SystemPromptModal({
+  visible,
+  content,
+  botPersonality,
+  scenario,
+  loading,
+  error,
+  onClose,
+}: {
+  visible: boolean;
+  content: string;
+  botPersonality: string;
+  scenario: string;
+  loading: boolean;
+  error: string | null;
+  onClose: () => void;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.sysPromptOverlay}>
+        <View style={styles.sysPromptModal}>
+          <View style={styles.sysPromptHeader}>
+            <Text style={styles.sysPromptTitle}>System Prompt</Text>
+            <Pressable onPress={onClose}>
+              <Text style={styles.sysPromptClose}>{"\u2715"}</Text>
+            </Pressable>
           </View>
+          {error ? (
+            <Text style={styles.sysPromptError}>{error}</Text>
+          ) : loading && !content && !botPersonality && !scenario ? (
+            <ActivityIndicator
+              color={colors.accent}
+              style={{ paddingVertical: 24 }}
+            />
+          ) : (
+            <ScrollView style={styles.sysPromptScroll}>
+              {loading && (
+                <View style={styles.sysPromptLoadingBar}>
+                  <ActivityIndicator size="small" color={colors.accent} />
+                  <Text style={styles.sysPromptLoadingText}>
+                    Loading system prompt…
+                  </Text>
+                </View>
+              )}
+              {content.length > 0 && (
+                <CollapsibleSection title="System Prompt">
+                  <TextInput
+                    multiline
+                    label="Raw System Prompt"
+                    style={styles.sysPromptTextInput}
+                    editable={!loading}
+                  >
+                    {content}
+                  </TextInput>
+                  <Pressable
+                    style={styles.sysPromptCopyBtn}
+                    onPress={() => {
+                      try {
+                        const Clipboard = require("expo-clipboard");
+                        Clipboard.setStringAsync(content);
+                      } catch {}
+                    }}
+                  >
+                    <Text style={styles.sysPromptCopyText}>Copy</Text>
+                  </Pressable>
+                </CollapsibleSection>
+              )}
+              {botPersonality.length > 0 && (
+                <CollapsibleSection title="Personality">
+                  <TextInput
+                    multiline
+                    label="Bot Personality"
+                    style={styles.sysPromptTextInput}
+                    editable={!loading}
+                  >
+                    {botPersonality}
+                  </TextInput>
+
+                  <Pressable
+                    style={styles.sysPromptCopyBtn}
+                    onPress={() => {
+                      try {
+                        const Clipboard = require("expo-clipboard");
+                        Clipboard.setStringAsync(botPersonality);
+                      } catch {}
+                    }}
+                  >
+                    <Text style={styles.sysPromptCopyText}>Copy</Text>
+                  </Pressable>
+                </CollapsibleSection>
+              )}
+              {scenario.length > 0 && (
+                <CollapsibleSection title="Scenario">
+                  <TextInput
+                    multiline
+                    label="Scenario"
+                    style={styles.sysPromptTextInput}
+                    editable={!loading}
+                  >
+                    {scenario}
+                  </TextInput>
+
+                  <Pressable
+                    style={styles.sysPromptCopyBtn}
+                    onPress={() => {
+                      try {
+                        const Clipboard = require("expo-clipboard");
+                        Clipboard.setStringAsync(scenario);
+                      } catch {}
+                    }}
+                  >
+                    <Text style={styles.sysPromptCopyText}>Copy</Text>
+                  </Pressable>
+                </CollapsibleSection>
+              )}
+            </ScrollView>
+          )}
         </View>
-      </Modal>
-    );
-  },
-);
+      </View>
+    </Modal>
+  );
+});
 
 const styles = StyleSheet.create({
   sysPromptOverlay: {

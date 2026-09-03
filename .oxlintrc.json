@@ -1,0 +1,11 @@
+{
+    "$schema": "./node_modules/oxlint/configuration_schema.json",
+    "plugins": ["typescript"],
+    "rules": {
+        "no-explicit-any": "off",
+        "no-unused-vars": "off",
+        "no-useless-catch": "off",
+        "no-unsafe-finally": "off",
+        "react/no-array-index-key": "off"
+    }
+}

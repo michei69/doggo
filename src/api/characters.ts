@@ -87,18 +87,14 @@ export async function getTagSuggestions(
     });
 }
 
-export async function checkFavorite(
-    characterId: string,
-): Promise<boolean> {
+export async function checkFavorite(characterId: string): Promise<boolean> {
     return request<boolean>({
         method: "GET",
         url: `/favorites/myfavorites/${characterId}`,
     });
 }
 
-export async function favoriteCharacter(
-    characterId: string,
-): Promise<void> {
+export async function favoriteCharacter(characterId: string): Promise<void> {
     await request<void>({
         method: "POST",
         url: "/favorites/favorite",
@@ -106,9 +102,7 @@ export async function favoriteCharacter(
     });
 }
 
-export async function unfavoriteCharacter(
-    characterId: string,
-): Promise<void> {
+export async function unfavoriteCharacter(characterId: string): Promise<void> {
     await request<void>({
         method: "POST",
         url: "/favorites/unfavorite",

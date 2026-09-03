@@ -72,7 +72,15 @@ function SheetRenderer({
     } else if (wasVisible.current) {
       animateOut();
     }
-  }, [visible, isClosing, translateY, backdropOpacity, windowHeight, animateIn, animateOut]);
+  }, [
+    visible,
+    isClosing,
+    translateY,
+    backdropOpacity,
+    windowHeight,
+    animateIn,
+    animateOut,
+  ]);
 
   const rContainerStyle = useAnimatedStyle(() => ({
     pointerEvents:
@@ -116,13 +124,11 @@ function SheetRenderer({
   );
 }
 
-export default function CustomBottomSheet(
-  props: {
-    visible: boolean;
-    onClose: () => void;
-    children: React.ReactNode;
-  },
-) {
+export default function CustomBottomSheet(props: {
+  visible: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
   // Renders via portal: Proxy registers with SheetPortalHost, returns null.
   // SheetPortalHost renders the sheet above the tab bar using SheetRenderer.
   return <Proxy {...props} />;

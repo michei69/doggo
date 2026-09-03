@@ -49,5 +49,7 @@ export function formatDate(
     dateStr: string,
     mode: "relative" | "absolute",
 ): string {
-    return mode === "relative" ? formatRelativeExtended(dateStr) : formatAbsolute(dateStr);
+    return mode === "relative"
+        ? formatRelativeExtended(dateStr)
+        : formatAbsolute(dateStr);
 }

@@ -42,7 +42,12 @@ import {
   getChatDetail,
   deleteChat,
 } from "../../api/chats";
-import type { CharacterDetail, ChatListItem, ChatDetail, PersonaRef } from "../../types/api";
+import type {
+  CharacterDetail,
+  ChatListItem,
+  ChatDetail,
+  PersonaRef,
+} from "../../types/api";
 import { processSystemMessage } from "../../utils/processText";
 import { storage } from "../../utils/storage";
 import { colors } from "../../utils/colors";
@@ -61,14 +66,21 @@ const LoadingState = React.memo(function LoadingState() {
           <View style={styles.skeletonAvatar} />
           <View style={styles.skeletonNameRow}>
             <View style={styles.skeletonLine} />
-            <View style={[styles.skeletonLine, { width: "50%", marginTop: 8 }]} />
+            <View
+              style={[styles.skeletonLine, { width: "50%", marginTop: 8 }]}
+            />
           </View>
           <View style={styles.skeletonStatsRow}>
             {[0, 1, 2].map((i) => (
               <View key={i} style={styles.skeletonStatChip} />
             ))}
           </View>
-          <View style={[styles.skeletonLine, { width: "100%", height: 80, marginTop: 16 }]} />
+          <View
+            style={[
+              styles.skeletonLine,
+              { width: "100%", height: 80, marginTop: 16 },
+            ]}
+          />
         </View>
       </Skeleton>
     </View>
@@ -102,7 +114,15 @@ const FavoriteButton = React.memo(function FavoriteButton({
   onToggle: () => void;
 }) {
   return (
-    <Pressable onPress={onToggle} style={styles.favBtn} hitSlop={8} accessibilityRole="button" accessibilityLabel={isFavorited ? "Remove from favorites" : "Add to favorites"}>
+    <Pressable
+      onPress={onToggle}
+      style={styles.favBtn}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={
+        isFavorited ? "Remove from favorites" : "Add to favorites"
+      }
+    >
       <Text
         style={[
           styles.favCount,
@@ -402,8 +422,9 @@ export default function CharacterScreen() {
   const [settingsSaving, setSettingsSaving] = useState<string | null>(null);
   const favLoadingRef = useRef(false);
   const [reportVisible, setReportVisible] = useState(false);
-  const [dateFormat, setDateFormat] =
-    useState<"relative" | "absolute">("relative");
+  const [dateFormat, setDateFormat] = useState<"relative" | "absolute">(
+    "relative",
+  );
   const user = useAuthStore((s) => s.user);
   const createChat = useChatStore((s) => s.createChat);
   const {
@@ -727,7 +748,7 @@ const styles = StyleSheet.create({
   favCount: {
     fontSize: 14,
     fontWeight: "600",
-    marginTop: 2
+    marginTop: 2,
   },
   errorText: {
     color: colors.danger,

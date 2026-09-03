@@ -1,4 +1,11 @@
-import { View, Text, Pressable, Modal, StyleSheet, useWindowDimensions } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  Modal,
+  StyleSheet,
+  useWindowDimensions,
+} from "react-native";
 import { colors } from "../../utils/colors";
 import { useIsTablet } from "../../hooks/useIsTablet";
 
@@ -37,7 +44,10 @@ export default function CustomAlert({
       onRequestClose={onDismiss}
     >
       <Pressable style={styles.overlay} onPress={onDismiss}>
-        <Pressable style={[styles.card, isTablet && styles.cardTablet]} onPress={() => {}}>
+        <Pressable
+          style={[styles.card, isTablet && styles.cardTablet]}
+          onPress={() => {}}
+        >
           <Text style={styles.title}>{title}</Text>
           {message ? <Text style={styles.message}>{message}</Text> : null}
 

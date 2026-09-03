@@ -90,9 +90,14 @@ export function useLocalSettings({
         try {
             const detail = useChatStore.getState().activeChatDetail;
             if (!detail) throw new Error("Chat not loaded");
-            const characterName = detail.character.chat_name || detail.character.name;
+            const characterName =
+                detail.character.chat_name || detail.character.name;
             setLocalPersonality(
-                await fetchPersonaField(detail, `${characterName}'s Persona`, "personality"),
+                await fetchPersonaField(
+                    detail,
+                    `${characterName}'s Persona`,
+                    "personality",
+                ),
             );
         } catch (err: any) {
             showAlert("Error", err.message || "Failed to fetch personality", [

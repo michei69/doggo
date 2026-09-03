@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    BackHandler,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  BackHandler,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import type {
-    CompositeNavigationProp,
-    RouteProp,
+  CompositeNavigationProp,
+  RouteProp,
 } from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -26,14 +26,14 @@ import { useAlert } from "../../hooks/useAlert";
 import { colors } from "../../utils/colors";
 import { storage } from "../../utils/storage";
 import type {
-    CharactersStackParamList,
-    MainTabParamList,
+  CharactersStackParamList,
+  MainTabParamList,
 } from "../../navigation/types";
 import type { BotFormState } from "./createBot/botFormState";
 
 type Nav = CompositeNavigationProp<
-    NativeStackNavigationProp<CharactersStackParamList, "WebBrowser">,
-    BottomTabNavigationProp<MainTabParamList>
+  NativeStackNavigationProp<CharactersStackParamList, "WebBrowser">,
+  BottomTabNavigationProp<MainTabParamList>
 >;
 
 type Route = RouteProp<CharactersStackParamList, "WebBrowser">;
@@ -111,289 +111,285 @@ const INJECTED_JS = `
 `;
 
 async function importJannyCharacter(data: any, nav: Nav): Promise<void> {
-    const character = data?.character ?? {};
-    const imageUrl = data?.imageUrl || character.avatar || "";
+  const character = data?.character ?? {};
+  const imageUrl = data?.imageUrl || character.avatar || "";
 
-    let avatar = "";
-    if (imageUrl) {
-        try {
-            const download = await downloadAsync(
-                imageUrl,
-                `${cacheDirectory}janny-avatar-${Date.now()}.jpg`,
-            );
-            const manip = await ImageManipulator.manipulateAsync(
-                download.uri,
-                [{ resize: { width: 256, height: 256 } }],
-                {
-                    format: ImageManipulator.SaveFormat.WEBP,
-                    compress: 0.85,
-                },
-            );
-            const upload = await uploadFile("webp", "bot");
-            await new Promise<void>((resolve, reject) => {
-                const xhr = new XMLHttpRequest();
-                xhr.open("PUT", upload.url);
-                xhr.setRequestHeader("Content-Type", "image/webp");
-                xhr.onload = () => {
-                    if (xhr.status >= 200 && xhr.status < 300) resolve();
-                    else reject(new Error(`HTTP ${xhr.status}`));
-                };
-                xhr.onerror = () => reject(new Error("Upload failed"));
-                xhr.send({
-                    uri: manip.uri,
-                    type: "image/webp",
-                    name: "bot.webp",
-                } as any);
-            });
-            avatar = upload.filename;
-        } catch {
-            avatar = "";
-        }
-    }
-
-    let tagIds: number[] = [];
+  let avatar = "";
+  if (imageUrl) {
     try {
-        const allTags = await getTags();
-        const slugToId = new Map<string, number>();
-        for (const t of allTags) slugToId.set(t.slug.toLowerCase(), t.id);
-        const byId = new Set(allTags.map((t) => t.id));
-
-        const importedTags = Array.isArray(character.tags)
-            ? character.tags
-            : [];
-        const fromSlugs = importedTags
-            .map((t: any) =>
-                t?.slug ? slugToId.get(String(t.slug).toLowerCase()) : undefined,
-            )
-            .filter((id: number | undefined): id is number => id !== undefined);
-        const fromIds = (
-            Array.isArray(character.tagIds) ? character.tagIds : []
-        ).filter((id: number) => byId.has(id));
-        tagIds = [...new Set([...fromSlugs, ...fromIds])];
+      const download = await downloadAsync(
+        imageUrl,
+        `${cacheDirectory}janny-avatar-${Date.now()}.jpg`,
+      );
+      const manip = await ImageManipulator.manipulateAsync(
+        download.uri,
+        [{ resize: { width: 256, height: 256 } }],
+        {
+          format: ImageManipulator.SaveFormat.WEBP,
+          compress: 0.85,
+        },
+      );
+      const upload = await uploadFile("webp", "bot");
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", upload.url);
+        xhr.setRequestHeader("Content-Type", "image/webp");
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else reject(new Error(`HTTP ${xhr.status}`));
+        };
+        xhr.onerror = () => reject(new Error("Upload failed"));
+        xhr.send({
+          uri: manip.uri,
+          type: "image/webp",
+          name: "bot.webp",
+        } as any);
+      });
+      avatar = upload.filename;
     } catch {
-        tagIds = [];
+      avatar = "";
     }
+  }
 
-    const formData: BotFormState = {
-        avatar,
-        name: character.name ?? "",
-        chat_name: "",
-        description: character.description ?? "",
-        personality: character.personality ?? "",
-        scenario: character.scenario ?? "",
-        example_dialogs: character.exampleDialogs ?? "",
-        first_messages: character.firstMessage ? [character.firstMessage] : [""],
-        is_nsfw: !!character.isNsfw,
-        tag_ids: tagIds,
-        custom_tags: [],
-    };
+  let tagIds: number[] = [];
+  try {
+    const allTags = await getTags();
+    const slugToId = new Map<string, number>();
+    for (const t of allTags) slugToId.set(t.slug.toLowerCase(), t.id);
+    const byId = new Set(allTags.map((t) => t.id));
 
-    await Promise.all([
-        storage.removeCreateBotState(),
-        storage.removeEditBotState(),
-    ]);
-    await storage.setCreateBotState(formData);
+    const importedTags = Array.isArray(character.tags) ? character.tags : [];
+    const fromSlugs = importedTags
+      .map((t: any) =>
+        t?.slug ? slugToId.get(String(t.slug).toLowerCase()) : undefined,
+      )
+      .filter((id: number | undefined): id is number => id !== undefined);
+    const fromIds = (
+      Array.isArray(character.tagIds) ? character.tagIds : []
+    ).filter((id: number) => byId.has(id));
+    tagIds = [...new Set([...fromSlugs, ...fromIds])];
+  } catch {
+    tagIds = [];
+  }
+
+  const formData: BotFormState = {
+    avatar,
+    name: character.name ?? "",
+    chat_name: "",
+    description: character.description ?? "",
+    personality: character.personality ?? "",
+    scenario: character.scenario ?? "",
+    example_dialogs: character.exampleDialogs ?? "",
+    first_messages: character.firstMessage ? [character.firstMessage] : [""],
+    is_nsfw: !!character.isNsfw,
+    tag_ids: tagIds,
+    custom_tags: [],
+  };
+
+  await Promise.all([
+    storage.removeCreateBotState(),
+    storage.removeEditBotState(),
+  ]);
+  await storage.setCreateBotState(formData);
 }
 
 export default function WebBrowserScreen() {
-    const navigation = useNavigation<Nav>();
-    const route = useRoute<Route>();
-    const webViewRef = useRef<WebView>(null);
-    const forceCloseRef = useRef(false);
-    const [loading, setLoading] = useState(true);
-    const [importing, setImporting] = useState(false);
-    const [canGoBack, setCanGoBack] = useState(false);
-    const { alert, showAlert, dismissAlert } = useAlert();
+  const navigation = useNavigation<Nav>();
+  const route = useRoute<Route>();
+  const webViewRef = useRef<WebView>(null);
+  const forceCloseRef = useRef(false);
+  const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const [canGoBack, setCanGoBack] = useState(false);
+  const { alert, showAlert, dismissAlert } = useAlert();
 
-    const url = route.params.url;
+  const url = route.params.url;
 
-    // Android hardware back: go back in webview history first.
-    useEffect(() => {
-        const sub = BackHandler.addEventListener("hardwareBackPress", () => {
-            if (canGoBack) {
-                webViewRef.current?.goBack();
-                return true;
-            }
-            return false;
-        });
-        return () => sub.remove();
-    }, [canGoBack]);
+  // Android hardware back: go back in webview history first.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (canGoBack) {
+        webViewRef.current?.goBack();
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [canGoBack]);
 
-    // iOS back gesture: same behavior via beforeRemove.
-    useEffect(() => {
-        const unsub = navigation.addListener("beforeRemove", (e) => {
-            if (
-                e.data.action.type === "GO_BACK" &&
-                !forceCloseRef.current &&
-                canGoBack
-            ) {
-                e.preventDefault();
-                webViewRef.current?.goBack();
-            }
-        });
-        return unsub;
-    }, [navigation, canGoBack]);
+  // iOS back gesture: same behavior via beforeRemove.
+  useEffect(() => {
+    const unsub = navigation.addListener("beforeRemove", (e) => {
+      if (
+        e.data.action.type === "GO_BACK" &&
+        !forceCloseRef.current &&
+        canGoBack
+      ) {
+        e.preventDefault();
+        webViewRef.current?.goBack();
+      }
+    });
+    return unsub;
+  }, [navigation, canGoBack]);
 
-    const handleClose = useCallback(() => {
+  const handleClose = useCallback(() => {
+    forceCloseRef.current = true;
+    navigation.goBack();
+  }, [navigation]);
+
+  const handleMessage = useCallback(
+    async (event: WebViewMessageEvent) => {
+      let msg: any;
+      try {
+        msg = JSON.parse(event.nativeEvent.data);
+      } catch {
+        return;
+      }
+      if (msg?.type !== "janny-import" || !msg.data) return;
+
+      setImporting(true);
+      try {
+        await importJannyCharacter(msg.data, navigation);
         forceCloseRef.current = true;
         navigation.goBack();
-    }, [navigation]);
+        navigation.navigate("CreateTab", {
+          screen: "CreateBot",
+          params: undefined,
+        });
+      } catch (err: any) {
+        showAlert(
+          "Import failed",
+          err?.message || "Something went wrong importing this character.",
+          [{ text: "OK", onPress: dismissAlert }],
+        );
+      } finally {
+        setImporting(false);
+      }
+    },
+    [navigation, showAlert, dismissAlert],
+  );
 
-    const handleMessage = useCallback(
-        async (event: WebViewMessageEvent) => {
-            let msg: any;
-            try {
-                msg = JSON.parse(event.nativeEvent.data);
-            } catch {
-                return;
-            }
-            if (msg?.type !== "janny-import" || !msg.data) return;
+  // Re-attach the interceptor on every webview navigation (SPA-safe).
+  const handleNavigationStateChange = useCallback((navState: any) => {
+    setCanGoBack(navState?.canGoBack ?? false);
+    webViewRef.current?.injectJavaScript(INJECTED_JS);
+  }, []);
 
-            setImporting(true);
-            try {
-                await importJannyCharacter(msg.data, navigation);
-                forceCloseRef.current = true;
-                navigation.goBack();
-                navigation.navigate("CreateTab", {
-                    screen: "CreateBot",
-                    params: undefined,
-                });
-            } catch (err: any) {
-                showAlert(
-                    "Import failed",
-                    err?.message || "Something went wrong importing this character.",
-                    [{ text: "OK", onPress: dismissAlert }],
-                );
-            } finally {
-                setImporting(false);
-            }
-        },
-        [navigation, showAlert, dismissAlert],
-    );
-
-    // Re-attach the interceptor on every webview navigation (SPA-safe).
-    const handleNavigationStateChange = useCallback((navState: any) => {
-        setCanGoBack(navState?.canGoBack ?? false);
-        webViewRef.current?.injectJavaScript(INJECTED_JS);
-    }, []);
-
-    return (
-        <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.title}>Browse</Text>
-                <View style={styles.headerSpacer} />
-                <Pressable
-                    style={({ pressed }) => [
-                        styles.closeButton,
-                        pressed && styles.pressed,
-                    ]}
-                    onPress={handleClose}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel="Close"
-                >
-                    <X size={22} color={colors.textSecondary} />
-                </Pressable>
-            </View>
-            <View style={styles.webviewContainer}>
-                <WebView
-                    ref={webViewRef}
-                    source={{ uri: url }}
-                    onMessage={handleMessage}
-                    onNavigationStateChange={handleNavigationStateChange}
-                    onLoadStart={() => setLoading(true)}
-                    onLoadEnd={() => setLoading(false)}
-                    injectedJavaScriptBeforeContentLoaded={INJECTED_JS}
-                    javaScriptEnabled
-                    domStorageEnabled
-                    originWhitelist={["*"]}
-                    mixedContentMode="compatibility"
-                    sharedCookiesEnabled
-                    thirdPartyCookiesEnabled
-                    style={styles.webview}
-                />
-                {loading && (
-                    <ActivityIndicator
-                        style={styles.loader}
-                        color={colors.accent}
-                        size="large"
-                    />
-                )}
-                {importing && (
-                    <View style={styles.importOverlay}>
-                        <ActivityIndicator size="large" color={colors.accent} />
-                        <Text style={styles.importText}>
-                            Importing character…
-                        </Text>
-                    </View>
-                )}
-            </View>
-            <CustomAlert
-                visible={alert.visible}
-                title={alert.title}
-                message={alert.message}
-                buttons={alert.buttons}
-                onDismiss={dismissAlert}
-            />
-        </View>
-    );
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Browse</Text>
+        <View style={styles.headerSpacer} />
+        <Pressable
+          style={({ pressed }) => [
+            styles.closeButton,
+            pressed && styles.pressed,
+          ]}
+          onPress={handleClose}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        >
+          <X size={22} color={colors.textSecondary} />
+        </Pressable>
+      </View>
+      <View style={styles.webviewContainer}>
+        <WebView
+          ref={webViewRef}
+          source={{ uri: url }}
+          onMessage={handleMessage}
+          onNavigationStateChange={handleNavigationStateChange}
+          onLoadStart={() => setLoading(true)}
+          onLoadEnd={() => setLoading(false)}
+          injectedJavaScriptBeforeContentLoaded={INJECTED_JS}
+          javaScriptEnabled
+          domStorageEnabled
+          originWhitelist={["*"]}
+          mixedContentMode="compatibility"
+          sharedCookiesEnabled
+          thirdPartyCookiesEnabled
+          style={styles.webview}
+        />
+        {loading && (
+          <ActivityIndicator
+            style={styles.loader}
+            color={colors.accent}
+            size="large"
+          />
+        )}
+        {importing && (
+          <View style={styles.importOverlay}>
+            <ActivityIndicator size="large" color={colors.accent} />
+            <Text style={styles.importText}>Importing character…</Text>
+          </View>
+        )}
+      </View>
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        buttons={alert.buttons}
+        onDismiss={dismissAlert}
+      />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: colors.background,
-    },
-    header: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 20,
-        paddingTop: 60,
-        paddingBottom: 8,
-    },
-    title: {
-        color: colors.text,
-        fontSize: 24,
-        fontWeight: "800",
-    },
-    headerSpacer: {
-        flex: 1,
-    },
-    closeButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: colors.card,
-        borderWidth: 1,
-        borderColor: colors.border,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    pressed: {
-        opacity: 0.7,
-    },
-    webviewContainer: {
-        flex: 1,
-    },
-    webview: {
-        flex: 1,
-        backgroundColor: colors.background,
-    },
-    loader: {
-        position: "absolute",
-        alignSelf: "center",
-        top: "45%",
-    },
-    importOverlay: {
-        ...StyleSheet.absoluteFill,
-        backgroundColor: "rgba(0,0,0,0.75)",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 12,
-    },
-    importText: {
-        color: colors.text,
-        fontSize: 15,
-        fontWeight: "600",
-    },
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 8,
+  },
+  title: {
+    color: colors.text,
+    fontSize: 24,
+    fontWeight: "800",
+  },
+  headerSpacer: {
+    flex: 1,
+  },
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+  webviewContainer: {
+    flex: 1,
+  },
+  webview: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  loader: {
+    position: "absolute",
+    alignSelf: "center",
+    top: "45%",
+  },
+  importOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  importText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "600",
+  },
 });

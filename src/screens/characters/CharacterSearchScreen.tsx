@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { getTags } from "../../api/characters";
@@ -19,10 +13,7 @@ import TagsModal, {
   type TagsModalHandle,
 } from "../../components/discover/TagsModal";
 import { useIsTablet } from "../../hooks/useIsTablet";
-import {
-  SORT_OPTIONS,
-  type FilterState,
-} from "../../utils/discover";
+import { SORT_OPTIONS, type FilterState } from "../../utils/discover";
 import { colors } from "../../utils/colors";
 import {
   ActionOverlays,
@@ -114,9 +105,7 @@ function useDiscoverSearch({
     paramsRef.current = currentSearchParams;
   }, [currentSearchParams]);
 
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSearchChange = useCallback(
     (text: string) => {
@@ -248,8 +237,7 @@ export default function CharacterSearchScreen() {
     [],
   );
 
-  const { state, doFetch, handleLoadMore, topCustomTags } =
-    useCharactersList();
+  const { state, doFetch, handleLoadMore, topCustomTags } = useCharactersList();
 
   const {
     currentSearchParams,

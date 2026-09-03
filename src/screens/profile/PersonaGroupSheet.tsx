@@ -7,10 +7,7 @@ import {
   TextInput as RNTextInput,
 } from "react-native";
 import { colors } from "../../utils/colors";
-import {
-  createPersonaGroup,
-  updatePersonaGroup,
-} from "../../api/profile";
+import { createPersonaGroup, updatePersonaGroup } from "../../api/profile";
 import type { PersonaGroup } from "../../types/api";
 import { useAlert } from "../../hooks/useAlert";
 import FormSheet from "../../components/common/FormSheet";
@@ -81,7 +78,9 @@ export default function PersonaGroupSheet({
 
       sheetRef.current?.close(onSaved);
     } catch {
-      showAlert("Error", "Failed to save group", [{ text: "OK", onPress: dismissAlert }]);
+      showAlert("Error", "Failed to save group", [
+        { text: "OK", onPress: dismissAlert },
+      ]);
     } finally {
       setSaving(false);
     }

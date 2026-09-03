@@ -120,6 +120,18 @@ export async function createChat(
     });
 }
 
+export async function updateChatSummary(
+    chatId: number,
+    summary: string,
+    summaryChatId: number | null,
+): Promise<SuccessResponse> {
+    return request<SuccessResponse>({
+        method: "PATCH",
+        url: `/chats/${chatId}`,
+        data: { summary, summary_chat_id: summaryChatId },
+    });
+}
+
 export async function deleteChat(chatId: number): Promise<SuccessResponse> {
     return request<SuccessResponse>({
         method: "DELETE",
@@ -350,7 +362,7 @@ export async function attemptExtractSystemPrompt(
             repetition_penalty: 1.5,
             top_k: 75,
             top_p: 0.75,
-        }
+        },
     };
 
     const body: SystemPromptRequestBody = {
@@ -381,7 +393,7 @@ export async function attemptExtractSystemPrompt(
                 resolve(msg || fullContent);
             },
             onError: (err: Error) => {
-                console.error(err)
+                console.error(err);
                 reject(err);
             },
         });

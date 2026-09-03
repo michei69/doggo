@@ -17,6 +17,7 @@ export default function ChatSettingsOverlay({
   onDeleteChat,
   onViewSystemPrompt,
   onAttemptViewSystemPrompt,
+  onChatSummary,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -32,6 +33,7 @@ export default function ChatSettingsOverlay({
   onDeleteChat: () => void;
   onViewSystemPrompt?: () => void;
   onAttemptViewSystemPrompt?: () => void;
+  onChatSummary?: () => void;
 }) {
   const nav = useNavigation<any>();
 
@@ -53,6 +55,11 @@ export default function ChatSettingsOverlay({
     onClose();
     nav.navigate("GenerationSettings");
   }, [onClose, nav]);
+
+  const handleChatSummary = useCallback(() => {
+    onClose();
+    onChatSummary?.();
+  }, [onClose, onChatSummary]);
 
   const handleNewChat = useCallback(() => {
     onClose();
@@ -93,6 +100,7 @@ export default function ChatSettingsOverlay({
       ? [{ label: "View Creator", onPress: handleViewCreator }]
       : []),
     { label: "Generation Settings", onPress: handleGenerationSettings },
+    { label: "Chat Summary", onPress: handleChatSummary },
     { label: "New Chat", onPress: handleNewChat },
     { label: "All Chats", onPress: handleAllChats },
     {

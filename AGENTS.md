@@ -7,10 +7,11 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 Use `bun` instead of `npm` and `bunx` instead of `npx` for all commands.
 
 Examples:
+
 - `bun install` (not `npm install`)
 - `bun add <package>` (not `npm install <package>`)
 - `bunx expo start` (not `npx expo start`)
-- `bunx biome check` (not `npx biome`)
+- `bunx oxlint` and `bunx oxfmt --check`
 
 # TypeScript & JSX Coding Preferences
 
@@ -20,7 +21,7 @@ Examples:
 - Use `import type { ... }` for all type-only imports (no bare `import` for types).
 - Use TypeScript utility types (`Partial<T>`, `Pick<T>`, `Omit<T>`, `Record<K,V>`) to avoid duplicating type shapes.
 - Never annotate component return types — let TypeScript infer them (no `React.FC<>`, no `JSX.Element`).
-- Keep `strict: true` and `noExplicitAny: off` (as configured in tsconfig.json and biome.json).
+- Keep `strict: true` and `noExplicitAny: off` (as configured in tsconfig.json, .oxlintrc.json, and .oxfmtrc.json).
 - Enforce `try/catch` on all async operations. Do not use `.then().catch()` chains.
 
 ## Imports
@@ -31,9 +32,9 @@ Examples:
 
 - **Components use `export default function`** (never arrow functions for components/JSX). Arrow functions are fine for hooks, utilities, callbacks, and non-JSX code.
 - **Props go directly in the function argument list** — do not create a separate `Props` interface. Example:
-  ```tsx
-  export default function Avatar({ uri, name, size = 48 }: { uri?: string; name?: string; size?: number }) {
-  ```
+    ```tsx
+    export default function Avatar({ uri, name, size = 48 }: { uri?: string; name?: string; size?: number }) {
+    ```
 - One component per file is preferred, but co-located small helper components in the same file are allowed when tightly coupled.
 - Components and their screen files use **PascalCase** filenames (`CharacterCard.tsx`, `LoginScreen.tsx`).
 - Styles are always co-located at the bottom of the file via `StyleSheet.create({...})`. No separate `.styles.ts` files.
@@ -51,10 +52,10 @@ Examples:
 - Use **selective subscriptions** to minimize re-renders — subscribe to individual fields, not the whole store.
 - Use `useShallow` for batching multiple field subscriptions where needed.
 - Paginated loads must use a **guard pattern** to prevent duplicate requests:
-  ```ts
-  if (get().isLoadingChats) return;
-  set({ isLoadingChats: true });
-  ```
+    ```ts
+    if (get().isLoadingChats) return;
+    set({ isLoadingChats: true });
+    ```
 
 ## Hooks vs Module-Scope Helpers
 
@@ -112,7 +113,7 @@ Examples:
 Before committing any code, run these checks:
 
 1. **TypeScript type-checking**: `bunx tsc --noEmit`
-2. **Biome lint/format**: `bunx biome check`
+2. **Oxc lint/format**: `bunx oxlint` and `bunx oxfmt --check`
 3. **React Doctor**: `bunx react-doctor@latest` — must be ≥80. Never install react-doctor as a project dependency; always run it via `bunx`.
 4. **stop-slop skill**: Use the stop-slop skill to check for AI-generated slop patterns
 

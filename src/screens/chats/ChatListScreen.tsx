@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useState, useRef, useMemo } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useState,
+  useRef,
+  useMemo,
+} from "react";
 import {
   View,
   Text,
@@ -115,9 +121,7 @@ export default function ChatListScreen() {
     () =>
       searchQuery.trim()
         ? chats.filter((c) =>
-            c.character.name
-              ?.toLowerCase()
-              .includes(searchQuery.toLowerCase()),
+            c.character.name?.toLowerCase().includes(searchQuery.toLowerCase()),
           )
         : chats,
     [chats, searchQuery],
@@ -262,7 +266,8 @@ export default function ChatListScreen() {
   const retryLoad = useCallback(() => loadChats(1), [loadChats]);
 
   if (isLoadingChats && chats.length === 0) return <ChatListLoading />;
-  if (error && chats.length === 0) return <ChatListError message={error} onRetry={retryLoad} />;
+  if (error && chats.length === 0)
+    return <ChatListError message={error} onRetry={retryLoad} />;
 
   return (
     <View style={styles.container}>
@@ -358,7 +363,9 @@ const ChatListLoading = React.memo(function ChatListLoading() {
                 <View style={styles.skelTimeStub} />
               </View>
               <View style={[styles.skeletonSummary, { marginTop: 8 }]} />
-              <View style={[styles.skeletonSummary, { width: "70%", marginTop: 6 }]} />
+              <View
+                style={[styles.skeletonSummary, { width: "70%", marginTop: 6 }]}
+              />
               <View style={styles.skelCountBar} />
             </View>
           </View>

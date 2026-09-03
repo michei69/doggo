@@ -11,11 +11,12 @@ import type {
     MainTabParamList,
     SwipeDiscoverParams,
 } from "../../../navigation/types";
-import type { CharacterTag, TagEntry, TrendingCharacter } from "../../../types/api";
-import {
-    INITIAL_FILTERS,
-    type FilterState,
-} from "../../../utils/discover";
+import type {
+    CharacterTag,
+    TagEntry,
+    TrendingCharacter,
+} from "../../../types/api";
+import { INITIAL_FILTERS, type FilterState } from "../../../utils/discover";
 
 export type Nav = NativeStackNavigationProp<
     CharactersStackParamList,
@@ -27,7 +28,10 @@ export type SwipeNav = CompositeNavigationProp<
     BottomTabNavigationProp<MainTabParamList>
 >;
 
-export type SearchRoute = RouteProp<CharactersStackParamList, "CharacterSearch">;
+export type SearchRoute = RouteProp<
+    CharactersStackParamList,
+    "CharacterSearch"
+>;
 
 export type DiscoveryMode = "characters" | "creators";
 
@@ -73,7 +77,10 @@ export function genericListReducer<T extends { id: string }>(
                     page === 1
                         ? data
                         : dedupe
-                          ? [...state.characters, ...data.filter((d) => !existingIds.has(d.id))]
+                          ? [
+                                ...state.characters,
+                                ...data.filter((d) => !existingIds.has(d.id)),
+                            ]
                           : [...state.characters, ...data],
                 total,
                 page,
@@ -90,7 +97,13 @@ export function genericListReducer<T extends { id: string }>(
                 error: action.payload,
             };
         case "RESET":
-            return { ...state, characters: [], page: 1, loading: true, error: null };
+            return {
+                ...state,
+                characters: [],
+                page: 1,
+                loading: true,
+                error: null,
+            };
         default:
             return state;
     }
@@ -242,13 +255,17 @@ export function filterDisplayCharacters(
                     text.includes(kw.toLowerCase()),
                 );
             }
-            return advancedKeywords.some((kw) => text.includes(kw.toLowerCase()));
+            return advancedKeywords.some((kw) =>
+                text.includes(kw.toLowerCase()),
+            );
         });
     }
     if (advancedBlacklist.length > 0) {
         result = result.filter((c) => {
             const text = searchText(c);
-            return !advancedBlacklist.some((kw) => text.includes(kw.toLowerCase()));
+            return !advancedBlacklist.some((kw) =>
+                text.includes(kw.toLowerCase()),
+            );
         });
     }
     if (hideDarkened) {
@@ -272,9 +289,7 @@ export function hasFilterOverrides(p?: DiscoverParamsLike): boolean {
     );
 }
 
-export function initialTagsFromParams(
-    p?: DiscoverParamsLike,
-): Set<string> {
+export function initialTagsFromParams(p?: DiscoverParamsLike): Set<string> {
     const tags = new Set<string>();
     if (!p) return tags;
     if (p.tag) {
@@ -293,9 +308,7 @@ export function initialTagsFromParams(
     return tags;
 }
 
-export function initialFiltersFromParams(
-    p?: DiscoverParamsLike,
-): FilterState {
+export function initialFiltersFromParams(p?: DiscoverParamsLike): FilterState {
     if (!p) return INITIAL_FILTERS;
     const f = { ...INITIAL_FILTERS };
     if (p.messages !== undefined) f.messages = p.messages;

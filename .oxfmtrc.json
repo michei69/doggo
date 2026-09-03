@@ -1,0 +1,23 @@
+{
+    "useTabs": false,
+    "tabWidth": 4,
+    "printWidth": 80,
+    "singleQuote": false,
+    "jsxSingleQuote": false,
+    "quoteProps": "as-needed",
+    "trailingComma": "all",
+    "semi": true,
+    "arrowParens": "always",
+    "bracketSameLine": false,
+    "bracketSpacing": true,
+    "ignorePatterns": [],
+    "$schema": "./node_modules/oxfmt/configuration_schema.json",
+    "overrides": [
+        {
+            "files": ["*.tsx"],
+            "options": {
+                "tabWidth": 2
+            }
+        }
+    ]
+}

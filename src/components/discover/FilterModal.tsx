@@ -150,9 +150,7 @@ export default function FilterModal({
           </Text>
           <Switch
             value={pending.proxyOnly}
-            onValueChange={(v) =>
-              setPending((p) => ({ ...p, proxyOnly: v }))
-            }
+            onValueChange={(v) => setPending((p) => ({ ...p, proxyOnly: v }))}
             trackColor={{ false: colors.border, true: colors.accent }}
             thumbColor={colors.text}
           />

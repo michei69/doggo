@@ -1,16 +1,29 @@
 import { useState, useCallback, useEffect } from "react";
-import { View, Text, StyleSheet, Pressable, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ActivityIndicator,
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { ThumbsUp, Trash2, BadgeCheck, Shield, MoreHorizontal, CirclePlus } from "lucide-react-native";
+import {
+  ThumbsUp,
+  Trash2,
+  BadgeCheck,
+  Shield,
+  MoreHorizontal,
+  CirclePlus,
+} from "lucide-react-native";
 import Avatar from "../common/Avatar";
 import CustomBottomSheet from "../common/CustomBottomSheet";
 import type { ReviewComment } from "../../types/api";
 import {
-    likeComment,
-    deleteComment as deleteCommentApi,
-    translateComment,
-    reactToComment,
-    removeCommentReaction,
+  likeComment,
+  deleteComment as deleteCommentApi,
+  translateComment,
+  reactToComment,
+  removeCommentReaction,
 } from "../../api/reviews";
 import { useAuthStore } from "../../stores/authStore";
 import { storage } from "../../utils/storage";
