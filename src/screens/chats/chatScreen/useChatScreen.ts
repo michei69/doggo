@@ -6,7 +6,6 @@ import {
 } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useChat } from "../../../hooks/useChat";
-import { useAuthStore } from "../../../stores/authStore";
 import { useChatStore } from "../../../stores/chatStore";
 import type { ChatsStackParamList } from "../../../navigation/types";
 import type { ChatMessage, ChatListItem, PersonaRef } from "../../../types/api";
@@ -95,7 +94,6 @@ export function useChatScreen() {
         userConfig,
         loadUserConfig,
     } = useChat();
-    const user = useAuthStore((s) => s.user);
     const storeRemoveMessages = useChatStore((s) => s.removeMessages);
     const isTablet = useIsTablet();
     const chatCentered = useChatStore((s) => s.chatCentered);
@@ -813,13 +811,6 @@ export function useChatScreen() {
         [deleteMsg, chatId],
     );
 
-    const handleDeleteBubble = useCallback(
-        (messageId: number) => {
-            return handleDelete([messageId]);
-        },
-        [handleDelete],
-    );
-
     const handleEdit = useCallback(
         async (messageId: number, newContent: string) => {
             try {
@@ -992,7 +983,6 @@ export function useChatScreen() {
         chatId,
         characterName,
         characterId,
-        user,
         handleGoBack,
         handleOpenSettings,
         proxyBlocked,
@@ -1004,7 +994,6 @@ export function useChatScreen() {
         messages,
         isLoadingMessages,
         handleEdit,
-        handleDeleteBubble,
         handleMessageLongPress,
         editingMessageId,
         handleEditingDone,

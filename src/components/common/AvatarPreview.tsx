@@ -19,7 +19,6 @@ import Animated, {
 } from "react-native-reanimated";
 import { Image } from "expo-image";
 import { colors } from "../../utils/colors";
-import { scheduleOnRN } from "react-native-worklets";
 import { AVATAR_THUMB_WIDTH } from "../../utils/assets";
 
 const MAX_SCALE = 5;
@@ -52,7 +51,7 @@ export default function AvatarPreview({
   };
 
   const pinch = Gesture.Pinch()
-    .onStart((e) => {
+    .onStart(() => {
       savedScale.value = scale.value;
       savedTranslateX.value = translateX.value;
       savedTranslateY.value = translateY.value;

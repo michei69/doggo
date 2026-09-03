@@ -296,14 +296,11 @@ export interface CharacterDetail {
     };
 }
 
-interface ProxyConfiguration {
+type ProxyConfiguration = Pick<ApiProxyConfig, "id" | "model" | "name"> & {
     apiKey: string;
     apiUrl: string;
-    id: string;
     jailbreakPrompt: string;
-    model: string;
-    name: string;
-}
+};
 
 export interface PromptLibraryItem {
     content: string;
@@ -625,12 +622,10 @@ export interface TagEntry {
 
 export type PersonaRef = Pick<Persona, "id" | "name" | "avatar">;
 
-export type PersonaEntry = Pick<
-    Persona,
-    "id" | "name" | "avatar" | "appearance"
-> & {
-    order: number;
-};
+export type PersonaEntry = PersonaRef &
+    Pick<Persona, "appearance"> & {
+        order: number;
+    };
 
 export interface AvatarPreviewState {
     uri: string;

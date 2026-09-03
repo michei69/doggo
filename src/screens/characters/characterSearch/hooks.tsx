@@ -211,7 +211,7 @@ interface ListCurrentParams {
   filters: FilterState;
 }
 
-export function usePaginatedFetch<
+function usePaginatedFetch<
   T extends { id: string },
   R extends { data: T[]; total: number },
   P = undefined,

@@ -16,11 +16,13 @@ import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { WebView } from "react-native-webview";
 import type { WebViewMessageEvent } from "react-native-webview";
-import * as ImageManipulator from "expo-image-manipulator";
 import { downloadAsync, cacheDirectory } from "expo-file-system/legacy";
 import { X } from "lucide-react-native";
 import { getTags } from "../../api/characters";
-import { uploadFile } from "../../api/profile";
+import {
+  manipulateAvatarImage,
+  uploadManipulatedImage,
+} from "../../api/uploads";
 import CustomAlert from "../../components/common/CustomAlert";
 import { useAlert } from "../../hooks/useAlert";
 import { colors } from "../../utils/colors";
@@ -110,7 +112,7 @@ const INJECTED_JS = `
 })();
 `;
 
-async function importJannyCharacter(data: any, nav: Nav): Promise<void> {
+async function importJannyCharacter(data: any): Promise<void> {
   const character = data?.character ?? {};
   const imageUrl = data?.imageUrl || character.avatar || "";
 
@@ -121,31 +123,8 @@ async function importJannyCharacter(data: any, nav: Nav): Promise<void> {
         imageUrl,
         `${cacheDirectory}janny-avatar-${Date.now()}.jpg`,
       );
-      const manip = await ImageManipulator.manipulateAsync(
-        download.uri,
-        [{ resize: { width: 256, height: 256 } }],
-        {
-          format: ImageManipulator.SaveFormat.WEBP,
-          compress: 0.85,
-        },
-      );
-      const upload = await uploadFile("webp", "bot");
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("PUT", upload.url);
-        xhr.setRequestHeader("Content-Type", "image/webp");
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) resolve();
-          else reject(new Error(`HTTP ${xhr.status}`));
-        };
-        xhr.onerror = () => reject(new Error("Upload failed"));
-        xhr.send({
-          uri: manip.uri,
-          type: "image/webp",
-          name: "bot.webp",
-        } as any);
-      });
-      avatar = upload.filename;
+      const manipUri = await manipulateAvatarImage(download.uri);
+      avatar = await uploadManipulatedImage(manipUri, "bot", "bot.webp");
     } catch {
       avatar = "";
     }
@@ -249,7 +228,7 @@ export default function WebBrowserScreen() {
 
       setImporting(true);
       try {
-        await importJannyCharacter(msg.data, navigation);
+        await importJannyCharacter(msg.data);
         forceCloseRef.current = true;
         navigation.goBack();
         navigation.navigate("CreateTab", {

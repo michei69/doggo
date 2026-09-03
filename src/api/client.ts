@@ -11,33 +11,14 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use(async (config) => {
     const authHeaders = await buildAuthHeaders();
     Object.assign(config.headers, authHeaders);
-    console.log(
-        "[API]",
-        config.method?.toUpperCase(),
-        config.url,
-        `(params: ${JSON.stringify(config.params ?? {})})`,
-    );
     return config;
 });
 
 apiClient.interceptors.response.use(
     (response) => {
-        console.log(
-            "[API]",
-            response.status,
-            response.config.method?.toUpperCase(),
-            response.config.url,
-        );
         return response;
     },
     async (error) => {
-        console.log(
-            "[API] ERR",
-            error.response?.status ?? "NO_RESPONSE",
-            error.config?.method?.toUpperCase(),
-            error.config?.url,
-            error.message,
-        );
         const headers = error.response?.headers || {};
         const contentType = headers["content-type"] || "";
 

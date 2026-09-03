@@ -10,8 +10,6 @@ import type {
     MyCharactersParams,
     TagSuggestionsResponse,
     FavoriteCountResponse,
-    CharacterAvatarPreview,
-    ProfileSearchResult,
     ProfileSearchResponse,
 } from "../types/api";
 

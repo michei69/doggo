@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,14 +9,12 @@ import {
   BackHandler,
 } from "react-native";
 import Animated from "react-native-reanimated";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { GestureDetector } from "react-native-gesture-handler";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import CustomAlert, {
-  type AlertButton,
-} from "../../components/common/CustomAlert";
+import CustomAlert from "../../components/common/CustomAlert";
+import { useAlert } from "../../hooks/useAlert";
 import { useAuthStore } from "../../stores/authStore";
-import type { Persona, PersonaGroup } from "../../types/api";
 import type { ProfileStackParamList } from "../../navigation/types";
 import { colors } from "../../utils/colors";
 import { avatarUrl } from "../../utils/assets";
@@ -57,20 +55,7 @@ export default function MyPersonasScreen() {
   } = useMyPersonasData();
   const { width: screenWidth } = useWindowDimensions();
 
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [alertTitle, setAlertTitle] = useState("");
-  const [alertMessage, setAlertMessage] = useState("");
-  const [alertButtons, setAlertButtons] = useState<AlertButton[]>([]);
-
-  const showAlert = useCallback(
-    (title: string, message: string, buttons: AlertButton[]) => {
-      setAlertTitle(title);
-      setAlertMessage(message);
-      setAlertButtons(buttons);
-      setAlertVisible(true);
-    },
-    [setAlertTitle, setAlertMessage, setAlertButtons, setAlertVisible],
-  );
+  const { alert, showAlert, dismissAlert } = useAlert();
 
   const {
     tab,
@@ -95,8 +80,12 @@ export default function MyPersonasScreen() {
     handlePersonaSaved,
     handlePersonaDeleteRequested,
     handleDelete,
-  } = usePersonaSheet(profile, setProfile, setPersonas, showAlert, () =>
-    setAlertVisible(false),
+  } = usePersonaSheet(
+    profile,
+    setProfile,
+    setPersonas,
+    showAlert,
+    dismissAlert,
   );
   const {
     groupModalVisible,
@@ -111,7 +100,7 @@ export default function MyPersonasScreen() {
     handleGroupSaved,
     handleGroupDeleteRequested,
     handleDeleteGroup,
-  } = useGroupSheet(setPersonaGroups, showAlert, () => setAlertVisible(false));
+  } = useGroupSheet(setPersonaGroups, showAlert, dismissAlert);
   const {
     drag,
     dragDy,
@@ -297,11 +286,11 @@ export default function MyPersonasScreen() {
         onCancelDeleteGroup={closeGroupDeleteAlert}
       />
       <CustomAlert
-        visible={alertVisible}
-        title={alertTitle}
-        message={alertMessage}
-        buttons={alertButtons}
-        onDismiss={() => setAlertVisible(false)}
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        buttons={alert.buttons}
+        onDismiss={dismissAlert}
       />
     </View>
   );

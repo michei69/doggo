@@ -2,7 +2,6 @@ import { create } from "zustand";
 import type { AuthUser } from "../types/api";
 import { storage } from "../utils/storage";
 import * as authApi from "../api/auth";
-import { STORAGE_KEYS } from "../utils/constants";
 import { setUserAgent } from "../utils/userAgent";
 
 interface AuthState {

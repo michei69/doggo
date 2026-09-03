@@ -19,9 +19,7 @@ const ChatBodyArea = React.memo(function ChatBodyArea({
   onRetry,
   chatId,
   messages,
-  currentUserId,
   onEdit,
-  onDelete,
   onMessageLongPress,
   editingMessageId,
   onEditingDone,
@@ -49,9 +47,7 @@ const ChatBodyArea = React.memo(function ChatBodyArea({
   onRetry: () => void;
   chatId: number;
   messages: ChatMessage[];
-  currentUserId: string | undefined;
   onEdit: (messageId: number, newContent: string) => void;
-  onDelete: (messageId: number) => void;
   onMessageLongPress: (message: ChatMessage) => void;
   editingMessageId: number | null;
   onEditingDone: () => void;
@@ -101,10 +97,8 @@ const ChatBodyArea = React.memo(function ChatBodyArea({
         <MessageList
           messages={messages}
           isLoading={isLoading}
-          currentUserId={currentUserId}
           chatId={chatId}
           onEdit={onEdit}
-          onDelete={onDelete}
           onMessageLongPress={onMessageLongPress}
           editingMessageId={editingMessageId}
           onEditingDone={onEditingDone}

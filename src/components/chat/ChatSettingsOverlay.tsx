@@ -7,7 +7,6 @@ export default function ChatSettingsOverlay({
   onClose,
   characterName,
   characterId,
-  chatId,
   creatorId,
   creatorName,
   allowProxy,
@@ -23,7 +22,6 @@ export default function ChatSettingsOverlay({
   onClose: () => void;
   characterName: string;
   characterId: string;
-  chatId: number;
   creatorId?: string;
   creatorName?: string;
   allowProxy?: boolean;

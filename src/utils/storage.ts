@@ -8,7 +8,7 @@ interface ChatLocalData {
     scenario: string;
 }
 
-export function createBooleanPref(key: string, defaultValue: boolean) {
+function createBooleanPref(key: string, defaultValue: boolean) {
     return {
         async set(value: boolean): Promise<void> {
             await AsyncStorage.setItem(key, String(value));
@@ -20,7 +20,7 @@ export function createBooleanPref(key: string, defaultValue: boolean) {
     };
 }
 
-export function createStringPref(key: string, defaultValue: string | null) {
+function createStringPref(key: string, defaultValue: string | null) {
     return {
         async set(value: string): Promise<void> {
             await AsyncStorage.setItem(key, value);
@@ -32,7 +32,7 @@ export function createStringPref(key: string, defaultValue: string | null) {
     };
 }
 
-export function createJsonPref<T>(key: string, defaultValue: T | null) {
+function createJsonPref<T>(key: string, defaultValue: T | null) {
     return {
         async set(value: T): Promise<void> {
             await AsyncStorage.setItem(key, JSON.stringify(value));
@@ -61,11 +61,11 @@ export const chatCenteredPref = createBooleanPref(
     STORAGE_KEYS.CHAT_CENTERED,
     false,
 );
-export const reviewReactionsPref = createBooleanPref(
+const reviewReactionsPref = createBooleanPref(
     STORAGE_KEYS.REVIEW_REACTIONS_ENABLED,
     false,
 );
-export const fullResImagesPref = createBooleanPref(
+const fullResImagesPref = createBooleanPref(
     STORAGE_KEYS.FULL_RES_IMAGES,
     false,
 );
@@ -90,19 +90,16 @@ async function setCachedFullResImages(value: boolean): Promise<void> {
     await fullResImagesPref.set(value);
 }
 
-export const privacyModePref = createBooleanPref(
-    STORAGE_KEYS.PRIVACY_MODE,
-    false,
-);
-export const discoverFiltersPref = createJsonPref<object>(
+const privacyModePref = createBooleanPref(STORAGE_KEYS.PRIVACY_MODE, false);
+const discoverFiltersPref = createJsonPref<object>(
     STORAGE_KEYS.DISCOVER_FILTERS,
     null,
 );
-export const createBotStatePref = createJsonPref<object>(
+const createBotStatePref = createJsonPref<object>(
     STORAGE_KEYS.CREATE_BOT_STATE,
     null,
 );
-export const editBotStatePref = createJsonPref<object>(
+const editBotStatePref = createJsonPref<object>(
     STORAGE_KEYS.EDIT_BOT_STATE,
     null,
 );

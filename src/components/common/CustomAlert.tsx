@@ -1,11 +1,4 @@
-import {
-  View,
-  Text,
-  Pressable,
-  Modal,
-  StyleSheet,
-  useWindowDimensions,
-} from "react-native";
+import { View, Text, Pressable, Modal, StyleSheet } from "react-native";
 import { colors } from "../../utils/colors";
 import { useIsTablet } from "../../hooks/useIsTablet";
 

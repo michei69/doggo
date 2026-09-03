@@ -35,7 +35,6 @@ export default React.memo(function ChatBubble({
   message,
   isUser,
   onEdit,
-  onDelete,
   onMessageLongPress,
   editingMessageId,
   onEditingDone,
@@ -50,7 +49,6 @@ export default React.memo(function ChatBubble({
   message: ChatMessage;
   isUser: boolean;
   onEdit: (messageId: number, newContent: string) => void;
-  onDelete: (messageId: number) => void;
   onMessageLongPress?: (message: ChatMessage) => void;
   editingMessageId?: number | null;
   onEditingDone?: () => void;
@@ -105,11 +103,15 @@ export default React.memo(function ChatBubble({
   const rawContent = message.message ?? "";
   const isEmpty = !rawContent || rawContent.trim() === "";
 
-  const { thinking: messageThinking } = useMemo(() => {
-    if (isEmpty || isUser) return { thinking: "", rest: "" };
-    return extractThinking(
-      replaceTags(rawContent, personaName, characterChatName, personaPronouns),
+  const processedContent = useMemo(() => {
+    const replaced = replaceTags(
+      rawContent,
+      personaName,
+      characterChatName,
+      personaPronouns,
     );
+    if (isEmpty || isUser) return { thinking: "", rest: replaced };
+    return extractThinking(replaced);
   }, [
     rawContent,
     isEmpty,
@@ -119,27 +121,10 @@ export default React.memo(function ChatBubble({
     personaPronouns,
   ]);
 
+  const messageThinking = processedContent.thinking;
+  const displayContent = processedContent.rest;
   const thinkingContent = activeThinking || messageThinking;
   const showThinking = !isUser && !!thinkingContent && enableThinking;
-  const displayContent = useMemo(() => {
-    if (isEmpty || isUser)
-      return replaceTags(
-        rawContent,
-        personaName,
-        characterChatName,
-        personaPronouns,
-      );
-    return extractThinking(
-      replaceTags(rawContent, personaName, characterChatName, personaPronouns),
-    ).rest;
-  }, [
-    rawContent,
-    isEmpty,
-    isUser,
-    personaName,
-    characterChatName,
-    personaPronouns,
-  ]);
 
   const avatarUri = isUser ? personaAvatar : characterAvatar;
   const avatarName = isUser

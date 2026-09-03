@@ -81,7 +81,7 @@ export function useTabSwipe(screenWidth: number) {
     };
 }
 
-export function useSheetModal<T>() {
+function useSheetModal<T>() {
     const [visible, setVisible] = useState(false);
     const [editing, setEditing] = useState<T | undefined>();
     const [session, setSession] = useState(0);
@@ -113,7 +113,7 @@ export function useSheetModal<T>() {
     };
 }
 
-export function useDeleteConfirmAlert({
+function useDeleteConfirmAlert({
     onDelete,
     onDeleted,
     errorMessage,

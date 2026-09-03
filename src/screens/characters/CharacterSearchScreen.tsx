@@ -3,15 +3,9 @@ import { StyleSheet, View } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { getTags } from "../../api/characters";
 import type { AdvancedSearchModalHandle } from "../../components/discover/AdvancedSearchModal";
-import FilterModal, {
-  type FilterModalHandle,
-} from "../../components/discover/FilterModal";
-import SortModal, {
-  type SortModalHandle,
-} from "../../components/discover/SortModal";
-import TagsModal, {
-  type TagsModalHandle,
-} from "../../components/discover/TagsModal";
+import type { FilterModalHandle } from "../../components/discover/FilterModal";
+import type { SortModalHandle } from "../../components/discover/SortModal";
+import type { TagsModalHandle } from "../../components/discover/TagsModal";
 import { useIsTablet } from "../../hooks/useIsTablet";
 import { SORT_OPTIONS, type FilterState } from "../../utils/discover";
 import { colors } from "../../utils/colors";
@@ -185,7 +179,6 @@ export default function CharacterSearchScreen() {
     sortMode,
     setSortMode,
     selectedTagIds,
-    setSelectedTagIds,
     toggleTag,
   } = useDiscoverState(route.params);
   const {

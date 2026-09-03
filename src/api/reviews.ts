@@ -9,7 +9,6 @@ import type {
     CreateCommentRequest,
     CreateCommentResponse,
     EmojiDefinitionsResponse,
-    ReviewSort,
     GetReviewsParams,
     TranslateCommentResponse,
     ReportCommentBody,

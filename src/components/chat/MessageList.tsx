@@ -104,7 +104,6 @@ const MessageGroupRenderer = React.memo(
     isLast,
     chatId,
     onEdit,
-    onDelete,
     onMessageLongPress,
     editingMessageId,
     onEditingDone,
@@ -121,7 +120,6 @@ const MessageGroupRenderer = React.memo(
     isLast: boolean;
     chatId?: number;
     onEdit: (messageId: number, newContent: string) => void;
-    onDelete: (messageId: number) => void;
     onMessageLongPress?: (message: ChatMessage) => void;
     editingMessageId?: number | null;
     onEditingDone?: () => void;
@@ -252,7 +250,6 @@ const MessageGroupRenderer = React.memo(
                   message={activeMessage}
                   isUser={false}
                   onEdit={onEdit}
-                  onDelete={onDelete}
                   onMessageLongPress={onMessageLongPress}
                   editingMessageId={editingMessageId}
                   onEditingDone={onEditingDone}
@@ -274,7 +271,6 @@ const MessageGroupRenderer = React.memo(
               }
               isUser={false}
               onEdit={onEdit}
-              onDelete={onDelete}
               onMessageLongPress={onMessageLongPress}
               editingMessageId={editingMessageId}
               onEditingDone={onEditingDone}
@@ -332,7 +328,6 @@ const MessageGroupRenderer = React.memo(
         message={userMsg}
         isUser={true}
         onEdit={onEdit}
-        onDelete={onDelete}
         onMessageLongPress={onMessageLongPress}
         editingMessageId={editingMessageId}
         onEditingDone={onEditingDone}
@@ -373,10 +368,8 @@ const MessageGroupRenderer = React.memo(
 export default function MessageList({
   messages,
   isLoading,
-  currentUserId,
   chatId,
   onEdit,
-  onDelete,
   onMessageLongPress,
   editingMessageId,
   onEditingDone,
@@ -391,10 +384,8 @@ export default function MessageList({
 }: {
   messages: ChatMessage[];
   isLoading: boolean;
-  currentUserId: string | undefined;
   chatId?: number;
   onEdit: (messageId: number, newContent: string) => void;
-  onDelete: (messageId: number) => void;
   onMessageLongPress?: (message: ChatMessage) => void;
   editingMessageId?: number | null;
   onEditingDone?: () => void;
@@ -471,7 +462,6 @@ export default function MessageList({
           isLast={isLast}
           chatId={chatId}
           onEdit={onEdit}
-          onDelete={onDelete}
           onMessageLongPress={onMessageLongPress}
           editingMessageId={editingMessageId}
           onEditingDone={onEditingDone}
@@ -490,7 +480,6 @@ export default function MessageList({
       groups.length,
       chatId,
       onEdit,
-      onDelete,
       onMessageLongPress,
       editingMessageId,
       onEditingDone,

@@ -1,4 +1,4 @@
-import { memo, useCallback } from "react";
+import { memo } from "react";
 import { View, Text, StyleSheet, Pressable, Modal, Switch } from "react-native";
 import type { CharacterDetail } from "../../types/api";
 import { colors } from "../../utils/colors";

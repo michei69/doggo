@@ -4,6 +4,7 @@ import { useAuthStore } from "../stores/authStore";
 import * as chatsApi from "../api/chats";
 import { sseClient } from "../api/sse";
 import { getMyProfile } from "../api/profile";
+import { loadChatUserConfig } from "../utils/chatConfig";
 import type { CreateMessageRequest, ChatMessage } from "../types/api";
 import { useTurnstile } from "../components/turnstile/TurnstileProvider";
 import { groupMessages } from "../utils/messages";
@@ -464,49 +465,24 @@ export function useChat() {
             };
 
             try {
-                const profile = await getMyProfile();
+                const {
+                    profile,
+                    selectedProxy,
+                    userConfig,
+                    apiUrl,
+                    apiKey,
+                    model,
+                } = await loadChatUserConfig();
                 storeSetUserConfig(profile.config);
-                const selectedProxy = profile.config.proxyConfigurations.find(
-                    (p) => p.id === profile.config.selectedProxyConfigId,
-                );
 
                 const enableThinking =
                     profile.config.generation_settings.enable_thinking ?? false;
                 storeSetEnableThinking(enableThinking);
 
-                const privacyMode = await storage.getPrivacyMode();
-
-                const userConfig = {
-                    ...profile.config,
-                    reverseProxyKey: selectedProxy?.apiKey ?? "",
-                    openAiModel:
-                        selectedProxy?.model ??
-                        profile.config.openAiModel ??
-                        "",
-                    open_ai_jailbreak_prompt:
-                        selectedProxy?.jailbreakPrompt ??
-                        profile.config.open_ai_jailbreak_prompt ??
-                        "",
-                };
-
-                if (privacyMode) {
-                    userConfig.open_ai_reverse_proxy = "http://doggy.privacy/";
-                    userConfig.reverseProxyKey = "redacted";
-                    userConfig.openAiModel = "doggy-privacy";
-                }
-
                 // Local mode: skip generateAlpha, use proxy directly
                 const localData = await storage.getChatLocalData(chatId);
                 if (localData?.local_mode) {
                     const { personality, scenario } = localData;
-
-                    const apiUrl =
-                        selectedProxy?.apiUrl ||
-                        userConfig.open_ai_reverse_proxy;
-                    const apiKey =
-                        selectedProxy?.apiKey || userConfig.reverseProxyKey;
-                    const model =
-                        selectedProxy?.model || userConfig.openAiModel;
 
                     if (!apiUrl || !apiKey || !model) {
                         throw new Error("No proxy configured for local mode");
@@ -894,11 +870,6 @@ export function useChat() {
             storeSetUserConfig(profile.config);
         } catch {}
     }, [storeSetUserConfig]);
-
-    const abortStream = useCallback(() => {
-        sseClient.abort();
-        storeSetSending(false);
-    }, [storeSetSending]);
 
     return {
         chats,

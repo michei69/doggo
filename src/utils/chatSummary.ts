@@ -1,11 +1,11 @@
-import { getMyProfile } from "../api/profile";
 import { generateAlpha } from "../api/chats";
 import { sseClient } from "../api/sse";
 import { useChatStore } from "../stores/chatStore";
 import { storage } from "./storage";
+import { loadChatUserConfig } from "./chatConfig";
 import type { ChatMessage } from "../types/api";
 
-export function buildChatSummaryPrompt({
+function buildChatSummaryPrompt({
     characterName,
     userName,
     summary,
@@ -43,7 +43,7 @@ Rules:
     return prompt;
 }
 
-export function stripThinkingText(text: string): string {
+function stripThinkingText(text: string): string {
     return text
         .replace(/<thinking>[\s\S]*?<\/thinking>/g, "")
         .replace(/<thought>[\s\S]*?<\/thought>/g, "")
@@ -86,35 +86,11 @@ export async function generateChatSummary({
         messages,
     });
 
-    const profile = await getMyProfile();
-    const selectedProxy = profile.config.proxyConfigurations.find(
-        (proxy) => proxy.id === profile.config.selectedProxyConfigId,
-    );
-
-    const userConfig = {
-        ...profile.config,
-        reverseProxyKey: selectedProxy?.apiKey ?? "",
-        openAiModel: selectedProxy?.model ?? profile.config.openAiModel ?? "",
-        open_ai_jailbreak_prompt:
-            selectedProxy?.jailbreakPrompt ??
-            profile.config.open_ai_jailbreak_prompt ??
-            "",
-    };
-
-    const privacyMode = await storage.getPrivacyMode();
-    if (privacyMode) {
-        userConfig.open_ai_reverse_proxy = "http://doggy.privacy/";
-        userConfig.reverseProxyKey = "redacted";
-        userConfig.openAiModel = "doggy-privacy";
-    }
+    const { profile, selectedProxy, userConfig, apiUrl, apiKey, model } =
+        await loadChatUserConfig();
 
     const localData = await storage.getChatLocalData(chatId);
     if (localData?.local_mode) {
-        const apiUrl =
-            selectedProxy?.apiUrl || userConfig.open_ai_reverse_proxy;
-        const apiKey = selectedProxy?.apiKey || userConfig.reverseProxyKey;
-        const model = selectedProxy?.model || userConfig.openAiModel;
-
         if (!apiUrl || !apiKey || !model) {
             throw new Error("No proxy configured for local mode");
         }

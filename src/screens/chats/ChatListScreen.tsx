@@ -15,7 +15,6 @@ import {
   ScrollView,
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
-import type { ListRenderItem } from "@shopify/flash-list";
 import Skeleton from "../../components/common/Skeleton";
 import { Search } from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";

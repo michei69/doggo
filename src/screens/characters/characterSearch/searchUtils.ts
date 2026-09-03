@@ -247,22 +247,20 @@ export function filterDisplayCharacters(
     const searchText = (c: TrendingCharacter) =>
         `${c.name} ${c.description || ""} ${(c.tags || []).map((t) => t.name).join(" ")} ${(c.custom_tags || []).join(" ")}`.toLowerCase();
     let result = characters;
-    if (advancedKeywords.length > 0) {
+    if (advancedKeywords.length > 0 || advancedBlacklist.length > 0) {
         result = result.filter((c) => {
             const text = searchText(c);
-            if (keywordMatchMode === "all") {
-                return advancedKeywords.every((kw) =>
-                    text.includes(kw.toLowerCase()),
-                );
+            if (advancedKeywords.length > 0) {
+                const matches =
+                    keywordMatchMode === "all"
+                        ? advancedKeywords.every((kw) =>
+                              text.includes(kw.toLowerCase()),
+                          )
+                        : advancedKeywords.some((kw) =>
+                              text.includes(kw.toLowerCase()),
+                          );
+                if (!matches) return false;
             }
-            return advancedKeywords.some((kw) =>
-                text.includes(kw.toLowerCase()),
-            );
-        });
-    }
-    if (advancedBlacklist.length > 0) {
-        result = result.filter((c) => {
-            const text = searchText(c);
             return !advancedBlacklist.some((kw) =>
                 text.includes(kw.toLowerCase()),
             );

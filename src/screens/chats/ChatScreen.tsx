@@ -20,7 +20,6 @@ export default function ChatScreen() {
     chatId,
     characterName,
     characterId,
-    user,
     handleGoBack,
     handleOpenSettings,
     proxyBlocked,
@@ -32,7 +31,6 @@ export default function ChatScreen() {
     messages,
     isLoadingMessages,
     handleEdit,
-    handleDeleteBubble,
     handleMessageLongPress,
     editingMessageId,
     handleEditingDone,
@@ -141,9 +139,7 @@ export default function ChatScreen() {
         onRetry={handleRetry}
         chatId={chatId}
         messages={messages}
-        currentUserId={user?.id}
         onEdit={handleEdit}
-        onDelete={handleDeleteBubble}
         onMessageLongPress={handleMessageLongPress}
         editingMessageId={editingMessageId}
         onEditingDone={handleEditingDone}
@@ -164,7 +160,6 @@ export default function ChatScreen() {
         onClose={handleSettingsClose}
         characterName={characterName}
         characterId={characterId}
-        chatId={chatId}
         creatorId={creatorId}
         creatorName={creatorName}
         allowProxy={allowProxy}
