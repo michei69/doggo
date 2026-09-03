@@ -17,8 +17,10 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
 } from "react-native-reanimated";
+import { Image } from "expo-image";
 import { colors } from "../../utils/colors";
 import { scheduleOnRN } from "react-native-worklets";
+import { AVATAR_THUMB_WIDTH } from "../../utils/assets";
 
 const MAX_SCALE = 5;
 const MIN_SCALE = 1;
@@ -116,6 +118,7 @@ export default function AvatarPreview({
 
   if (!uri) return null;
   const previewUri = uri.replace(/\?width=\d+$/, "");
+  const previewThumbUri = `${previewUri}?width=${AVATAR_THUMB_WIDTH}`;
 
   return (
     <Modal
@@ -127,11 +130,16 @@ export default function AvatarPreview({
       <GestureHandlerRootView style={styles.root}>
         <GestureDetector gesture={composed}>
           <View style={styles.overlay}>
-            <Animated.Image
-              source={{ uri: previewUri }}
-              style={[styles.image, animatedStyle]}
-              resizeMode="contain"
-            />
+            <Animated.View style={[styles.image, animatedStyle]}>
+              <Image
+                source={{ uri: previewUri }}
+                placeholder={{ uri: previewThumbUri }}
+                placeholderContentFit="contain"
+                style={styles.image}
+                contentFit="contain"
+                cachePolicy="memory-disk"
+              />
+            </Animated.View>
             <Pressable onPress={onClose} style={styles.closeBtn}>
               <Text style={styles.closeText}>✕</Text>
             </Pressable>

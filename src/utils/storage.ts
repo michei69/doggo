@@ -69,6 +69,27 @@ export const fullResImagesPref = createBooleanPref(
     STORAGE_KEYS.FULL_RES_IMAGES,
     false,
 );
+
+let fullResImagesCache: boolean | null = null;
+let fullResImagesPromise: Promise<boolean> | null = null;
+
+async function getCachedFullResImages(): Promise<boolean> {
+    if (fullResImagesCache !== null) return fullResImagesCache;
+    if (!fullResImagesPromise) {
+        fullResImagesPromise = fullResImagesPref.get().then((value) => {
+            fullResImagesCache = value;
+            return value;
+        });
+    }
+    return fullResImagesPromise;
+}
+
+async function setCachedFullResImages(value: boolean): Promise<void> {
+    fullResImagesCache = value;
+    fullResImagesPromise = Promise.resolve(value);
+    await fullResImagesPref.set(value);
+}
+
 export const privacyModePref = createBooleanPref(
     STORAGE_KEYS.PRIVACY_MODE,
     false,
@@ -217,8 +238,8 @@ export const storage = {
     setReviewReactionsEnabled: reviewReactionsPref.set,
     getReviewReactionsEnabled: reviewReactionsPref.get,
 
-    setFullResImages: fullResImagesPref.set,
-    getFullResImages: fullResImagesPref.get,
+    setFullResImages: setCachedFullResImages,
+    getFullResImages: getCachedFullResImages,
 
     setPrivacyMode: privacyModePref.set,
     getPrivacyMode: privacyModePref.get,

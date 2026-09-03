@@ -16,7 +16,11 @@ import type {
 import Avatar from "../../../components/common/Avatar";
 import EmptyState from "../../../components/common/EmptyState";
 import { useRefreshControl } from "../../../components/common/useRefreshControl";
-import { avatarUrl, botAvatarUrl } from "../../../utils/assets";
+import {
+  avatarUrl,
+  botAvatarUrl,
+  AVATAR_THUMB_WIDTH,
+} from "../../../utils/assets";
 import { colors } from "../../../utils/colors";
 
 export const CharacterList = React.memo(function CharacterList({
@@ -73,7 +77,7 @@ export const CharacterList = React.memo(function CharacterList({
       key={isTablet ? "tablet-2col" : "phone-1col"}
       onEndReached={onEndReached}
       onEndReachedThreshold={0.5}
-      drawDistance={800}
+      drawDistance={300}
       refreshControl={refreshControl}
       contentContainerStyle={styles.list}
       showsVerticalScrollIndicator={false}
@@ -147,7 +151,7 @@ export const CreatorList = React.memo(function CreatorList({
       keyExtractor={(item) => item.id}
       onEndReached={onEndReached}
       onEndReachedThreshold={0.5}
-      drawDistance={800}
+      drawDistance={300}
       refreshControl={refreshControl}
       contentContainerStyle={styles.list}
       showsVerticalScrollIndicator={false}
@@ -229,13 +233,17 @@ const CharPreviewRow = React.memo(function CharPreviewRow({
   char: CharacterAvatarPreview;
   onPressCharacter: (char: CharacterAvatarPreview) => void;
 }) {
+  const previewUri = botAvatarUrl(char.avatar, AVATAR_THUMB_WIDTH);
   return (
     <Pressable
       style={styles.charPreviewItem}
       onPress={() => onPressCharacter(char)}
     >
       <Image
-        source={{ uri: botAvatarUrl(char.avatar) }}
+        source={{ uri: previewUri }}
+        cachePolicy="memory-disk"
+        priority="high"
+        recyclingKey={previewUri}
         style={styles.charPreviewAvatar}
       />
       <Text

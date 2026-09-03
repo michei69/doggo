@@ -114,6 +114,7 @@ export default function EmojiPickerModal({
                 >
                   <Image
                     source={{ uri: emoji.img }}
+                    cachePolicy="memory-disk"
                     style={styles.emojiImg}
                     resizeMode="contain"
                   />

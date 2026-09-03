@@ -207,8 +207,8 @@ export default function MyCharactersScreen() {
           keyExtractor={(item) => item.id}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
-          drawDistance={2000}
-          overrideProps={{ initialDrawBatchSize: 50 }}
+          drawDistance={300}
+          overrideProps={{ initialDrawBatchSize: 10 }}
           refreshControl={refreshControl}
           ListFooterComponent={renderFooter}
           ListEmptyComponent={renderEmpty}

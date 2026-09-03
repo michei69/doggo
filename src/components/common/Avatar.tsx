@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import { colors } from "../../utils/colors";
 import { storage } from "../../utils/storage";
+import { AVATAR_THUMB_WIDTH } from "../../utils/assets";
 
 export default function Avatar({
   uri,
@@ -29,6 +30,11 @@ export default function Avatar({
         .slice(0, 2)
     : "?";
 
+  const sourceUri =
+    useThumbnail && uri && !uri.includes("?width=")
+      ? `${uri}?width=${AVATAR_THUMB_WIDTH}`
+      : uri;
+
   const content = (
     <View
       style={[
@@ -38,12 +44,10 @@ export default function Avatar({
     >
       {uri ? (
         <Image
-          source={{
-            uri:
-              useThumbnail && !uri.includes("?width=")
-                ? `${uri}?width=${size}`
-                : uri,
-          }}
+          source={{ uri: sourceUri }}
+          cachePolicy="memory-disk"
+          priority="high"
+          recyclingKey={sourceUri}
           style={[styles.image, { borderRadius: size / 2 }]}
         />
       ) : (
