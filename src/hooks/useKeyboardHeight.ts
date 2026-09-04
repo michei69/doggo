@@ -5,14 +5,14 @@ export function useKeyboardHeight(): number {
     const [keyboardHeight, setKeyboardHeight] = useState(0);
 
     useEffect(() => {
-        const eventShow =
+        const eventShow: "keyboardWillShow" | "keyboardDidShow" =
             Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-        const eventHide =
+        const eventHide: "keyboardWillHide" | "keyboardDidHide" =
             Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-        const show = Keyboard.addListener(eventShow as any, (e: any) =>
+        const show = Keyboard.addListener(eventShow, (e: any) =>
             setKeyboardHeight(e.endCoordinates.height),
         );
-        const hide = Keyboard.addListener(eventHide as any, () =>
+        const hide = Keyboard.addListener(eventHide, () =>
             setKeyboardHeight(0),
         );
         return () => {

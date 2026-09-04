@@ -14,20 +14,20 @@ import MainTabs from "./MainTabs";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-function parseQueryString(queryString: string): Record<string, string> {
+function parseQueryString(queryString: string) {
   if (!queryString) return {};
-  const params: Record<string, string> = {};
-  for (const part of queryString.split("&")) {
-    const eqIdx = part.indexOf("=");
-    if (eqIdx === -1) {
-      params[decodeURIComponent(part)] = "";
-    } else {
-      const key = decodeURIComponent(part.slice(0, eqIdx));
-      const value = decodeURIComponent(part.slice(eqIdx + 1));
-      params[key] = value;
-    }
-  }
-  return params;
+  return Object.fromEntries(
+    queryString.split("&").map((part) => {
+      const eqIdx = part.indexOf("=");
+      if (eqIdx === -1) {
+        return [decodeURIComponent(part), ""];
+      }
+      return [
+        decodeURIComponent(part.slice(0, eqIdx)),
+        decodeURIComponent(part.slice(eqIdx + 1)),
+      ];
+    }),
+  );
 }
 
 function getStateFromPath(path: string) {
@@ -51,10 +51,7 @@ function getStateFromPath(path: string) {
                   routes: [
                     {
                       name: "CharacterSearch",
-                      params: {
-                        ...params,
-                        ...(tag ? { tag } : {}),
-                      },
+                      params: tag ? { ...params, tag } : params,
                     },
                   ],
                 },

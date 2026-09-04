@@ -1,5 +1,5 @@
 import * as ImagePicker from "expo-image-picker";
-import * as ImageManipulator from "expo-image-manipulator";
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { uploadFile } from "./profile";
 
 type PickAndUploadAvatarResult =
@@ -8,11 +8,13 @@ type PickAndUploadAvatarResult =
     | { status: "uploaded"; filename: string };
 
 export async function manipulateAvatarImage(uri: string): Promise<string> {
-    const result = await ImageManipulator.manipulateAsync(
-        uri,
-        [{ resize: { width: 256, height: 256 } }],
-        { format: ImageManipulator.SaveFormat.WEBP, compress: 0.85 },
-    );
+    const context = ImageManipulator.manipulate(uri);
+    context.resize({ width: 256, height: 256 });
+    const image = await context.renderAsync();
+    const result = await image.saveAsync({
+        format: SaveFormat.WEBP,
+        compress: 0.85,
+    });
     return result.uri;
 }
 
@@ -36,7 +38,7 @@ export async function uploadManipulatedImage(
             uri,
             type: "image/webp",
             name: fileName,
-        } as any);
+        });
     });
 
     return upload.filename;

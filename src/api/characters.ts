@@ -127,10 +127,18 @@ export async function searchProfiles(
     });
 }
 
+interface MyCharactersQueryParams {
+    page: number;
+    privacyFilter: string;
+    search: string;
+    sort: string;
+    is_public?: string;
+}
+
 export async function getMyCharacters(
     params: MyCharactersParams = {},
 ): Promise<TrendingResponse> {
-    const queryParams: Record<string, string | number> = {
+    const queryParams: MyCharactersQueryParams = {
         page: params.page ?? 1,
         privacyFilter: "all",
         search: "",

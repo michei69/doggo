@@ -383,6 +383,7 @@ const ReviewsHeader = memo(function ReviewsHeader({
   listLoading: boolean;
   onSortChange: (sort: ReviewSort) => void;
 }) {
+  // SAFETY: "likes", "latest" and "oldest" are exactly the ReviewSort union members.
   return (
     <View style={styles.header}>
       {/* Header with counts and sort */}

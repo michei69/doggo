@@ -24,6 +24,7 @@ export function processText(
 
     if (removeTags) {
         processed = processed
+            .replace(/\n?\s*<thinking>[\s\S]*?<\/thinking>\s*\n?/g, "")
             .replace(
                 /\n?\s*<(thought|thoughts)>[\s\S]*?<\/(thought|thoughts)>\s*\n?/g,
                 "",

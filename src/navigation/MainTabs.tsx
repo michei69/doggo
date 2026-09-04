@@ -143,7 +143,7 @@ function getTabBarVisibility(
   route:
     | Partial<RouteProp<MainTabParamList, "ChatsTab">>
     | Partial<RouteProp<MainTabParamList, "DiscoverTab">>,
-): object {
+) {
   const routeName = getFocusedRouteNameFromRoute(route);
   if (
     routeName === "ChatScreen" ||

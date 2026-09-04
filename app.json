@@ -42,6 +42,6 @@
         "web": {
             "favicon": "./assets/favicon.png"
         },
-        "plugins": ["react-native-enriched-markdown"]
+        "plugins": ["react-native-enriched-markdown", "expo-image"]
     }
 }

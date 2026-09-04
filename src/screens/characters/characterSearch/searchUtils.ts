@@ -44,18 +44,17 @@ interface ListState<T> {
     error: string | null;
 }
 
+export interface LoadedPayload<T> {
+    data: T[];
+    total: number;
+    page: number;
+    dedupe?: boolean;
+}
+
 type ListAction<T> =
     | { type: "LOADING" }
     | { type: "REFRESHING" }
-    | {
-          type: "LOADED";
-          payload: {
-              data: T[];
-              total: number;
-              page: number;
-              dedupe?: boolean;
-          };
-      }
+    | { type: "LOADED"; payload: LoadedPayload<T> }
     | { type: "ERROR"; payload: string }
     | { type: "RESET" };
 
@@ -109,21 +108,11 @@ export function genericListReducer<T extends { id: string }>(
     }
 }
 
-export function listReducer(
-    state: ListState<TrendingCharacter>,
-    action: ListAction<TrendingCharacter>,
-): ListState<TrendingCharacter> {
-    return genericListReducer(state, action);
-}
-
 export function tagsToTagEntries(tags: CharacterTag[]): TagEntry[] {
     return tags.map((t) => ({ id: t.id, name: t.name, slug: t.slug }));
 }
 
-function splitTagIds(tags: Set<string>): {
-    normalIds: string[];
-    customSlugs: string[];
-} {
+function splitTagIds(tags: Set<string>) {
     const normalIds: string[] = [];
     const customSlugs: string[] = [];
     for (const id of tags) {
@@ -376,15 +365,7 @@ export function buildSwipeParams(input: SwipeParamsInput): SwipeDiscoverParams {
     return p;
 }
 
-export function parseSwipeParams(p?: SwipeDiscoverParams): {
-    filters: FilterState;
-    tags: Set<string>;
-    search: string;
-    sort: string;
-    advancedKeywords: string[];
-    advancedBlacklist: string[];
-    keywordMatchMode: "any" | "all";
-} {
+export function parseSwipeParams(p?: SwipeDiscoverParams) {
     return {
         filters: initialFiltersFromParams(p),
         tags: initialTagsFromParams(p),

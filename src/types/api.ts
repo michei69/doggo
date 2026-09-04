@@ -1,3 +1,5 @@
+import type { JsonObject } from "../utils/json";
+
 export interface BlockedContent {
     bots: string[];
     creators: string[];
@@ -359,7 +361,7 @@ export interface ApiSettingsSettings {
     janitor_prompt: string | null;
     migrated_from_legacy_at: string;
     openai_model: string;
-    openai_prompt: { id: string; [key: string]: unknown };
+    openai_prompt: { id: string } & JsonObject;
     proxy_global_prompt: string | null;
     router_enabled: boolean;
     selected_proxy_config_id: string;
@@ -808,7 +810,7 @@ export interface SystemPromptRequestBody {
     profiles: unknown[];
     userConfig: {
         api: string;
-        generation_settings: Record<string, unknown>;
+        generation_settings: Partial<ApiSettingsGeneration>;
         open_ai_mode?: string;
     };
     forcedPromptGenerationCacheRefetch?: {
@@ -818,4 +820,44 @@ export interface SystemPromptRequestBody {
         script: boolean;
     };
     clientPlatform?: string;
+}
+
+export interface GenerateAlphaRequestBody {
+    chat: {
+        character_id: string;
+        id?: number;
+        persona_id?: string | null;
+        summary?: string;
+        summary_chat_id?: number | null;
+        user_id?: string;
+    };
+    chatMessages?: Array<{
+        chat_id?: number;
+        created_at?: string;
+        id?: number;
+        is_bot?: boolean;
+        is_main?: boolean;
+        message?: string;
+        character_id?: string;
+        persona_id?: string | null;
+    }>;
+    generateMode?: string;
+    generateType?: string;
+    profile?: { id?: string; name?: string; user_name?: string };
+    profiles?: unknown[];
+    userConfig?: Omit<Partial<UserProfile["config"]>, "generation_settings"> & {
+        generation_settings?: Partial<ApiSettingsGeneration>;
+        reverseProxyKey?: string;
+        openAiModel?: string;
+        openAIKey?: string | null;
+        claudeApiKey?: string | null;
+    };
+    forcedPromptGenerationCacheRefetch?: {
+        character?: boolean;
+        chat?: boolean;
+        profile?: boolean;
+        script?: boolean;
+    };
+    clientPlatform?: string;
+    personas?: Persona[];
 }

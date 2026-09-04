@@ -58,6 +58,8 @@ export function useChatScreen() {
     const [allChatsVisible, setAllChatsVisible] = useState(false);
     const [allChats, setAllChats] = useState<ChatListItem[]>([]);
     const [allChatsLoading, setAllChatsLoading] = useState(false);
+    // SAFETY: null is a member of string | null, so the initial error value is
+    // a valid value for the declared state type.
     const [systemPrompt, setSystemPrompt] = useState({
         visible: false,
         content: "",
@@ -480,7 +482,7 @@ export function useChatScreen() {
                                     "application/json",
                                 );
                             await writeAsStringAsync(fileUri, json, {
-                                encoding: "utf8" as any,
+                                encoding: "utf8",
                             });
                             toast(`Saved ${filename}`);
                         } catch {}

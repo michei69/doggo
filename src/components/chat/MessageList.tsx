@@ -37,7 +37,7 @@ const MessagingSkeleton = React.memo(function MessagingSkeleton() {
         const right = i % 2 === 1;
         return (
           <View
-            key={i}
+            key={h}
             style={[styles.skelGroup, right && styles.skelAlignEnd]}
           >
             <View style={[styles.skelAvatarRow, right && styles.skelAlignEnd]}>
@@ -64,8 +64,8 @@ const MessagingSkeleton = React.memo(function MessagingSkeleton() {
 const JanitorSkeleton = React.memo(function JanitorSkeleton() {
   return (
     <View style={styles.flashlist}>
-      {SKELETON_BUBBLE_HEIGHTS.map((h, i) => (
-        <View key={i} style={styles.skelJanitorRow}>
+      {SKELETON_BUBBLE_HEIGHTS.map((h) => (
+        <View key={h} style={styles.skelJanitorRow}>
           <View style={styles.skelAvatarMd} />
           <View style={styles.skelJanitorContent}>
             <View style={styles.skelNameBold} />
@@ -80,8 +80,8 @@ const JanitorSkeleton = React.memo(function JanitorSkeleton() {
 const EdgeToEdgeSkeleton = React.memo(function EdgeToEdgeSkeleton() {
   return (
     <View style={styles.flashlist}>
-      {SKELETON_BUBBLE_HEIGHTS.map((h, i) => (
-        <View key={i} style={styles.skelEdgeGroup}>
+      {SKELETON_BUBBLE_HEIGHTS.map((h) => (
+        <View key={h} style={styles.skelEdgeGroup}>
           <View style={styles.skelAvatarRow}>
             <View style={styles.skelAvatarXs} />
             <View style={styles.skelNameBar} />

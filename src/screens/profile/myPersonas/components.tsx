@@ -455,6 +455,8 @@ export const DragOverlay = memo(function DragOverlay({
     shadowRadius: 12,
   }));
 
+  // SAFETY: drag.item is either a Persona or a PersonaGroup, selected by the
+  // `drag.type === "persona"` guard, so each branch's cast is valid.
   return (
     <Animated.View style={dragOverlayStyle}>
       {drag.type === "persona" ? (

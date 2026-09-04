@@ -1,5 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { AuthUser } from "../types/api";
 import { STORAGE_KEYS } from "./constants";
 
 interface ChatLocalData {
@@ -39,6 +40,8 @@ function createJsonPref<T>(key: string, defaultValue: T | null) {
         },
         async get<U = T>(): Promise<U | null> {
             const data = await AsyncStorage.getItem(key);
+            // SAFETY: the persisted value was written as T; U is the caller's
+            // typed view of that same JSON, and the default mirrors T | null.
             return data ? (JSON.parse(data) as U) : (defaultValue as U | null);
         },
     };
@@ -121,7 +124,7 @@ export const storage = {
         return SecureStore.getItemAsync(STORAGE_KEYS.REFRESH_TOKEN);
     },
 
-    async setUser(user: object): Promise<void> {
+    async setUser(user: AuthUser): Promise<void> {
         await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
     },
 

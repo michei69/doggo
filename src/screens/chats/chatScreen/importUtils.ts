@@ -1,4 +1,5 @@
 import type { ChatMessage } from "../../../types/api";
+import { isBoolean, isRecord, isString } from "../../../utils/json";
 
 export function validateMessagesImport(
     raw: string,
@@ -21,25 +22,25 @@ export function validateMessagesImport(
     const messages: ChatMessage[] = [];
     for (let i = 0; i < data.length; i++) {
         const item = data[i];
-        if (typeof item !== "object" || item === null) {
+        if (!isRecord(item)) {
             return {
                 valid: false,
-                error: `Item ${i}: expected an object, got ${typeof item}.`,
+                error: `Item ${i}: expected an object.`,
             };
         }
-        if (typeof item.is_bot !== "boolean") {
+        if (!isBoolean(item.is_bot)) {
             return {
                 valid: false,
                 error: `Item ${i}: "is_bot" must be a boolean.`,
             };
         }
-        if (typeof item.is_main !== "boolean") {
+        if (!isBoolean(item.is_main)) {
             return {
                 valid: false,
                 error: `Item ${i}: "is_main" must be a boolean.`,
             };
         }
-        if (typeof item.message !== "string") {
+        if (!isString(item.message)) {
             return {
                 valid: false,
                 error: `Item ${i}: "message" must be a string.`,

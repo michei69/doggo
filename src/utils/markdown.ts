@@ -98,18 +98,6 @@ export const generify = (thing: string, charName: string) =>
         );
 export const cleanTags = (thing: string, personaTag: string) =>
     thing
-        .replace(
-            new RegExp(
-                `<${personaTag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}>`,
-                "i",
-            ),
-            "",
-        )
-        .replace(
-            new RegExp(
-                `</${personaTag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}>`,
-                "i",
-            ),
-            "",
-        )
+        .replace(new RegExp(`<${escapeRegex(personaTag)}>`, "i"), "")
+        .replace(new RegExp(`</${escapeRegex(personaTag)}>`, "i"), "")
         .trim();

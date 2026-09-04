@@ -62,6 +62,7 @@ export default function EmojiPickerModal({
     return true;
   });
 
+  // SAFETY: "all", "animated" and "static" are exactly the Tab union members.
   return (
     <Modal
       visible={visible}

@@ -10,11 +10,7 @@ function hashStr(s: string): number {
   return h;
 }
 
-function customColor(label: string): {
-  bg: string;
-  fg: string;
-  border: string;
-} {
+function customColor(label: string) {
   const h = ((hashStr(label) % 360) + 360) % 360;
   return {
     bg: `hsla(${h}, 70%, 40%, 0.15)`,

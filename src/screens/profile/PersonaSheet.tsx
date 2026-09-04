@@ -37,7 +37,11 @@ const EMPTY_PRONOUNS: Pronouns = {
   reflexive: "",
 };
 
-const PRONOUN_PRESETS: Record<string, Pronouns> = {
+interface PronounPresetMap {
+  [key: string]: Pronouns;
+}
+
+const PRONOUN_PRESETS: PronounPresetMap = {
   "he/him": {
     subjective: "he",
     objective: "him",

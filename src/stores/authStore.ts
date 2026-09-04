@@ -159,30 +159,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     },
 
     login: async (email, password, captchaToken) => {
-        try {
-            const response = await authApi.login({
-                email,
-                password,
-                gotrue_meta_security: { captcha_token: captchaToken },
-            });
-            await Promise.all([
-                storage.setAccessToken(response.access_token),
-                storage.setRefreshToken(response.refresh_token),
-                storage.setUser(response.user),
-                storage.setTokenExpiresAt(response.expires_at),
-            ]);
-            set({
-                accessToken: response.access_token,
-                refreshToken: response.refresh_token,
-                user: response.user,
-                isAuthenticated: true,
-            });
-            scheduleRefresh(response.expires_at, () =>
-                performRefresh(get, set),
-            );
-        } catch (err: any) {
-            throw err;
-        }
+        const response = await authApi.login({
+            email,
+            password,
+            gotrue_meta_security: { captcha_token: captchaToken },
+        });
+        await Promise.all([
+            storage.setAccessToken(response.access_token),
+            storage.setRefreshToken(response.refresh_token),
+            storage.setUser(response.user),
+            storage.setTokenExpiresAt(response.expires_at),
+        ]);
+        set({
+            accessToken: response.access_token,
+            refreshToken: response.refresh_token,
+            user: response.user,
+            isAuthenticated: true,
+        });
+        scheduleRefresh(response.expires_at, () => performRefresh(get, set));
     },
 
     register: async (email, password, captchaToken) => {

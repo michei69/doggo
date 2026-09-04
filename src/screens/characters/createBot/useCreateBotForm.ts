@@ -26,6 +26,7 @@ import { tagsToTagEntries } from "../characterSearch/searchUtils";
 import {
     type BotFormState,
     EMPTY_FORM,
+    characterToBotFormState,
     persistForm,
     clearPersistedForm,
 } from "./botFormState";
@@ -68,23 +69,10 @@ export function useCreateBotForm() {
                     } else {
                         const char = await getCharacterDetail(characterId);
                         if (cancelled) return;
-                        const editState: BotFormState = {
-                            avatar: char.avatar ?? "",
-                            name: char.name ?? "",
-                            chat_name: char.chat_name ?? "",
-                            description: char.description ?? "",
-                            personality: char.personality ?? "",
-                            scenario: char.scenario ?? "",
-                            example_dialogs: char.example_dialogs ?? "",
-                            first_messages:
-                                char.first_messages.length > 0
-                                    ? char.first_messages
-                                    : [""],
-                            is_nsfw: char.is_nsfw,
-                            tag_ids: char.tags.map((t) => t.id),
-                            custom_tags: char.custom_tags ?? [],
-                            editCharacterId: characterId,
-                        };
+                        const editState = characterToBotFormState(
+                            char,
+                            characterId,
+                        );
                         setForm(editState);
                         storage.setEditBotState(editState);
                     }
@@ -99,8 +87,7 @@ export function useCreateBotForm() {
             } catch {
                 // Failed to load persisted state — start fresh
             } finally {
-                if (cancelled) return;
-                setLoaded(true);
+                if (!cancelled) setLoaded(true);
             }
         };
         loadState();

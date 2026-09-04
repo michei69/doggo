@@ -10,7 +10,22 @@
     "arrowParens": "always",
     "bracketSameLine": false,
     "bracketSpacing": true,
-    "ignorePatterns": [],
+    "ignorePatterns": [
+        ".agent/**",
+        ".agents/**",
+        ".claude/**",
+        ".codex/**",
+        ".continue/**",
+        ".cursor/**",
+        ".gemini/**",
+        ".opencode/**",
+        ".pi/**",
+        ".roo/**",
+        ".windsurf/**",
+        ".impeccable/**",
+        ".omo/**",
+        "tools/oxlint/anti-slop/**"
+    ],
     "$schema": "./node_modules/oxfmt/configuration_schema.json",
     "overrides": [
         {

@@ -1,37 +1,39 @@
 import { View, Text, StyleSheet } from "react-native";
 import { colors } from "../../utils/colors";
 
+type BadgeVariant = "nsfw" | "safe" | "proxy" | "private";
+
+const VARIANT_STYLES = {
+  nsfw: {
+    bg: colors.dangerLight,
+    border: "rgba(231, 76, 60, 0.3)",
+    color: colors.danger,
+  },
+  safe: {
+    bg: colors.successLight,
+    border: "rgba(46, 204, 113, 0.3)",
+    color: colors.success,
+  },
+  proxy: {
+    bg: colors.accentFaded,
+    border: colors.accentStrong,
+    color: colors.accent,
+  },
+  private: {
+    bg: "rgba(170, 170, 170, 0.15)",
+    border: "rgba(170, 170, 170, 0.25)",
+    color: colors.textMuted,
+  },
+} as const;
+
 export default function Badge({
   label,
   variant = "proxy",
 }: {
   label: string;
-  variant?: "nsfw" | "safe" | "proxy" | "private";
+  variant?: BadgeVariant;
 }) {
-  const bg =
-    variant === "nsfw"
-      ? colors.dangerLight
-      : variant === "safe"
-        ? colors.successLight
-        : variant === "private"
-          ? "rgba(170, 170, 170, 0.15)"
-          : colors.accentFaded;
-  const border =
-    variant === "nsfw"
-      ? "rgba(231, 76, 60, 0.3)"
-      : variant === "safe"
-        ? "rgba(46, 204, 113, 0.3)"
-        : variant === "private"
-          ? "rgba(170, 170, 170, 0.25)"
-          : colors.accentStrong;
-  const color =
-    variant === "nsfw"
-      ? colors.danger
-      : variant === "safe"
-        ? colors.success
-        : variant === "private"
-          ? colors.textMuted
-          : colors.accent;
+  const { bg, border, color } = VARIANT_STYLES[variant];
 
   return (
     <View style={[styles.badge, { backgroundColor: bg, borderColor: border }]}>

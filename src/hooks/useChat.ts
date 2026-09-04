@@ -5,6 +5,7 @@ import * as chatsApi from "../api/chats";
 import { sseClient } from "../api/sse";
 import { getMyProfile } from "../api/profile";
 import { loadChatUserConfig } from "../utils/chatConfig";
+import { buildGenerateAlphaBody } from "../utils/generateAlphaBody";
 import type { CreateMessageRequest, ChatMessage } from "../types/api";
 import { useTurnstile } from "../components/turnstile/TurnstileProvider";
 import { groupMessages } from "../utils/messages";
@@ -667,7 +668,7 @@ export function useChat() {
                 }
 
                 const chatMessages = filteredMessages;
-                const body = {
+                const body = buildGenerateAlphaBody({
                     chat: {
                         character_id: detail.chat.character_id,
                         id: detail.chat.id,
@@ -690,15 +691,7 @@ export function useChat() {
                             ? undefined
                             : detail.chat.persona_id || personaId,
                     })),
-                    clientPlatform: "web",
-                    forcedPromptGenerationCacheRefetch: {
-                        character: false,
-                        chat: false,
-                        profile: false,
-                        script: false,
-                    },
                     generateMode,
-                    generateType: "CHAT",
                     personas: detail.personas,
                     profile: {
                         id: profile.id,
@@ -711,15 +704,8 @@ export function useChat() {
                         name: p.name,
                         type: "persona",
                     })),
-                    userConfig: {
-                        ...userConfig,
-                        proxyConfigurations: undefined,
-                        openAIKey: null,
-                        selectedProxyConfigId: undefined,
-                        bio_preview_images: undefined,
-                        claudeApiKey: null,
-                    },
-                };
+                    userConfig,
+                });
 
                 const msgBuffer = createTokenBuffer((accumulated) => {
                     const msgs = useChatStore.getState().messages;

@@ -120,7 +120,7 @@ function useDeleteConfirmAlert({
     showAlert,
     dismissAlert,
 }: {
-    onDelete: (id: string) => Promise<unknown>;
+    onDelete: (id: string) => Promise<boolean>;
     onDeleted: (id: string) => void;
     errorMessage: string;
     showAlert: ShowAlert;
@@ -428,7 +428,7 @@ export function useMyPersonasData() {
             const [p, ps, gs] = await Promise.all([
                 getMyProfile(),
                 getMyPersonas(),
-                getPersonaGroups().catch(() => [] as PersonaGroup[]),
+                getPersonaGroups().catch(() => []),
             ]);
             setProfile(p);
             setPersonas(ps);

@@ -369,6 +369,8 @@ export default function SettingsScreen() {
   );
   const selectLayout = useCallback(
     (key: string) => {
+      // SAFETY: the layout picker only ever calls this with keys that are
+      // exactly the LayoutOption members.
       setChatLayout(key as LayoutOption);
       setLayoutPickerVisible(false);
     },

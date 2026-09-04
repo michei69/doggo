@@ -26,7 +26,11 @@ import { botAvatarUrl } from "../../utils/assets";
 import { colors } from "../../utils/colors";
 import { formatDate } from "../../utils/time";
 
-const SCRIPT_THEMES: Record<string, { light: string; dark: string }> = {
+interface ScriptThemes {
+  [key: string]: { light: string; dark: string };
+}
+
+const SCRIPT_THEMES: ScriptThemes = {
   purple: { light: "#8b5cf6", dark: "#4a3570" },
   teal: { light: "#14b8a6", dark: "#0e5a70" },
   green: { light: "#10b981", dark: "#0f5940" },

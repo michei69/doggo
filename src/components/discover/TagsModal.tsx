@@ -26,7 +26,7 @@ function hashStr(s: string): number {
   return h;
 }
 
-function tagColor(label: string, selected: boolean): object {
+function tagColor(label: string, selected: boolean) {
   const h = ((hashStr(label) % 360) + 360) % 360;
   if (selected) {
     return {

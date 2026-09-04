@@ -10,6 +10,7 @@ import type {
     EditMessageBody,
     ClearResetMessagesBody,
     SystemPromptRequestBody,
+    GenerateAlphaRequestBody,
 } from "../types/api";
 import { buildAuthHeaders } from "../utils/authHeaders";
 import {
@@ -17,12 +18,8 @@ import {
     GENERATE_ALPHA_URL,
 } from "../utils/constants";
 import { request } from "./request";
-import {
-    isRecord,
-    readSSEStream,
-    streamRequest,
-    type SSECallbacks,
-} from "./sse";
+import { readSSEStream, streamRequest, type SSECallbacks } from "./sse";
+import { isRecord, isString, type JsonValue } from "../utils/json";
 
 export async function getChats(page: number = 1): Promise<ChatListItem[]> {
     return request<ChatListItem[]>({
@@ -101,8 +98,7 @@ export async function deleteMessages(
     chatId: number,
     messageIds: number[],
 ): Promise<SuccessResponse> {
-    const lastResponse = await deleteMessagesChunked(chatId, messageIds, 100);
-    return lastResponse!;
+    return (await deleteMessagesChunked(chatId, messageIds, 100))!;
 }
 
 export async function createChat(
@@ -153,7 +149,7 @@ export async function deleteMessagesInBatches(
     messageIds: number[],
 ): Promise<void> {
     const validIds = messageIds.filter(
-        (id) => id > 0 && id <= 99000000000 && Number.isInteger(id),
+        (id) => Number.isInteger(id) && id > 0 && id <= 99000000000,
     );
     await deleteMessagesChunked(chatId, validIds, 256);
 }
@@ -214,7 +210,7 @@ export async function forkChat(
 }
 
 export async function generateAlpha(
-    body: object,
+    body: GenerateAlphaRequestBody,
     signal: AbortSignal,
     callbacks: SSECallbacks,
     apiUrl?: string,
@@ -227,7 +223,7 @@ export async function generateAlpha(
         signal,
         headers: await buildAuthHeaders({ contentType: "application/json" }),
         callbacks,
-        onJson: async (json: unknown) => {
+        onJson: async (json: JsonValue) => {
             if (isRecord(json) && json.model === "doggy-privacy" && realModel) {
                 json.model = realModel;
             }
@@ -320,7 +316,7 @@ export async function fetchSystemPrompt(detail: ChatDetail): Promise<string> {
                 throw err;
             },
         },
-        onJson: async (json: unknown) => {
+        onJson: async (json: JsonValue) => {
             if (isRecord(json)) {
                 const messages = json.messages;
                 if (
@@ -329,7 +325,7 @@ export async function fetchSystemPrompt(detail: ChatDetail): Promise<string> {
                     isRecord(messages[0])
                 ) {
                     const content = messages[0].content;
-                    if (typeof content === "string") {
+                    if (isString(content)) {
                         result = content;
                         return;
                     }

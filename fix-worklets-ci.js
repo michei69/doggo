@@ -1,5 +1,4 @@
 const fs = require("fs");
-const path = require("path");
 
 const metroPath = "metro.config.js";
 let config = fs.readFileSync(metroPath, "utf8");

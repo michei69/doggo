@@ -1,4 +1,5 @@
 import { storage } from "../../../utils/storage";
+import type { CharacterDetail } from "../../../types/api";
 
 export interface BotFormState {
     avatar: string;
@@ -28,6 +29,27 @@ export const EMPTY_FORM: BotFormState = {
     tag_ids: [],
     custom_tags: [],
 };
+
+export function characterToBotFormState(
+    char: CharacterDetail,
+    characterId: string,
+): BotFormState {
+    return {
+        avatar: char.avatar ?? "",
+        name: char.name ?? "",
+        chat_name: char.chat_name ?? "",
+        description: char.description ?? "",
+        personality: char.personality ?? "",
+        scenario: char.scenario ?? "",
+        example_dialogs: char.example_dialogs ?? "",
+        first_messages:
+            char.first_messages.length > 0 ? char.first_messages : [""],
+        is_nsfw: char.is_nsfw,
+        tag_ids: char.tags.map((t) => t.id),
+        custom_tags: char.custom_tags ?? [],
+        editCharacterId: characterId,
+    };
+}
 
 export function persistForm(form: BotFormState, isEditMode: boolean): void {
     if (isEditMode) {

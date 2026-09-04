@@ -3,6 +3,8 @@ import { sseClient } from "../api/sse";
 import { useChatStore } from "../stores/chatStore";
 import { storage } from "./storage";
 import { loadChatUserConfig } from "./chatConfig";
+import { buildGenerateAlphaBody } from "./generateAlphaBody";
+import { processText } from "./processText";
 import type { ChatMessage } from "../types/api";
 
 function buildChatSummaryPrompt({
@@ -43,14 +45,6 @@ Rules:
     return prompt;
 }
 
-function stripThinkingText(text: string): string {
-    return text
-        .replace(/<thinking>[\s\S]*?<\/thinking>/g, "")
-        .replace(/<thought>[\s\S]*?<\/thought>/g, "")
-        .replace(/<think>[\s\S]*?<\/think>/g, "")
-        .trim();
-}
-
 export async function generateChatSummary({
     chatId,
     characterId,
@@ -86,10 +80,13 @@ export async function generateChatSummary({
         messages,
     });
 
-    const { profile, selectedProxy, userConfig, apiUrl, apiKey, model } =
-        await loadChatUserConfig();
-
-    const localData = await storage.getChatLocalData(chatId);
+    const [
+        { profile, selectedProxy, userConfig, apiUrl, apiKey, model },
+        localData,
+    ] = await Promise.all([
+        loadChatUserConfig(),
+        storage.getChatLocalData(chatId),
+    ]);
     if (localData?.local_mode) {
         if (!apiUrl || !apiKey || !model) {
             throw new Error("No proxy configured for local mode");
@@ -105,7 +102,7 @@ export async function generateChatSummary({
                     onToken: () => {},
                     onThinking: () => {},
                     onComplete: (message) =>
-                        resolve(stripThinkingText(message)),
+                        resolve(processText(message, { wrapper: "" })),
                     onError: (error) => reject(error),
                 },
                 false,
@@ -113,7 +110,7 @@ export async function generateChatSummary({
         });
     }
 
-    const body = {
+    const body = buildGenerateAlphaBody({
         chat: {
             character_id: characterId,
             id: detail.chat.id,
@@ -134,15 +131,7 @@ export async function generateChatSummary({
                 persona_id: detail.chat.persona_id,
             },
         ],
-        clientPlatform: "web",
-        forcedPromptGenerationCacheRefetch: {
-            character: false,
-            chat: false,
-            profile: false,
-            script: false,
-        },
         generateMode: "NEW",
-        generateType: "CHAT",
         personas: detail.personas,
         profile: {
             id: profile.id,
@@ -155,15 +144,8 @@ export async function generateChatSummary({
             name: persona.name,
             type: "persona",
         })),
-        userConfig: {
-            ...userConfig,
-            proxyConfigurations: undefined,
-            openAIKey: null,
-            selectedProxyConfigId: undefined,
-            bio_preview_images: undefined,
-            claudeApiKey: null,
-        },
-    };
+        userConfig,
+    });
 
     return await new Promise<string>((resolve, reject) => {
         generateAlpha(
@@ -172,7 +154,8 @@ export async function generateChatSummary({
             {
                 onToken: () => {},
                 onThinking: () => {},
-                onComplete: (message) => resolve(stripThinkingText(message)),
+                onComplete: (message) =>
+                    resolve(processText(message, { wrapper: "" })),
                 onError: (error) => reject(error),
             },
             selectedProxy?.apiUrl,

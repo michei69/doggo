@@ -13,6 +13,7 @@ import ScreenHeader from "../../components/common/ScreenHeader";
 import EmptyState from "../../components/common/EmptyState";
 import { colors } from "../../utils/colors";
 import { storage } from "../../utils/storage";
+import { isRecord, isString } from "../../utils/json";
 import { toast } from "../../utils/toast";
 import {
   StorageAccessFramework,
@@ -106,7 +107,7 @@ export default function HiddenCharactersScreen() {
         "hidden_characters.json",
         "application/json",
       );
-      await writeAsStringAsync(fileUri, json, { encoding: "utf8" as any });
+      await writeAsStringAsync(fileUri, json, { encoding: "utf8" });
       toast(`Saved ${ids.length} hidden character IDs`);
     } catch {
       toast("Failed to export hidden characters", "error");
@@ -124,10 +125,8 @@ export default function HiddenCharactersScreen() {
           return;
         }
         const ids = Array.isArray(parsed)
-          ? (parsed as unknown[]).filter(
-              (x): x is string => typeof x === "string",
-            )
-          : typeof parsed === "object" && parsed !== null
+          ? parsed.filter(isString)
+          : isRecord(parsed)
             ? Object.keys(parsed)
             : [];
         if (ids.length === 0) {
@@ -161,7 +160,7 @@ export default function HiddenCharactersScreen() {
           return;
         }
         const raw = await readAsStringAsync(jsonFile, {
-          encoding: "utf8" as any,
+          encoding: "utf8",
         });
         await doImport(raw);
       } catch {

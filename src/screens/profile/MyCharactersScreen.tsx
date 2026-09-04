@@ -24,7 +24,7 @@ import {
   useBlockAlert,
 } from "../characters/characterSearch/hooks";
 import type { ProfileStackParamList } from "../../navigation/types";
-import type { TrendingCharacter } from "../../types/api";
+import type { TrendingCharacter, MyCharactersParams } from "../../types/api";
 import { colors } from "../../utils/colors";
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList, "MyCharacters">;
@@ -77,7 +77,7 @@ export default function MyCharactersScreen() {
         setLoadingMore(true);
       }
       try {
-        const params: { page: number; is_public?: boolean } = {
+        const params: MyCharactersParams = {
           page: pageNum,
         };
         if (privacyFilter === "public") {

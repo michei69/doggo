@@ -1,5 +1,6 @@
 import { memo, useCallback } from "react";
 import { reportComment } from "../../api/reviews";
+import type { ReportCommentBody } from "../../types/api";
 import ReportModal from "../common/ReportModal";
 
 const CHARACTER_REASONS = [
@@ -28,13 +29,16 @@ function CharacterReportModal({
       details: string;
       link: string;
     }) => {
-      await reportComment({
+      const payload: ReportCommentBody = {
         character_id: characterId,
         reason: reportType,
         details: details.trim(),
         url: `https://janitorai.com/characters/${characterId}`,
-        ...(reportType === "stolen" ? { originalBotLink: link.trim() } : {}),
-      });
+      };
+      if (reportType === "stolen") {
+        payload.originalBotLink = link.trim();
+      }
+      await reportComment(payload);
     },
     [characterId],
   );

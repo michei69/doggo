@@ -28,21 +28,19 @@ async function authRequest<T>(config: AxiosRequestConfig): Promise<T> {
 }
 
 export async function login(data: LoginRequest): Promise<LoginResponse> {
-    const response = await authRequest<LoginResponse>({
+    return authRequest<LoginResponse>({
         method: "POST",
         url: "/auth/v1/token?grant_type=password",
         data,
     });
-    return response;
 }
 
 export async function register(data: LoginRequest): Promise<LoginResponse> {
-    const response = await authRequest<LoginResponse>({
+    return authRequest<LoginResponse>({
         method: "POST",
         url: "/auth/v1/token?grant_type=signup",
         data,
     });
-    return response;
 }
 
 export async function refreshToken(

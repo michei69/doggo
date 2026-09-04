@@ -1,6 +1,7 @@
 import axios from "axios";
 import { API_BASE_URL } from "../utils/constants";
 import { buildAuthHeaders } from "../utils/authHeaders";
+import { isString } from "../utils/json";
 
 export const apiClient = axios.create({
     baseURL: API_BASE_URL,
@@ -24,11 +25,13 @@ apiClient.interceptors.response.use(
 
         if (
             error.response?.status === 403 &&
-            typeof error.response.data === "string" &&
+            isString(error.response.data) &&
             contentType.includes("text/html")
         ) {
-            (error as any).challengeHtml = error.response.data;
-            (error as any).needsCloudflareChallenge = true;
+            Object.assign(error, {
+                challengeHtml: error.response.data,
+                needsCloudflareChallenge: true,
+            });
         }
 
         return Promise.reject(error);

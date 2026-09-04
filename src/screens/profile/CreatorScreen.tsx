@@ -49,7 +49,7 @@ import type {
   AvatarPreviewState,
   CharacterSearchParams,
 } from "../../types/api";
-import { listReducer } from "../characters/characterSearch/searchUtils";
+import { genericListReducer } from "../characters/characterSearch/searchUtils";
 import {
   useLongPressActions,
   useBlockAlert,
@@ -481,7 +481,7 @@ function useCreatorProfile(userId: string, isOwnProfile: boolean) {
 }
 
 function useCreatorCharacterList(userId: string) {
-  const [list, dispatch] = useReducer(listReducer, {
+  const [list, dispatch] = useReducer(genericListReducer<TrendingCharacter>, {
     characters: [],
     page: 1,
     loading: true,

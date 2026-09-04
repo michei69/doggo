@@ -1,3 +1,5 @@
+import { isRecord, isString, type JsonValue } from "../utils/json";
+
 export interface SSECallbacks {
     onToken: (token: string) => void;
     onThinking: (thinking: string) => void;
@@ -88,36 +90,17 @@ export async function readSSEStream(
     }
 }
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null;
-}
-
 async function extractErrorMessage(response: Response): Promise<string> {
     const fallback = `HTTP ${response.status}`;
     try {
         const body: unknown = await response.json();
-        if (typeof body === "object" && body !== null) {
-            if (
-                "message" in body &&
-                typeof body.message === "string" &&
-                body.message
-            ) {
-                return body.message;
-            }
-            if ("error" in body) {
-                const error = body.error;
-                if (typeof error === "string" && error) {
-                    return error;
-                }
-                if (
-                    typeof error === "object" &&
-                    error !== null &&
-                    "message" in error &&
-                    typeof error.message === "string" &&
-                    error.message
-                ) {
-                    return error.message;
-                }
+        if (isRecord(body)) {
+            const message = body.message;
+            if (isString(message) && message) return message;
+            const error = body.error;
+            if (isString(error) && error) return error;
+            if (isRecord(error) && isString(error.message) && error.message) {
+                return error.message;
             }
         }
     } catch {
@@ -126,7 +109,7 @@ async function extractErrorMessage(response: Response): Promise<string> {
     return fallback;
 }
 
-function extractStreamContent(value: unknown): string {
+function extractStreamContent(value: JsonValue): string {
     if (!isRecord(value)) return "";
     const choices = value.choices;
     if (!Array.isArray(choices)) return "";
@@ -135,7 +118,7 @@ function extractStreamContent(value: unknown): string {
     const message = first.message;
     if (!isRecord(message)) return "";
     const content = message.content;
-    return typeof content === "string" ? content : "";
+    return isString(content) ? content : "";
 }
 
 interface StreamRequestOptions {
@@ -144,7 +127,7 @@ interface StreamRequestOptions {
     signal?: AbortSignal;
     headers: Record<string, string>;
     callbacks: SSECallbacks;
-    onJson: (json: unknown) => Promise<void>;
+    onJson: (json: JsonValue) => Promise<void>;
     onStream?: (response: Response) => Promise<void>;
 }
 
@@ -181,7 +164,7 @@ export async function streamRequest({
     const contentType = response.headers.get("content-type") || "";
 
     if (contentType.includes("application/json") || !response.body) {
-        const json: unknown = await response.json();
+        const json: JsonValue = await response.json();
         await onJson(json);
         return;
     }
@@ -197,6 +180,14 @@ export async function streamRequest({
         signal ?? new AbortController().signal,
         callbacks,
     );
+}
+
+interface ChatCompletionBody {
+    model: string;
+    messages: Array<{ role: string; content: string }>;
+    stream: boolean;
+    thinking: { type: "enabled" | "disabled" };
+    prefill?: string;
 }
 
 class SSEClient {
@@ -226,7 +217,7 @@ class SSEClient {
                 : ("disabled" as const),
         };
 
-        const body: Record<string, unknown> = {
+        const body: ChatCompletionBody = {
             model,
             messages,
             stream: true,
@@ -247,7 +238,7 @@ class SSEClient {
                     Authorization: `Bearer ${apiKey}`,
                 },
                 callbacks,
-                onJson: async (json: unknown) => {
+                onJson: async (json: JsonValue) => {
                     callbacks.onComplete(extractStreamContent(json));
                 },
             });

@@ -200,6 +200,9 @@ async function buildCopyFormData(character: CharacterDetail) {
   const charName = character.chat_name || character.name;
 
   if (character.allow_proxy) {
+    // SAFETY: this object carries exactly the ChatDetail field
+    // (chat.character_id) that fetchSystemPrompt reads; the remaining ChatDetail
+    // fields are unused for this System-Prompt fetch.
     const minimalDetail = {
       chat: { character_id: character.id },
     } as ChatDetail;
@@ -287,6 +290,8 @@ function useCharacterData(characterId: string) {
     let cancelled = false;
     const fetchData = async () => {
       try {
+        // SAFETY: on a failed fetch the catch returns an empty chat list, and an
+        // empty array is a valid ChatListItem[] value.
         const [chats, data, favStatus, favCountRes] = await Promise.all([
           getCharacterChats(characterId).catch(() => [] as ChatListItem[]),
           getCharacterDetail(characterId),

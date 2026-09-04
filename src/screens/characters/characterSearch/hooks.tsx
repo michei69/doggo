@@ -23,6 +23,7 @@ import type {
 } from "../../../types/api";
 import { INITIAL_FILTERS, type FilterState } from "../../../utils/discover";
 import { storage } from "../../../utils/storage";
+import type { JsonObject } from "../../../utils/json";
 import { CreatorCard } from "./cards";
 import {
   buildParams,
@@ -32,6 +33,7 @@ import {
   initialFiltersFromParams,
   initialTagsFromParams,
   parseSwipeParams,
+  type LoadedPayload,
   type Nav,
   type SearchRoute,
 } from "./searchUtils";
@@ -262,15 +264,15 @@ function usePaginatedFetch<
       try {
         const result = await fetchFn(pageNum, params);
         const data = result.data;
-        dispatch({
-          type: "LOADED",
-          payload: {
-            data,
-            total: result.total,
-            page: pageNum,
-            ...(dedupeAppend ? {} : { dedupe: false }),
-          },
-        });
+        const payload: LoadedPayload<T> = {
+          data,
+          total: result.total,
+          page: pageNum,
+        };
+        if (!dedupeAppend) {
+          payload.dedupe = false;
+        }
+        dispatch({ type: "LOADED", payload });
         pageRef.current = pageNum;
 
         if (data.length === 0) {
@@ -296,6 +298,7 @@ function usePaginatedFetch<
     if (!autoInit) return;
     if (initialLoadRef.current) return;
     initialLoadRef.current = true;
+    // SAFETY: callers that enable autoInit pass an initParams object.
     doFetch(1, initParams as P);
   }, [autoInit, doFetch, initParams]);
 
@@ -369,7 +372,7 @@ export function useCreators() {
 }
 
 export function useLongPressActions(
-  navigate: (name: string, params?: object) => void,
+  navigate: (name: string, params?: JsonObject) => void,
   characterScreenName = "CharacterScreen",
 ) {
   const [longPressCharacter, setLongPressCharacter] =

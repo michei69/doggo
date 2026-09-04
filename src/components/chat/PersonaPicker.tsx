@@ -11,9 +11,9 @@ import {
   Pressable,
   Modal,
   ActivityIndicator,
-  ScrollView,
   StyleSheet,
 } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import { getMyProfile, getMyPersonas } from "../../api/profile";
 import Avatar from "../common/Avatar";
 import { avatarUrl } from "../../utils/assets";
@@ -94,6 +94,13 @@ export default function PersonaPicker({
     return [...main, ...others].sort((a, b) => a.order - b.order);
   }, [profile, personas]);
 
+  const renderItem = useCallback(
+    ({ item }: { item: PersonaEntry }) => (
+      <PersonaRow item={item} onClose={onClose} onSelect={onSelect} />
+    ),
+    [onClose, onSelect],
+  );
+
   return (
     <Modal
       visible={visible}
@@ -129,20 +136,13 @@ export default function PersonaPicker({
           ) : entries.length === 0 ? (
             <Text style={styles.empty}>No personas available</Text>
           ) : (
-            <ScrollView
-              style={styles.list}
+            <FlashList
+              data={entries}
+              keyExtractor={(item) => item.id}
+              renderItem={renderItem}
               showsVerticalScrollIndicator={false}
-            >
-              {entries.map((item) => (
-                <View key={item.id}>
-                  <PersonaRow
-                    item={item}
-                    onClose={onClose}
-                    onSelect={onSelect}
-                  />
-                </View>
-              ))}
-            </ScrollView>
+              style={styles.list}
+            />
           )}
 
           <Pressable
