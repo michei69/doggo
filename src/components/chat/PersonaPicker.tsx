@@ -10,10 +10,10 @@ import {
   Text,
   Pressable,
   Modal,
+  ScrollView,
   ActivityIndicator,
   StyleSheet,
 } from "react-native";
-import { FlashList } from "@shopify/flash-list";
 import { getMyProfile, getMyPersonas } from "../../api/profile";
 import Avatar from "../common/Avatar";
 import { avatarUrl } from "../../utils/assets";
@@ -94,13 +94,6 @@ export default function PersonaPicker({
     return [...main, ...others].sort((a, b) => a.order - b.order);
   }, [profile, personas]);
 
-  const renderItem = useCallback(
-    ({ item }: { item: PersonaEntry }) => (
-      <PersonaRow item={item} onClose={onClose} onSelect={onSelect} />
-    ),
-    [onClose, onSelect],
-  );
-
   return (
     <Modal
       visible={visible}
@@ -136,13 +129,24 @@ export default function PersonaPicker({
           ) : entries.length === 0 ? (
             <Text style={styles.empty}>No personas available</Text>
           ) : (
-            <FlashList
-              data={entries}
-              keyExtractor={(item) => item.id}
-              renderItem={renderItem}
-              showsVerticalScrollIndicator={false}
+            // A ScrollView, not a FlashList: this card sizes to its content, and a
+            // virtualized list in an auto-height parent measures to 0 and renders
+            // nothing. The persona count is small enough that virtualization buys
+            // us nothing here.
+            <ScrollView
               style={styles.list}
-            />
+              showsVerticalScrollIndicator={false}
+            >
+              {entries.map((item) => (
+                <View key={item.id}>
+                  <PersonaRow
+                    item={item}
+                    onClose={onClose}
+                    onSelect={onSelect}
+                  />
+                </View>
+              ))}
+            </ScrollView>
           )}
 
           <Pressable

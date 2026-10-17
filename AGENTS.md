@@ -77,6 +77,7 @@ Examples:
 ## Lists
 
 - **Always use `@shopify/flash-list`** (`FlashList`) for list rendering. Never use React Native's `FlatList`.
+- Exception: a short list inside an auto-height modal/sheet must be a `ScrollView` + `.map`. `FlashList` in a parent whose height comes from its content measures to 0 and renders nothing (`PersonaPicker` was hit by this twice).
 
 ## Animations
 
