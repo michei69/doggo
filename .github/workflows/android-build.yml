@@ -43,6 +43,22 @@ jobs:
             - name: Fix worklets resolver (path + placeholder)
               run: node fix-worklets-ci.js
 
+            # Every beta must carry a higher android versionCode than the one before it,
+            # otherwise the package installer treats it as the same build and sideloaded
+            # updates look like no-ops. Expo prebuild reads this straight from app.json;
+            # the change lives on the runner only, master keeps versionCode unset.
+            - name: Stamp build number
+              env:
+                  RUN_NUMBER: ${{ github.run_number }}
+              run: |
+                  node -e "
+                  const fs = require('fs');
+                  const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+                  app.expo.android = { ...app.expo.android, versionCode: Number(process.env.RUN_NUMBER) };
+                  fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
+                  console.log('Android versionCode: ' + app.expo.android.versionCode);
+                  "
+
             - name: Prebuild Android
               run: npx expo prebuild --platform android --clean
 
@@ -96,3 +112,78 @@ jobs:
                   name: doggo-release-apk
                   path: android/app/build/outputs/apk/release/app-release.apk
                   retention-days: 30
+
+    # Rolling beta channel: one pre-release tagged `beta`, rebuilt in place on every
+    # master build so the download link never changes. Pull requests only build.
+    publish-beta:
+        name: Publish beta release
+        needs: build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && github.repository == 'michei69/doggo'
+        runs-on: ubuntu-latest
+        concurrency:
+            group: publish-beta
+            cancel-in-progress: false
+        permissions:
+            contents: write
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Download APK artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: doggo-release-apk
+                  path: artifacts
+
+            - name: Publish beta release
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  RUN_NUMBER: ${{ github.run_number }}
+              run: |
+                  set -euo pipefail
+
+                  APK=$(find artifacts -type f -name '*.apk' | head -n 1)
+                  if [ -z "$APK" ]; then
+                    echo "No APK in the build artifact"; exit 1
+                  fi
+
+                  mkdir -p release-assets
+                  cp "$APK" release-assets/Doggo-beta.apk
+                  ( cd release-assets && sha256sum Doggo-beta.apk > Doggo-beta.apk.sha256 )
+                  VERSION=$(node -p "require('./app.json').expo.version")
+
+                  # The previous beta's tag is rewritten on every publish, so fetch it
+                  # before deleting to diff against it.
+                  git fetch --tags --force origin master >/dev/null 2>&1 || true
+                  PREV_BETA=$(git rev-list -n 1 refs/tags/beta 2>/dev/null || true)
+
+                  {
+                    echo "Latest Doggo beta for Android, built from master (run ${RUN_NUMBER}, version ${VERSION})."
+                    echo
+                    if [ -n "$PREV_BETA" ] && git merge-base --is-ancestor "$PREV_BETA" HEAD; then
+                      echo "### Changes since the previous beta"
+                      echo
+                      git log --pretty=format:'* %s (%h)' "${PREV_BETA}..HEAD"
+                    else
+                      echo "### Recent changes"
+                      echo
+                      git log --pretty=format:'* %s (%h)' -15
+                    fi
+                    echo
+                    echo
+                    echo "Download \`Doggo-beta.apk\` and verify it against \`Doggo-beta.apk.sha256\`."
+                    echo "Built from commit ${GITHUB_SHA}."
+                  } > notes.md
+
+                  # Replace the single rolling prerelease. --latest=false keeps it out of
+                  # the "latest release" slot.
+                  gh release delete beta --cleanup-tag --yes || true
+                  gh release create beta release-assets/Doggo-beta.apk release-assets/Doggo-beta.apk.sha256 \
+                    --title "Doggo beta (latest)" \
+                    --notes-file notes.md \
+                    --prerelease \
+                    --latest=false \
+                    --target "$GITHUB_SHA"
