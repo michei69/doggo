@@ -1,6 +1,7 @@
 import { memo, useCallback } from "react";
 import { Share } from "react-native";
 import OptionSheet, { type OptionSheetAction } from "../common/OptionSheet";
+import { getSiteUrl } from "../../utils/baseUrl";
 
 function CharacterMenuSheet({
   visible,
@@ -28,7 +29,7 @@ function CharacterMenuSheet({
   characterName: string;
 }) {
   const handleShare = useCallback(async () => {
-    const url = `https://janitorai.com/characters/${characterId}_${encodeURIComponent(characterName)}`;
+    const url = `${getSiteUrl()}/characters/${characterId}_${encodeURIComponent(characterName)}`;
     try {
       await Share.share({ url, message: url });
     } catch {

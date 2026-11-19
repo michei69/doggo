@@ -1,15 +1,20 @@
 import axios from "axios";
-import { API_BASE_URL } from "../utils/constants";
+import {
+    enableFallback,
+    getApiBaseUrl,
+    isNetworkFailure,
+} from "../utils/baseUrl";
 import { buildAuthHeaders } from "../utils/authHeaders";
 import { isString } from "../utils/json";
 
 export const apiClient = axios.create({
-    baseURL: API_BASE_URL,
+    baseURL: getApiBaseUrl(),
     headers: { "Content-Type": "application/json" },
     timeout: 30000,
 });
 
 apiClient.interceptors.request.use(async (config) => {
+    config.baseURL = getApiBaseUrl();
     const authHeaders = await buildAuthHeaders();
     Object.assign(config.headers, authHeaders);
     return config;
@@ -20,6 +25,10 @@ apiClient.interceptors.response.use(
         return response;
     },
     async (error) => {
+        if (isNetworkFailure(error)) {
+            enableFallback();
+        }
+
         const headers = error.response?.headers || {};
         const contentType = headers["content-type"] || "";
 

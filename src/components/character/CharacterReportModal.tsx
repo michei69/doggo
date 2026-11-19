@@ -1,5 +1,6 @@
 import { memo, useCallback } from "react";
 import { reportComment } from "../../api/reviews";
+import { getSiteUrl } from "../../utils/baseUrl";
 import type { ReportCommentBody } from "../../types/api";
 import ReportModal from "../common/ReportModal";
 
@@ -33,7 +34,7 @@ function CharacterReportModal({
         character_id: characterId,
         reason: reportType,
         details: details.trim(),
-        url: `https://janitorai.com/characters/${characterId}`,
+        url: `${getSiteUrl()}/characters/${characterId}`,
       };
       if (reportType === "stolen") {
         payload.originalBotLink = link.trim();

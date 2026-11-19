@@ -53,6 +53,7 @@ import { storage } from "../../utils/storage";
 import { colors } from "../../utils/colors";
 import { useIsTablet } from "../../hooks/useIsTablet";
 import { cleanTags, generify } from "../../utils/markdown";
+import { getSiteUrl } from "../../utils/baseUrl";
 import { formatCount } from "../../utils/format";
 import { getEmojiDefinitions } from "../../stores/reviewStore";
 
@@ -241,7 +242,7 @@ async function buildCopyFormData(character: CharacterDetail) {
     }
   }
 
-  const attribution = `Private clone of <a href='https://janitorai.com/characters/${character.id}'>${character.creator_name}'s original bot</a>\n\n`;
+  const attribution = `Private clone of <a href='${getSiteUrl()}/characters/${character.id}'>${character.creator_name}'s original bot</a>\n\n`;
   const description = attribution + (character.description ?? "");
 
   let firstMessages: string[] =

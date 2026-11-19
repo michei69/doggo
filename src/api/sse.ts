@@ -1,4 +1,5 @@
 import { isRecord, isString, type JsonValue } from "../utils/json";
+import { enableFallback, isJanitorUrl } from "../utils/baseUrl";
 
 export interface SSECallbacks {
     onToken: (token: string) => void;
@@ -150,6 +151,9 @@ export async function streamRequest({
         });
     } catch (err: unknown) {
         if (signal?.aborted) return;
+        if (isJanitorUrl(url)) {
+            enableFallback();
+        }
         callbacks.onError(err instanceof Error ? err : new Error(String(err)));
         return;
     }

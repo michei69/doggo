@@ -166,7 +166,7 @@ function getStateFromPath(path: string) {
 }
 
 const linking: LinkingOptions<RootStackParamList> = {
-  prefixes: ["https://janitorai.com", "janitorai://"],
+  prefixes: ["https://janitorai.com", "https://jani.com", "janitorai://"],
   getStateFromPath,
   config: {
     screens: {

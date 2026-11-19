@@ -9,6 +9,7 @@ import {
   Modal,
 } from "react-native";
 import { colors } from "../../utils/colors";
+import { getSiteUrl } from "../../utils/baseUrl";
 
 function ReportModal({
   visible,
@@ -16,7 +17,7 @@ function ReportModal({
   question,
   reasons,
   showLinkField = false,
-  linkPlaceholder = "https://janitorai.com/characters/...",
+  linkPlaceholder = `${getSiteUrl()}/characters/...`,
   onSubmit,
   onClose,
 }: {

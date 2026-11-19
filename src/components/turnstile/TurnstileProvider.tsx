@@ -1,7 +1,15 @@
-import React, { use, useCallback, useMemo, useRef, useState } from "react";
+import React, {
+  use,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { WebView, type WebViewNavigation } from "react-native-webview";
 import { useAuthStore } from "../../stores/authStore";
+import { getSiteUrl, useFallbackStore } from "../../utils/baseUrl";
 import { TURNSTILE_HTML } from "../../utils/turnstile";
 import { setUserAgent } from "../../utils/userAgent";
 import { storage } from "../../utils/storage";
@@ -39,8 +47,14 @@ export default function TurnstileProvider({
     baseUrl: string;
   }>({
     html: TURNSTILE_HTML,
-    baseUrl: "https://janitorai.com",
+    baseUrl: getSiteUrl(),
   });
+
+  const useFallback = useFallbackStore((s) => s.useFallback);
+
+  useEffect(() => {
+    setWebViewSource((prev) => ({ ...prev, baseUrl: getSiteUrl() }));
+  }, [useFallback]);
 
   const readyRef = useRef(false);
   const webViewRef = useRef<WebView>(null);
@@ -77,7 +91,7 @@ export default function TurnstileProvider({
 
   const pollForClearance = useCallback(async () => {
     try {
-      const cookies = await CookieManager.get("https://janitorai.com");
+      const cookies = await CookieManager.get(getSiteUrl());
       const clearance = cookies.cf_clearance ?? cookies["cf-clearance"];
       const bm = cookies.__cf_bm ?? cookies["cf-bm"];
       if (clearance && bm) {
@@ -144,7 +158,7 @@ export default function TurnstileProvider({
         pendingSiteKeyRef.current = siteKey;
         setWebViewSource({
           html: TURNSTILE_HTML,
-          baseUrl: "https://janitorai.com",
+          baseUrl: getSiteUrl(),
         });
         setVisible(true);
 
@@ -165,7 +179,7 @@ export default function TurnstileProvider({
         challengeStartedRef.current = true;
         setWebViewSource({
           html: challengeHtml,
-          baseUrl: "https://janitorai.com",
+          baseUrl: getSiteUrl(),
         });
         setVisible(true);
       });

@@ -14,9 +14,9 @@ import type {
 } from "../types/api";
 import { buildAuthHeaders } from "../utils/authHeaders";
 import {
-    GENERATE_ALPHA_CANCEL_URL,
-    GENERATE_ALPHA_URL,
-} from "../utils/constants";
+    getGenerateAlphaCancelUrl,
+    getGenerateAlphaUrl,
+} from "../utils/baseUrl";
 import { request } from "./request";
 import { readSSEStream, streamRequest, type SSECallbacks } from "./sse";
 import { isRecord, isString, type JsonValue } from "../utils/json";
@@ -218,7 +218,7 @@ export async function generateAlpha(
     realModel?: string,
 ): Promise<void> {
     await streamRequest({
-        url: GENERATE_ALPHA_URL,
+        url: getGenerateAlphaUrl(),
         body,
         signal,
         headers: await buildAuthHeaders({ contentType: "application/json" }),
@@ -275,7 +275,7 @@ export async function generateAlpha(
 }
 
 export async function cancelGeneration(): Promise<void> {
-    await request<void>({ method: "POST", url: GENERATE_ALPHA_CANCEL_URL });
+    await request<void>({ method: "POST", url: getGenerateAlphaCancelUrl() });
 }
 
 export async function fetchSystemPrompt(detail: ChatDetail): Promise<string> {
@@ -303,7 +303,7 @@ export async function fetchSystemPrompt(detail: ChatDetail): Promise<string> {
 
     let result = "";
     await streamRequest({
-        url: GENERATE_ALPHA_URL,
+        url: getGenerateAlphaUrl(),
         body,
         headers: await buildAuthHeaders({ contentType: "application/json" }),
         callbacks: {

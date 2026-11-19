@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Linking } from "react-native";
+import { isJanitorHost } from "./baseUrl";
 
 export function useNavigateToJanitorLink() {
     const navigation = useNavigation<NativeStackNavigationProp<any>>();
@@ -10,7 +11,7 @@ export function useNavigateToJanitorLink() {
         ({ url }: { url: string }) => {
             try {
                 const parsed = new URL(url);
-                if (parsed.hostname !== "janitorai.com") {
+                if (!isJanitorHost(parsed.hostname)) {
                     Linking.openURL(url);
                     return;
                 }
