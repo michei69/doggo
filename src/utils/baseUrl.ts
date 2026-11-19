@@ -8,6 +8,8 @@ interface FallbackState {
     enableFallback: () => void;
 }
 
+// Deliberately in-memory only: never persist this flag. A fresh app launch
+// resets it to false so janitorai.com is always tried again first.
 export const useFallbackStore = create<FallbackState>((set, get) => ({
     useFallback: false,
     enableFallback: () => {
