@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 const PRIMARY_HOST = "janitorai.com";
 const FALLBACK_HOST = "jani.com";
+const FALLBACK_AUTH_URL = "https://mcmzxtzommpnxkynddbo.supabase.co";
 
 interface FallbackState {
     useFallback: boolean;
@@ -38,8 +39,12 @@ export function getApiBaseUrl(): string {
     return `${getSiteUrl()}/hampter`;
 }
 
+// Auth is a Supabase backend, not part of the hampter API. It falls back to
+// the project URL directly instead of a jani.com subdomain.
 export function getAuthBaseUrl(): string {
-    return `https://auth.${currentHost()}`;
+    return isUsingFallback()
+        ? FALLBACK_AUTH_URL
+        : `https://auth.${PRIMARY_HOST}`;
 }
 
 export function getGenerateAlphaUrl(): string {
