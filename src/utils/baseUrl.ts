@@ -22,6 +22,10 @@ export function isUsingFallback(): boolean {
     return useFallbackStore.getState().useFallback;
 }
 
+export function enableFallback(): void {
+    useFallbackStore.getState().enableFallback();
+}
+
 function currentHost(): string {
     return isUsingFallback() ? FALLBACK_HOST : PRIMARY_HOST;
 }
