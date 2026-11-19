@@ -5,6 +5,7 @@ import {
     enableFallback,
     getAuthBaseUrl,
     isNetworkFailure,
+    isUsingFallback,
 } from "../utils/baseUrl";
 import type { LoginRequest, LoginResponse } from "../types/api";
 import { getUserAgent } from "../utils/userAgent";
@@ -33,8 +34,15 @@ authAxios.interceptors.response.use(
         return response;
     },
     async (error) => {
-        if (isNetworkFailure(error)) {
+        if (isNetworkFailure(error) && !isUsingFallback()) {
             enableFallback();
+            const config = error.config as
+                | (AxiosRequestConfig & { _fallbackRetried?: boolean })
+                | undefined;
+            if (config && !config._fallbackRetried) {
+                config._fallbackRetried = true;
+                return authAxios.request(config);
+            }
         }
         return Promise.reject(error);
     },

@@ -1,5 +1,10 @@
 import { isRecord, isString, type JsonValue } from "../utils/json";
-import { enableFallback, isJanitorUrl } from "../utils/baseUrl";
+import {
+    enableFallback,
+    isJanitorUrl,
+    isUsingFallback,
+    withFallbackHost,
+} from "../utils/baseUrl";
 
 export interface SSECallbacks {
     onToken: (token: string) => void;
@@ -132,6 +137,26 @@ interface StreamRequestOptions {
     onStream?: (response: Response) => Promise<void>;
 }
 
+async function postWithFallback(
+    url: string,
+    init: RequestInit,
+    signal?: AbortSignal,
+): Promise<Response> {
+    try {
+        return await fetch(url, init);
+    } catch (err: unknown) {
+        if (signal?.aborted) throw err;
+        if (isJanitorUrl(url) && !isUsingFallback()) {
+            enableFallback();
+            const retryUrl = withFallbackHost(url);
+            if (retryUrl !== url) {
+                return fetch(retryUrl, init);
+            }
+        }
+        throw err;
+    }
+}
+
 export async function streamRequest({
     url,
     body,
@@ -143,17 +168,18 @@ export async function streamRequest({
 }: StreamRequestOptions): Promise<void> {
     let response: Response;
     try {
-        response = await fetch(url, {
-            method: "POST",
-            headers,
-            body: JSON.stringify(body),
+        response = await postWithFallback(
+            url,
+            {
+                method: "POST",
+                headers,
+                body: JSON.stringify(body),
+                signal,
+            },
             signal,
-        });
+        );
     } catch (err: unknown) {
         if (signal?.aborted) return;
-        if (isJanitorUrl(url)) {
-            enableFallback();
-        }
         callbacks.onError(err instanceof Error ? err : new Error(String(err)));
         return;
     }

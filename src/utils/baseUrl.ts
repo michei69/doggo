@@ -70,6 +70,21 @@ export function isJanitorUrl(url: string): boolean {
     }
 }
 
+export function withFallbackHost(url: string): string {
+    try {
+        const parsed = new URL(url);
+        if (isHost(parsed.hostname, PRIMARY_HOST)) {
+            parsed.hostname = parsed.hostname.replace(
+                PRIMARY_HOST,
+                FALLBACK_HOST,
+            );
+        }
+        return parsed.toString();
+    } catch {
+        return url;
+    }
+}
+
 /**
  * A failure with no HTTP response at all (DNS failure, connection refused,
  * timeout, etc.). Any real status code (2xx/3xx/4xx/5xx) means the host was
