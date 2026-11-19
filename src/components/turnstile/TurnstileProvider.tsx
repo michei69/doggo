@@ -1,15 +1,8 @@
-import React, {
-  use,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { use, useCallback, useMemo, useRef, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { WebView, type WebViewNavigation } from "react-native-webview";
 import { useAuthStore } from "../../stores/authStore";
-import { getSiteUrl, useFallbackStore } from "../../utils/baseUrl";
+import { getSiteUrl } from "../../utils/baseUrl";
 import { TURNSTILE_HTML } from "../../utils/turnstile";
 import { setUserAgent } from "../../utils/userAgent";
 import { storage } from "../../utils/storage";
@@ -50,12 +43,6 @@ export default function TurnstileProvider({
     baseUrl: getSiteUrl(),
   });
 
-  const useFallback = useFallbackStore((s) => s.useFallback);
-
-  useEffect(() => {
-    setWebViewSource((prev) => ({ ...prev, baseUrl: getSiteUrl() }));
-  }, [useFallback]);
-
   const readyRef = useRef(false);
   const webViewRef = useRef<WebView>(null);
   const resolveRef = useRef<((token: string) => void) | null>(null);
@@ -67,9 +54,16 @@ export default function TurnstileProvider({
   const setCfBm = useAuthStore((s) => s.setCfBm);
 
   const injectRender = useCallback((siteKey: string) => {
-    webViewRef.current?.injectJavaScript(
-      `window.renderTurnstile('${siteKey}'); true;`,
-    );
+    const webView = webViewRef.current;
+    if (typeof webView?.injectJavaScript !== "function") return;
+    try {
+      webView.injectJavaScript(
+        `window.renderTurnstile('${siteKey}'); true;`,
+      );
+    } catch {
+      // The WebView may be mid-reload; ignore it rather than crashing the
+      // login promise. The READY handler retries via pendingSiteKeyRef.
+    }
   }, []);
 
   const cleanup = useCallback(() => {
