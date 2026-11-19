@@ -3,6 +3,7 @@ import { create } from "zustand";
 const PRIMARY_HOST = "janitorai.com";
 const FALLBACK_HOST = "jani.com";
 const FALLBACK_AUTH_URL = "https://mcmzxtzommpnxkynddbo.supabase.co";
+const FALLBACK_ELLA_URL = "https://janitorsunite.b-cdn.net";
 
 interface FallbackState {
     useFallback: boolean;
@@ -55,8 +56,11 @@ export function getGenerateAlphaCancelUrl(): string {
     return `${getSiteUrl()}/generateAlpha/cancel`;
 }
 
+// Avatar/image CDN, not part of the hampter API.
 export function getEllaBase(): string {
-    return `https://ella.${currentHost()}`;
+    return isUsingFallback()
+        ? FALLBACK_ELLA_URL
+        : `https://ella.${PRIMARY_HOST}`;
 }
 
 function isHost(hostname: string, host: string): boolean {
